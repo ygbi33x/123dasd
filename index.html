@@ -75,6 +75,9 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 .btn.mode:hover{background:#6d28d9;}
 .btn.mode.radial{background:#db2777;}
 .btn.mode.radial:hover{background:#be185d;}
+.btn.quick-btn{background:#059669;font-size:12px;padding:6px 12px;}
+.btn.quick-btn:hover{background:#047857;}
+.radial-quick{display:flex;}
 .lg-line{display:inline-block;width:20px;height:4px;border-radius:2px;vertical-align:middle;margin-right:4px;}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:#374151;margin-top:3px;}
 .lg-item{display:flex;align-items:center;gap:4px;}
@@ -249,6 +252,11 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
       </div>
       <div class="controls">
         <div class="tip" id="tip">📌 点击城市添加到路线；再点已选城市只取消该点；多点自动优化最短顺序</div>
+        <div class="radial-quick" id="radialQuick" style="display:none;margin-top:8px;gap:8px;flex-wrap:wrap;">
+          <button class="btn quick-btn" onclick="addAllCapitalsAsDestinations()">🏛️ 目的地=所有省会</button>
+          <button class="btn quick-btn" onclick="addAllCentersAsDestinations()">⭐ 目的地=所有中心</button>
+          <button class="btn quick-btn" onclick="clearRadialDestinations()">🗑️ 清空目的地</button>
+        </div>
       </div>
       <div class="legend">
         <div class="lg-item"><span class="lg-dot" style="background:#2563eb;width:12px;height:12px;"></span>中心城市（大）</div>
@@ -1121,6 +1129,7 @@ function toggleMode() {
     currentMode = 'radial';
     document.getElementById('modeBtn').textContent = '🌟 放射状路线';
     document.getElementById('modeBtn').classList.add('radial');
+    document.getElementById('radialQuick').style.display = 'flex';
     clearRoute();
     clearRadialRoutes();
     tipDom.innerHTML = '🌟 放射状模式：先点出发地，再点多个目的地，每个目的地只与出发地连线';
@@ -1128,6 +1137,7 @@ function toggleMode() {
     currentMode = 'multi';
     document.getElementById('modeBtn').textContent = '🔀 多点路线';
     document.getElementById('modeBtn').classList.remove('radial');
+    document.getElementById('radialQuick').style.display = 'none';
     clearRadialRoutes();
     tipDom.innerHTML = '📌 多点路线模式：点击城市添加到路线；再点已选城市只取消该点';
   }
@@ -1196,6 +1206,91 @@ function scheduleRadialPlan() {
   radialPlanTimer = setTimeout(function() {
     planRadialRoutes();
   }, 300);
+}
+
+// 便捷：添加所有省会为目的地
+function addAllCapitalsAsDestinations() {
+  if(!radialOrigin) {
+    tipDom.innerHTML = '⚠️ 请先点击选择出发地';
+    return;
+  }
+  let added = 0;
+  for(let i = 0; i < CAPITALS.length; i++) {
+    const cap = CAPITALS[i];
+    // 跳过出发地本身
+    if(radialOrigin.city.name === cap.name) continue;
+    // 跳过已添加的
+    if(radialDestinations.findIndex(function(d) { return d.city.name === cap.name; }) >= 0) continue;
+    
+    const idx = radialDestinations.length + 1;
+    const marker = new AMap.Marker({
+      position: [cap.lng, cap.lat],
+      content: '<div style="background:#2563eb;color:#fff;border:2px solid #fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer;">' + idx + '</div>',
+      offset: new AMap.Pixel(-14, -14),
+      zIndex: 350
+    });
+    marker.on("click", function() { handleRadialCityClick(cap); });
+    marker.setMap(map);
+    const label = createCityLabel(cap, [cap.lng, cap.lat]);
+    radialDestinations.push({city: cap, marker: marker, label: label, route: null});
+    added++;
+  }
+  tipDom.innerHTML = '✅ 已添加 ' + added + ' 个省会为目的地（共' + radialDestinations.length + '个），正在规划路线...';
+  scheduleRadialPlan();
+  renderRouteBar();
+  renderCityList();
+}
+
+// 便捷：添加所有中心城市为目的地
+function addAllCentersAsDestinations() {
+  if(!radialOrigin) {
+    tipDom.innerHTML = '⚠️ 请先点击选择出发地';
+    return;
+  }
+  const centers = CITIES.filter(function(c) { return c.isCenter; });
+  let added = 0;
+  for(let i = 0; i < centers.length; i++) {
+    const center = centers[i];
+    // 跳过出发地本身
+    if(radialOrigin.city.name === center.name) continue;
+    // 跳过已添加的
+    if(radialDestinations.findIndex(function(d) { return d.city.name === center.name; }) >= 0) continue;
+    
+    const idx = radialDestinations.length + 1;
+    const marker = new AMap.Marker({
+      position: [center.lng, center.lat],
+      content: '<div style="background:#2563eb;color:#fff;border:2px solid #fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer;">' + idx + '</div>',
+      offset: new AMap.Pixel(-14, -14),
+      zIndex: 350
+    });
+    marker.on("click", function() { handleRadialCityClick(center); });
+    marker.setMap(map);
+    const label = createCityLabel(center, [center.lng, center.lat]);
+    radialDestinations.push({city: center, marker: marker, label: label, route: null});
+    added++;
+  }
+  tipDom.innerHTML = '✅ 已添加 ' + added + ' 个中心城市为目的地（共' + radialDestinations.length + '个），正在规划路线...';
+  scheduleRadialPlan();
+  renderRouteBar();
+  renderCityList();
+}
+
+// 便捷：清空目的地（保留出发地）
+function clearRadialDestinations() {
+  for(let i = 0; i < radialDestinations.length; i++) {
+    if(radialDestinations[i].marker) map.remove(radialDestinations[i].marker);
+    if(radialDestinations[i].label) map.remove(radialDestinations[i].label);
+  }
+  radialDestinations = [];
+  for(let i = 0; i < radialPolylines.length; i++) {
+    map.remove(radialPolylines[i]);
+  }
+  radialPolylines = [];
+  radialPlanVersion++;
+  tipDom.innerHTML = '🗑️ 已清空目的地，出发地保留，可继续点击添加';
+  renderRouteBar();
+  renderCityList();
+  updateRadialSummary();
 }
 
 function planRadialRoutes() {
