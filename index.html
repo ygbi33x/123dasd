@@ -794,12 +794,55 @@ const TRAFFIC_COLORS = {
 };
 
 let routePolylines = [];
+let segmentInfoWindow = null;
 
 function clearRoutePolylines() {
   for(let i = 0; i < routePolylines.length; i++) {
     map.remove(routePolylines[i]);
   }
   routePolylines = [];
+  if(segmentInfoWindow) {
+    segmentInfoWindow.close();
+    segmentInfoWindow = null;
+  }
+}
+
+const TRAFFIC_STATUS_TEXT = {
+  0: '未知',
+  1: '畅通',
+  2: '缓行',
+  3: '拥堵',
+  4: '严重拥堵'
+};
+
+function showSegmentInfo(step, position) {
+  if(segmentInfoWindow) {
+    segmentInfoWindow.close();
+    segmentInfoWindow = null;
+  }
+  
+  const trafficStatus = step.traffic_status || 0;
+  const trafficText = TRAFFIC_STATUS_TEXT[trafficStatus] || '未知';
+  const trafficColor = TRAFFIC_COLORS[trafficStatus] || '#22c55e';
+  const distanceKm = (step.distance / 1000).toFixed(1);
+  const timeMin = Math.ceil(step.time / 60);
+  
+  const content = '<div style="padding:10px 14px;min-width:200px;">' +
+    '<div style="font-weight:700;font-size:15px;color:#1f2937;margin-bottom:6px;">路段详情</div>' +
+    '<div style="font-size:13px;color:#374151;line-height:1.6;">' +
+    '<div>📏 距离：<b>' + distanceKm + ' km</b></div>' +
+    '<div>⏱️ 预计：<b>' + timeMin + ' 分钟</b></div>' +
+    '<div>🚦 路况：<span style="color:' + trafficColor + ';font-weight:700;">' + trafficText + '</span></div>' +
+    (step.road ? '<div>🛣️ 道路：' + step.road + '</div>' : '') +
+    (step.instruction ? '<div style="margin-top:4px;color:#6b7280;font-size:12px;">' + step.instruction + '</div>' : '') +
+    '</div></div>';
+  
+  segmentInfoWindow = new AMap.InfoWindow({
+    content: content,
+    offset: new AMap.Pixel(0, -10),
+    closeWhenClickMap: true
+  });
+  segmentInfoWindow.open(map, position);
 }
 
 function drawRouteWithTraffic(route) {
@@ -816,12 +859,29 @@ function drawRouteWithTraffic(route) {
       const polyline = new AMap.Polyline({
         path: step.path,
         strokeColor: color,
-        strokeWeight: 6,
-        strokeOpacity: 0.9,
+        strokeWeight: 7,
+        strokeOpacity: 0.85,
         lineJoin: 'round',
         lineCap: 'round',
-        zIndex: 100
+        zIndex: 100,
+        cursor: 'pointer'
       });
+      
+      // 点击路段显示详情
+      polyline.on('click', function(e) {
+        const midIdx = Math.floor(step.path.length / 2);
+        const midPos = step.path[midIdx];
+        showSegmentInfo(step, midPos);
+      });
+      
+      // hover效果
+      polyline.on('mouseover', function() {
+        polyline.setOptions({strokeWeight: 9, strokeOpacity: 1});
+      });
+      polyline.on('mouseout', function() {
+        polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.85});
+      });
+      
       polyline.setMap(map);
       routePolylines.push(polyline);
       
