@@ -243,7 +243,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         </div>
       </div>
       <div class="controls">
-        <div class="tip" id="tip">📌 点击城市添加到路线；再点已选城市可取消；多点自动优化最短顺序</div>
+        <div class="tip" id="tip">📌 点击城市添加到路线；再点已选城市只取消该点；多点自动优化最短顺序</div>
       </div>
       <div class="legend">
         <div class="lg-item"><span class="lg-dot" style="background:#2563eb;width:12px;height:12px;"></span>中心城市（大）</div>
@@ -951,11 +951,11 @@ function addPoint(city) {
 }
 
 function removePointAt(idx) {
-  const removed = routePoints.splice(idx);
+  const removed = routePoints.splice(idx, 1);
   removed.forEach(function(p) { if(p.marker) map.remove(p.marker); });
   renumberMarkers();
   tipDom.innerHTML = routePoints.length > 0 ?
-    "已取消第 " + (idx+1) + " 点及之后的点，当前 " + routePoints.length + " 个点，重新规划..." :
+    "已取消第 " + (idx+1) + " 点，当前 " + routePoints.length + " 个点，重新规划..." :
     "📌 路线已清空，点击城市重新开始";
   renderRouteBar();
   renderCityList();
