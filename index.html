@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全国地级市多点驾车路线地图 · 高德</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden;}
+#app{display:flex;height:100vh;}
+.sidebar{width:300px;min-width:300px;background:#fff;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;z-index:100;flex-shrink:0;position:relative;transition:width .25s ease,min-width .25s ease;}
+.sidebar.collapsed{width:44px;min-width:44px;overflow:hidden;}
+.sidebar.collapsed .sidebar-content{display:none;}
+.sidebar-toggle{position:absolute;top:50%;right:-14px;transform:translateY(-50%);z-index:200;width:28px;height:56px;background:#fff;border:1px solid #e5e7eb;border-left:none;border-radius:0 8px 8px 0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6b7280;font-size:14px;box-shadow:2px 0 6px rgba(0,0,0,.08);transition:background .15s;}
+.sidebar-toggle:hover{background:#f3f4f6;color:#111;}
+.sidebar-toggle:active{transform:translateY(-50%) scale(.95);}
+.sidebar.collapsed .sidebar-toggle{right:-14px;}
+.sidebar-content{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+.sidebar-header{padding:10px 14px;border-bottom:1px solid #e5e7eb;background:#f9fafb;}
+.sidebar-title{font-size:15px;font-weight:700;color:#1a1a2e;margin-bottom:2px;}
+.sidebar-sub{font-size:11px;color:#9ca3af;}
+.route-bar{padding:8px 14px;border-bottom:1px solid #e5e7eb;background:#eff6ff;max-height:120px;overflow-y:auto;}
+.route-bar-title{font-size:12px;font-weight:700;color:#1e40af;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;}
+.route-bar-actions{display:flex;gap:6px;align-items:center;}
+.route-bar-clear{font-size:11px;color:#dc2626;cursor:pointer;font-weight:400;}
+.route-bar-clear:hover{text-decoration:underline;}
+.route-optimize{font-size:11px;color:#2563eb;cursor:pointer;font-weight:400;padding:1px 6px;border:1px solid #93c5fd;border-radius:8px;background:#fff;}
+.route-optimize:hover{background:#dbeafe;}
+.route-points{display:flex;flex-wrap:wrap;gap:4px;align-items:center;}
+.route-point-tag{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;background:#fff;border:1px solid #93c5fd;border-radius:12px;font-size:11px;color:#1e40af;cursor:pointer;}
+.route-point-tag:hover{background:#fef2f2;border-color:#fca5a5;color:#dc2626;}
+.route-point-tag .num{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#2563eb;color:#fff;font-size:10px;font-weight:700;}
+.route-arrow{color:#93c5fd;font-size:12px;}
+.route-empty{font-size:11px;color:#6b7280;}
+.search-box{padding:8px 14px;border-bottom:1px solid #f3f4f6;}
+.search-box input{width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;outline:none;}
+.search-box input:focus{border-color:#2385de;box-shadow:0 0 0 2px rgba(35,133,222,.15);}
+.filter-section{padding:6px 14px;border-bottom:1px solid #f3f4f6;}
+.filter-label{font-size:11px;color:#6b7280;font-weight:600;margin-bottom:4px;}
+.filter-tabs{display:flex;flex-wrap:wrap;gap:3px;}
+.filter-tab{padding:2px 7px;font-size:11px;border:1px solid #d1d5db;border-radius:10px;cursor:pointer;color:#6b7280;background:#fff;transition:.15s;}
+.filter-tab:hover{border-color:#2385de;color:#2385de;}
+.filter-tab.active{background:#2385de;color:#fff;border-color:#2385de;}
+.city-list{flex:1;overflow-y:auto;padding:2px 0;scroll-behavior:smooth;}
+.city-item{display:flex;align-items:center;padding:5px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f9fafb;transition:.15s;}
+.city-item:hover{background:#f0f7ff;}
+.city-item.in-route{background:#dbeafe;border-left:3px solid #2563eb;}
+.city-item.is-center{background:#f0f9ff;}
+.city-item.is-center:hover{background:#e0f2fe;}
+.city-item.flash{animation:flashBg 1.2s ease;}
+@keyframes flashBg{0%{background:#fef08a;}100%{background:transparent;}}
+.city-name{flex:1;color:#1f2937;}
+.city-name .center-star{color:#f59e0b;font-weight:700;margin-right:3px;font-size:12px;}
+.city-item.is-center .city-name{color:#1e40af;font-weight:600;}
+.city-center-tag{display:inline-block;font-size:9px;color:#fff;background:#f59e0b;border-radius:3px;padding:0 3px;margin-left:4px;font-weight:600;line-height:1.4;vertical-align:middle;}
+.route-num{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#16a34a;color:#fff;font-size:11px;font-weight:700;margin-right:5px;flex-shrink:0;}
+.city-province{font-size:10px;color:#9ca3af;margin-right:4px;}
+.city-count{padding:6px 14px;font-size:11px;color:#9ca3af;border-top:1px solid #f3f4f6;background:#fafbfc;}
+.empty-tip{padding:20px 14px;text-align:center;color:#9ca3af;font-size:12px;}
+.main{flex:1;display:flex;flex-direction:column;min-width:0;}
+.header{background:#fff;border-bottom:1px solid #e5e7eb;padding:6px 16px;box-shadow:0 1px 4px rgba(0,0,0,.06);z-index:50;flex-shrink:0;}
+.title-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
+.title{font-size:15px;font-weight:700;color:#1a1a2e;}
+.subtitle{font-size:11px;color:#6b7280;}
+.controls{display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap;}
+.tip{flex:1;font-size:12px;color:#374151;min-width:200px;}
+.btn{padding:5px 12px;border:none;border-radius:5px;cursor:pointer;font-size:12px;color:#fff;}
+.btn.reset{background:#6b7280;}
+.btn.reset:hover{background:#4b5563;}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:#374151;margin-top:3px;}
+.lg-item{display:flex;align-items:center;gap:4px;}
+.lg-dot{width:10px;height:10px;border-radius:50%;}
+#map{flex:1;min-height:0;z-index:1;}
+#panel{position:absolute;right:14px;top:100px;width:280px;max-width:86vw;max-height:50vh;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.14);z-index:200;display:none;overflow:hidden;flex-direction:column;}
+#panel.open{display:flex;}
+#panelHead{padding:8px 14px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:8px;background:#f9fafb;}
+#pTitle{font-size:13px;font-weight:700;color:#1a1a2e;flex:1;}
+#panelClose{cursor:pointer;color:#9ca3af;font-size:16px;padding:0 2px;}
+#panelClose:hover{color:#111;}
+#pBody{overflow:auto;padding:5px 0;}
+#pMeta{padding:6px 14px;font-size:12px;color:#6b7280;border-bottom:1px solid #f3f4f6;line-height:1.7;}
+#pMeta b{color:#111;font-size:13px;}
+#segList{list-style:none;}
+#segList li{padding:4px 14px;font-size:12px;color:#374151;border-bottom:1px solid #f9fafb;line-height:1.5;}
+#segList li:hover{background:#f8fafc;}
+.seg-dist{color:#dc2626;font-weight:600;float:right;}
+.footnote{font-size:11px;color:#9ca3af;padding:6px 14px;border-top:1px solid #f3f4f6;background:#fafbfc;}
+
+/* ===== 省会距离面板 ===== */
+#distPanel{position:absolute;right:14px;top:100px;width:280px;max-width:86vw;max-height:60vh;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.14);z-index:250;display:none;overflow:hidden;flex-direction:column;}
+#distPanel.open{display:flex;}
+#distHead{padding:9px 14px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:8px;background:#f0fdf4;}
+#distTitle{font-size:13px;font-weight:700;color:#166534;flex:1;}
+#distClose{cursor:pointer;color:#9ca3af;font-size:16px;padding:0 2px;}
+#distClose:hover{color:#111;}
+#distMeta{padding:6px 14px;font-size:11px;color:#6b7280;border-bottom:1px solid #f3f4f6;background:#fafbfc;}
+#distList{list-style:none;overflow-y:auto;flex:1;}
+#distList li{display:flex;align-items:center;padding:5px 14px;font-size:12px;color:#374151;border-bottom:1px solid #f9fafb;cursor:pointer;transition:.1s;}
+#distList li:hover{background:#f0f7ff;}
+.dist-rank{width:20px;height:20px;border-radius:50%;background:#f3f4f6;color:#6b7280;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-right:8px;flex-shrink:0;}
+.dist-rank.top3{background:#16a34a;color:#fff;}
+.dist-name{flex:1;}
+.dist-region{font-size:10px;color:#9ca3af;margin-right:6px;}
+.dist-val{color:#dc2626;font-weight:700;font-size:12px;}
+.dist-hint{padding:8px 14px;font-size:10px;color:#9ca3af;border-top:1px solid #f3f4f6;background:#fafbfc;}
+
+
+.filter-header{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;cursor:pointer;border-bottom:1px solid #e5e7eb;background:#f9fafb;user-select:none;}
+.filter-header:hover{background:#f3f4f6;}
+.filter-header-title{font-size:12px;font-weight:700;color:#374151;}
+.filter-toggle{font-size:11px;color:#6b7280;}
+#filterArea{transition:max-height .25s ease,opacity .2s ease;overflow:hidden;max-height:500px;opacity:1;}
+#filterArea.collapsed{max-height:0;opacity:0;border-bottom:none;}
+
+@media(max-width:768px), (orientation:landscape) and (max-height:520px){
+  .sidebar{width:220px;min-width:220px;}
+  .sidebar.collapsed{width:40px;min-width:40px;}
+  
+  .header{padding:6px 10px;}
+  .title{font-size:14px;}
+  .subtitle{font-size:10px;}
+  .tip{font-size:11px;min-width:0;}
+  .btn{padding:6px 12px;font-size:12px;}
+  .legend{font-size:10px;gap:8px;}
+  .lg-dot{width:8px;height:8px;}
+  
+  #panel{right:8px;left:8px;bottom:8px;top:auto;width:auto;max-width:none;max-height:45vh;border-radius:12px;}
+  #distPanel{right:8px;left:8px;bottom:8px;top:auto;width:auto;max-width:none;max-height:50vh;border-radius:12px;}
+  
+  .city-item{padding:7px 12px;font-size:13px;}
+  .city-province{font-size:10px;}
+  .filter-tab{padding:3px 8px;font-size:11px;}
+  .filter-header{padding:8px 12px;}
+  .filter-header-title{font-size:12px;}
+  .route-point-tag{padding:3px 8px;font-size:11px;}
+  .route-bar{max-height:120px;padding:6px 12px;}
+  .sidebar-header{padding:8px 12px;}
+  .sidebar-title{font-size:13px;}
+  .sidebar-sub{font-size:10px;}
+  .search-box{padding:6px 12px;}
+  .search-box input{padding:5px 8px;font-size:12px;}
+  .filter-section{padding:5px 12px;}
+  .filter-label{font-size:10px;margin-bottom:3px;}
+  .city-count{padding:5px 12px;font-size:10px;}
+}
+
+@media(max-width:479px), (orientation:landscape) and (max-height:420px){
+  .sidebar{width:180px;min-width:180px;}
+  .sidebar.collapsed{width:36px;min-width:36px;}
+  .title{font-size:13px;}
+  .controls{gap:6px;}
+  .btn{padding:5px 10px;font-size:11px;}
+  .city-item{padding:6px 10px;font-size:12px;}
+  .sidebar-header{padding:6px 10px;}
+  .search-box{padding:5px 10px;}
+  .filter-section{padding:4px 10px;}
+  .route-bar{padding:5px 10px;}
+}
+
+/* 横屏超矮屏：顶部栏更紧凑 */
+@media(orientation:landscape) and (max-height:420px){
+  .header{padding:4px 10px;}
+  .title{font-size:12px;}
+  .subtitle{display:none;}
+  .tip{font-size:10px;}
+  .legend{font-size:9px;gap:6px;margin-top:1px;}
+  .controls{margin-top:2px;gap:4px;}
+  .btn{padding:3px 8px;font-size:10px;}
+  .sidebar-toggle{width:24px;height:44px;font-size:12px;right:-12px;}
+}
+
+/* 横屏全屏按钮 */
+.fullscreen-btn{position:fixed;bottom:16px;right:16px;z-index:9999;background:#2563eb;color:#fff;border:none;border-radius:24px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(37,99,235,.4);transition:transform .15s,background .15s;}
+.fullscreen-btn:hover{background:#1d4ed8;}
+.fullscreen-btn:active{transform:scale(.95);}
+
+/* 横屏全屏模式：旋转90度 + 隐藏侧边栏和顶部栏 */
+body.landscape-fullscreen #app{transform:rotate(90deg);transform-origin:center center;width:100vh;height:100vw;position:fixed;top:50%;left:50%;margin-top:-50vw;margin-left:-50vh;}
+body.landscape-fullscreen .sidebar{display:none !important;}
+body.landscape-fullscreen .header{display:none !important;}
+body.landscape-fullscreen .fullscreen-btn{position:fixed;bottom:12px;right:12px;top:auto;z-index:10000;background:#6b7280;}
+body.landscape-fullscreen #panel{top:10px;right:10px;left:auto;max-height:70vh;}
+body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75vh;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="sidebar">
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="收回/展开侧边栏">◀</button>
+    <div class="sidebar-content">
+    <div class="sidebar-header">
+      <div class="sidebar-title">城市列表</div>
+      <div class="sidebar-sub">共 <b id="totalCount"></b> 城 · 点击添加路线点，再点已选城市取消</div>
+    </div>
+    <div class="route-bar">
+      <div class="route-bar-title">
+        <span>已选路线（<span id="routeCount">0</span>个点）</span>
+        <div class="route-bar-actions">
+          <span class="route-optimize" id="optimizeBtn" title="用Dijkstra算法自动优化访问顺序">🔄 优化顺序</span>
+          <span class="route-bar-clear" id="clearRouteBtn">清空</span>
+        </div>
+      </div>
+      <div class="route-points" id="routePointsBar">
+        <span class="route-empty">尚未选择城市，点击下方列表或地图上的点开始</span>
+      </div>
+    </div>
+    <div class="filter-header" onclick="toggleFilter()">
+      <span class="filter-header-title">🔍 筛选</span>
+      <span class="filter-toggle" id="filterToggleIcon">▲ 收起</span>
+    </div>
+    <div id="filterArea">
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="搜索城市名称..." />
+      </div>
+      <div class="filter-section">
+        <div class="filter-label">大区</div>
+        <div class="filter-tabs" id="regionTabs"></div>
+      </div>
+      <div class="filter-section">
+        <div class="filter-label">省区</div>
+        <div class="filter-tabs" id="provinceTabs"></div>
+      </div>
+    </div>
+    <div class="city-list" id="cityList"></div>
+    <div class="city-count" id="cityCount">显示 0 个城市</div>
+    </div>
+  </div>
+  <div class="main">
+    <div class="header">
+      <div class="title-row">
+        <div>
+          <div class="title">全国地级市 · 多点连续驾车路线地图</div>
+          <div class="subtitle">高德地图底图 · 支持多点连续路线 · 自动优化最短顺序</div>
+        </div>
+        <button class="btn reset" id="clearBtn">全部重置</button>
+      </div>
+      <div class="controls">
+        <div class="tip" id="tip">📌 点击城市添加到路线；再点已选城市可取消；多点自动优化最短顺序</div>
+      </div>
+      <div class="legend">
+        <div class="lg-item"><span class="lg-dot" style="background:#2563eb;width:12px;height:12px;"></span>中心城市（大）</div>
+        <div class="lg-item"><span class="lg-dot" style="background:#2563eb;"></span>普通地级市</div>
+        <div class="lg-item"><span class="lg-dot" style="background:#16a34a;"></span>路线点（编号）</div>
+      </div>
+    </div>
+<div id="map"></div>
+<div id="landscapeOverlay" style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;z-index:500;background:transparent;touch-action:none;"></div>
+<div id="landscapeZoom" style="display:none;position:fixed;left:12px;bottom:12px;z-index:10000;display:flex;flex-direction:column;gap:8px;">
+  <button id="zoomInBtn" style="width:44px;height:44px;border-radius:8px;border:none;background:rgba(255,255,255,0.95);font-size:22px;font-weight:700;color:#333;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.2);">+</button>
+  <button id="zoomOutBtn" style="width:44px;height:44px;border-radius:8px;border:none;background:rgba(255,255,255,0.95);font-size:22px;font-weight:700;color:#333;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.2);">−</button>
+</div>
+<div id="landscapeTip" style="display:none;position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10000;background:rgba(0,0,0,0.7);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;white-space:nowrap;">横屏模式：可拖拽缩放查看，点击城市请先退出横屏</div>
+  </div>
+</div>
+
+<!-- 省会距离面板 -->
+<div id="distPanel">
+  <div id="distHead">
+    <span id="distTitle">到各省会距离</span>
+    <span id="distClose" title="关闭">&#10005;</span>
+  </div>
+  <div id="distMeta">直线距离（球面）· 点击省会规划驾车路线</div>
+  <ul id="distList"></ul>
+  <div class="dist-hint">共 31 个省会/直辖市/首府 · 按距离从近到远排序</div>
+</div>
+
+<div id="panel">
+  <div id="panelHead">
+    <span id="pTitle">路线汇总</span>
+    <span id="panelClose" title="关闭">&#10005;</span>
+  </div>
+  <div id="pBody">
+    <div id="pMeta"></div>
+    <ul id="segList"></ul>
+  </div>
+  <div class="footnote">数据来源：高德地图驾车路线规划</div>
+</div>
+
+<script>
+window._AMapSecurityConfig = {
+  securityJsCode: "5709f1c855ca34155623c5fe0db7f05a"
+};
+</script>
+<script src="https://webapi.amap.com/maps?v=2.0&key=6ef93fcd8d5b297ae869c20eceaba5a6&plugin=AMap.Driving,AMap.TruckDriving,AMap.Scale,AMap.ToolBar"></script>
+
+<script>
+const CITIES = [{"name": "昭通市", "province": "云南", "region": "西南", "lng": 103.7247, "lat": 27.338, "isCenter": false}, {"name": "红河哈尼族彝族自治州", "province": "云南", "region": "西南", "lng": 103.38, "lat": 23.36, "isCenter": false}, {"name": "曲靖市", "province": "云南", "region": "西南", "lng": 103.796, "lat": 25.5011, "isCenter": false}, {"name": "怒江傈僳族自治州", "province": "云南", "region": "西南", "lng": 98.86, "lat": 25.85, "isCenter": false}, {"name": "玉溪市", "province": "云南", "region": "西南", "lng": 102.5488, "lat": 24.352, "isCenter": false}, {"name": "保山市", "province": "云南", "region": "西南", "lng": 99.1641, "lat": 25.1194, "isCenter": false}, {"name": "大理白族自治州", "province": "云南", "region": "西南", "lng": 100.23, "lat": 25.59, "isCenter": false}, {"name": "丽江市", "province": "云南", "region": "西南", "lng": 100.233, "lat": 26.872, "isCenter": false}, {"name": "迪庆藏族自治州", "province": "云南", "region": "西南", "lng": 99.71, "lat": 27.83, "isCenter": false}, {"name": "西双版纳傣族自治州", "province": "云南", "region": "西南", "lng": 100.8, "lat": 22.0, "isCenter": false}, {"name": "昆明市", "province": "云南", "region": "西南", "lng": 102.7123, "lat": 25.0406, "isCenter": true}, {"name": "普洱市", "province": "云南", "region": "西南", "lng": 100.966, "lat": 22.825, "isCenter": false}, {"name": "文山壮族苗族自治州", "province": "云南", "region": "西南", "lng": 104.24, "lat": 23.37, "isCenter": false}, {"name": "楚雄彝族自治州", "province": "云南", "region": "西南", "lng": 101.55, "lat": 25.04, "isCenter": false}, {"name": "临沧市", "province": "云南", "region": "西南", "lng": 100.08, "lat": 23.88, "isCenter": false}, {"name": "德宏傣族景颇族自治州", "province": "云南", "region": "西南", "lng": 98.59, "lat": 24.44, "isCenter": false}, {"name": "六盘水市", "province": "贵州", "region": "西南", "lng": 104.8223, "lat": 26.5947, "isCenter": false}, {"name": "铜仁市", "province": "贵州", "region": "西南", "lng": 109.189, "lat": 27.713, "isCenter": false}, {"name": "遵义市", "province": "贵州", "region": "西南", "lng": 106.9327, "lat": 27.7071, "isCenter": false}, {"name": "安顺市", "province": "贵州", "region": "西南", "lng": 105.9552, "lat": 26.2531, "isCenter": false}, {"name": "黔南布依族苗族自治州", "province": "贵州", "region": "西南", "lng": 107.52, "lat": 26.26, "isCenter": false}, {"name": "毕节市", "province": "贵州", "region": "西南", "lng": 105.285, "lat": 27.299, "isCenter": false}, {"name": "黔东南苗族侗族自治州", "province": "贵州", "region": "西南", "lng": 107.98, "lat": 26.58, "isCenter": false}, {"name": "黔西南布依族苗族自治州", "province": "贵州", "region": "西南", "lng": 104.9, "lat": 25.09, "isCenter": false}, {"name": "贵阳市", "province": "贵州", "region": "西南", "lng": 106.6302, "lat": 26.6477, "isCenter": true}, {"name": "巴中市", "province": "四川", "region": "西南", "lng": 106.741, "lat": 31.8677, "isCenter": false}, {"name": "成都市", "province": "四川", "region": "西南", "lng": 104.0668, "lat": 30.5728, "isCenter": true}, {"name": "德阳市", "province": "四川", "region": "西南", "lng": 104.3904, "lat": 31.1268, "isCenter": false}, {"name": "广元市", "province": "四川", "region": "西南", "lng": 105.84, "lat": 32.44, "isCenter": false}, {"name": "遂宁市", "province": "四川", "region": "西南", "lng": 105.5825, "lat": 30.5308, "isCenter": false}, {"name": "资阳市", "province": "四川", "region": "西南", "lng": 104.637, "lat": 30.126, "isCenter": false}, {"name": "绵阳市", "province": "四川", "region": "西南", "lng": 104.7531, "lat": 31.4677, "isCenter": false}, {"name": "广安市", "province": "四川", "region": "西南", "lng": 106.6364, "lat": 30.4726, "isCenter": false}, {"name": "达州市", "province": "四川", "region": "西南", "lng": 107.5039, "lat": 31.2123, "isCenter": false}, {"name": "南充市", "province": "四川", "region": "西南", "lng": 106.0834, "lat": 30.8433, "isCenter": true}, {"name": "内江市", "province": "四川", "region": "西南", "lng": 105.065, "lat": 29.5834, "isCenter": false}, {"name": "宜宾市", "province": "四川", "region": "西南", "lng": 104.6434, "lat": 28.7521, "isCenter": false}, {"name": "泸州市", "province": "四川", "region": "西南", "lng": 105.443, "lat": 28.889, "isCenter": false}, {"name": "阿坝藏族羌族自治州", "province": "四川", "region": "西南", "lng": 102.22, "lat": 31.9, "isCenter": false}, {"name": "自贡市", "province": "四川", "region": "西南", "lng": 104.7784, "lat": 29.339, "isCenter": true}, {"name": "雅安市", "province": "四川", "region": "西南", "lng": 103.0011, "lat": 29.9878, "isCenter": false}, {"name": "眉山市", "province": "四川", "region": "西南", "lng": 103.8327, "lat": 30.0754, "isCenter": false}, {"name": "乐山市", "province": "四川", "region": "西南", "lng": 103.7616, "lat": 29.5522, "isCenter": false}, {"name": "攀枝花市", "province": "四川", "region": "西南", "lng": 101.716, "lat": 26.582, "isCenter": false}, {"name": "凉山彝族自治州", "province": "四川", "region": "西南", "lng": 102.26, "lat": 27.89, "isCenter": false}, {"name": "甘孜藏族自治州", "province": "四川", "region": "西南", "lng": 101.96, "lat": 30.06, "isCenter": false}, {"name": "日喀则市", "province": "西藏", "region": "西南", "lng": 88.882, "lat": 29.267, "isCenter": false}, {"name": "山南市", "province": "西藏", "region": "西南", "lng": 91.77, "lat": 29.237, "isCenter": false}, {"name": "那曲市", "province": "西藏", "region": "西南", "lng": 92.05, "lat": 31.476, "isCenter": false}, {"name": "昌都市", "province": "西藏", "region": "西南", "lng": 97.178, "lat": 31.137, "isCenter": false}, {"name": "拉萨市", "province": "西藏", "region": "西南", "lng": 91.1322, "lat": 29.6547, "isCenter": false}, {"name": "林芝市", "province": "西藏", "region": "西南", "lng": 94.362, "lat": 29.648, "isCenter": false}, {"name": "阿里地区", "province": "西藏", "region": "西南", "lng": 80.105, "lat": 32.503, "isCenter": false}, {"name": "商洛市", "province": "陕西", "region": "西北", "lng": 109.9331, "lat": 33.8723, "isCenter": false}, {"name": "铜川市", "province": "陕西", "region": "西北", "lng": 108.947, "lat": 34.897, "isCenter": false}, {"name": "西安市", "province": "陕西", "region": "西北", "lng": 108.948, "lat": 34.2632, "isCenter": true}, {"name": "汉中市", "province": "陕西", "region": "西北", "lng": 107.0266, "lat": 33.0727, "isCenter": false}, {"name": "榆林市", "province": "陕西", "region": "西北", "lng": 109.742, "lat": 38.2903, "isCenter": false}, {"name": "延安市", "province": "陕西", "region": "西北", "lng": 109.4905, "lat": 36.5852, "isCenter": false}, {"name": "宝鸡市", "province": "陕西", "region": "西北", "lng": 107.237, "lat": 34.364, "isCenter": false}, {"name": "渭南市", "province": "陕西", "region": "西北", "lng": 109.5033, "lat": 34.4983, "isCenter": false}, {"name": "咸阳市", "province": "陕西", "region": "西北", "lng": 108.7097, "lat": 34.3274, "isCenter": false}, {"name": "安康市", "province": "陕西", "region": "西北", "lng": 109.0291, "lat": 32.6889, "isCenter": false}, {"name": "金昌市", "province": "甘肃", "region": "西北", "lng": 102.188, "lat": 38.52, "isCenter": false}, {"name": "白银市", "province": "甘肃", "region": "西北", "lng": 104.1335, "lat": 36.5403, "isCenter": false}, {"name": "酒泉市", "province": "甘肃", "region": "西北", "lng": 98.5122, "lat": 39.7327, "isCenter": false}, {"name": "陇南市", "province": "甘肃", "region": "西北", "lng": 104.9273, "lat": 33.387, "isCenter": false}, {"name": "平凉市", "province": "甘肃", "region": "西北", "lng": 106.6843, "lat": 35.5431, "isCenter": false}, {"name": "武威市", "province": "甘肃", "region": "西北", "lng": 102.6371, "lat": 37.9285, "isCenter": false}, {"name": "兰州市", "province": "甘肃", "region": "西北", "lng": 103.8343, "lat": 36.0611, "isCenter": true}, {"name": "嘉峪关市", "province": "甘肃", "region": "西北", "lng": 98.289, "lat": 39.773, "isCenter": false}, {"name": "甘南藏族自治州", "province": "甘肃", "region": "西北", "lng": 102.91, "lat": 35.0, "isCenter": false}, {"name": "临夏回族自治州", "province": "甘肃", "region": "西北", "lng": 103.21, "lat": 35.6, "isCenter": false}, {"name": "张掖市", "province": "甘肃", "region": "西北", "lng": 100.4457, "lat": 39.8597, "isCenter": false}, {"name": "庆阳市", "province": "甘肃", "region": "西北", "lng": 107.6111, "lat": 35.7304, "isCenter": false}, {"name": "定西市", "province": "甘肃", "region": "西北", "lng": 104.621, "lat": 35.5778, "isCenter": false}, {"name": "天水市", "province": "甘肃", "region": "西北", "lng": 105.7246, "lat": 34.5797, "isCenter": false}, {"name": "石嘴山市", "province": "宁夏", "region": "西北", "lng": 106.387, "lat": 38.9909, "isCenter": false}, {"name": "中卫市", "province": "宁夏", "region": "西北", "lng": 105.1805, "lat": 37.5132, "isCenter": false}, {"name": "固原市", "province": "宁夏", "region": "西北", "lng": 106.2811, "lat": 36.0114, "isCenter": false}, {"name": "银川市", "province": "宁夏", "region": "西北", "lng": 106.2309, "lat": 38.4872, "isCenter": true}, {"name": "吴忠市", "province": "宁夏", "region": "西北", "lng": 106.1956, "lat": 37.9979, "isCenter": false}, {"name": "果洛藏族自治州", "province": "青海", "region": "西北", "lng": 100.24, "lat": 34.48, "isCenter": false}, {"name": "海南藏族自治州", "province": "青海", "region": "西北", "lng": 100.62, "lat": 36.28, "isCenter": false}, {"name": "玉树藏族自治州", "province": "青海", "region": "西北", "lng": 97.01, "lat": 33.0, "isCenter": false}, {"name": "黄南藏族自治州", "province": "青海", "region": "西北", "lng": 102.02, "lat": 35.52, "isCenter": false}, {"name": "海西蒙古族藏族自治州", "province": "青海", "region": "西北", "lng": 97.37, "lat": 37.37, "isCenter": false}, {"name": "海东市", "province": "青海", "region": "西北", "lng": 102.1053, "lat": 36.503, "isCenter": false}, {"name": "西宁市", "province": "青海", "region": "西北", "lng": 101.7782, "lat": 36.6171, "isCenter": true}, {"name": "海北藏族自治州", "province": "青海", "region": "西北", "lng": 100.99, "lat": 36.9, "isCenter": false}, {"name": "双河市", "province": "新疆", "region": "西北", "lng": 82.28, "lat": 44.98, "isCenter": false}, {"name": "北屯市", "province": "新疆", "region": "西北", "lng": 87.82, "lat": 47.35, "isCenter": false}, {"name": "博尔塔拉蒙古自治州", "province": "新疆", "region": "西北", "lng": 82.07, "lat": 44.9, "isCenter": false}, {"name": "铁门关市", "province": "新疆", "region": "西北", "lng": 85.33, "lat": 41.86, "isCenter": false}, {"name": "可克达拉市", "province": "新疆", "region": "西北", "lng": 80.78, "lat": 43.92, "isCenter": false}, {"name": "乌鲁木齐市", "province": "新疆", "region": "西北", "lng": 87.6169, "lat": 43.8257, "isCenter": true}, {"name": "昆玉市", "province": "新疆", "region": "西北", "lng": 79.18, "lat": 37.48, "isCenter": false}, {"name": "巴音郭楞蒙古自治州", "province": "新疆", "region": "西北", "lng": 86.15, "lat": 41.76, "isCenter": false}, {"name": "和田地区", "province": "新疆", "region": "西北", "lng": 79.923, "lat": 37.11, "isCenter": false}, {"name": "塔城地区", "province": "新疆", "region": "西北", "lng": 82.986, "lat": 46.746, "isCenter": false}, {"name": "阿勒泰地区", "province": "新疆", "region": "西北", "lng": 88.139, "lat": 47.845, "isCenter": false}, {"name": "昌吉回族自治州", "province": "新疆", "region": "西北", "lng": 87.31, "lat": 44.01, "isCenter": false}, {"name": "石河子市", "province": "新疆", "region": "西北", "lng": 86.041, "lat": 44.306, "isCenter": false}, {"name": "五家渠市", "province": "新疆", "region": "西北", "lng": 87.537, "lat": 44.168, "isCenter": false}, {"name": "伊犁哈萨克自治州", "province": "新疆", "region": "西北", "lng": 81.32, "lat": 43.91, "isCenter": false}, {"name": "阿拉尔市", "province": "新疆", "region": "西北", "lng": 81.276, "lat": 40.548, "isCenter": false}, {"name": "吐鲁番市", "province": "新疆", "region": "西北", "lng": 89.184, "lat": 42.948, "isCenter": false}, {"name": "喀什地区", "province": "新疆", "region": "西北", "lng": 75.989, "lat": 39.47, "isCenter": false}, {"name": "哈密市", "province": "新疆", "region": "西北", "lng": 93.515, "lat": 42.819, "isCenter": false}, {"name": "图木舒克市", "province": "新疆", "region": "西北", "lng": 79.069, "lat": 39.868, "isCenter": false}, {"name": "克孜勒苏柯尔克孜自治州", "province": "新疆", "region": "西北", "lng": 76.17, "lat": 39.71, "isCenter": false}, {"name": "阿克苏地区", "province": "新疆", "region": "西北", "lng": 80.264, "lat": 41.168, "isCenter": false}, {"name": "克拉玛依市", "province": "新疆", "region": "西北", "lng": 84.8752, "lat": 45.5799, "isCenter": false}, {"name": "胡杨河市", "province": "新疆", "region": "西北", "lng": 84.9, "lat": 44.83, "isCenter": false}, {"name": "唐山市", "province": "河北", "region": "华北", "lng": 118.1802, "lat": 39.6307, "isCenter": true}, {"name": "廊坊市", "province": "河北", "region": "华北", "lng": 116.6945, "lat": 39.5379, "isCenter": false}, {"name": "秦皇岛市", "province": "河北", "region": "华北", "lng": 119.5866, "lat": 39.9354, "isCenter": false}, {"name": "张家口市", "province": "河北", "region": "华北", "lng": 114.8757, "lat": 40.8239, "isCenter": false}, {"name": "沧州市", "province": "河北", "region": "华北", "lng": 116.8286, "lat": 38.31, "isCenter": false}, {"name": "邯郸市", "province": "河北", "region": "华北", "lng": 114.4783, "lat": 36.6177, "isCenter": false}, {"name": "邢台市", "province": "河北", "region": "华北", "lng": 114.5087, "lat": 37.0624, "isCenter": false}, {"name": "石家庄市", "province": "河北", "region": "华北", "lng": 114.4782, "lat": 38.0486, "isCenter": true}, {"name": "衡水市", "province": "河北", "region": "华北", "lng": 115.7278, "lat": 37.7203, "isCenter": false}, {"name": "保定市", "province": "河北", "region": "华北", "lng": 115.4646, "lat": 38.8739, "isCenter": false}, {"name": "承德市", "province": "河北", "region": "华北", "lng": 117.9376, "lat": 40.9573, "isCenter": false}, {"name": "运城市", "province": "山西", "region": "华北", "lng": 110.9901, "lat": 35.029, "isCenter": true}, {"name": "临汾市", "province": "山西", "region": "华北", "lng": 111.5197, "lat": 36.0874, "isCenter": false}, {"name": "太原市", "province": "山西", "region": "华北", "lng": 112.549, "lat": 37.8706, "isCenter": true}, {"name": "阳泉市", "province": "山西", "region": "华北", "lng": 113.5783, "lat": 37.857, "isCenter": false}, {"name": "朔州市", "province": "山西", "region": "华北", "lng": 112.4201, "lat": 39.333, "isCenter": false}, {"name": "忻州市", "province": "山西", "region": "华北", "lng": 112.739, "lat": 38.4126, "isCenter": false}, {"name": "晋中市", "province": "山西", "region": "华北", "lng": 112.7525, "lat": 37.687, "isCenter": false}, {"name": "吕梁市", "province": "山西", "region": "华北", "lng": 111.1433, "lat": 37.5271, "isCenter": false}, {"name": "大同市", "province": "山西", "region": "华北", "lng": 113.2952, "lat": 40.0912, "isCenter": false}, {"name": "长治市", "province": "山西", "region": "华北", "lng": 113.1147, "lat": 36.2027, "isCenter": false}, {"name": "晋城市", "province": "山西", "region": "华北", "lng": 112.8507, "lat": 35.4973, "isCenter": false}, {"name": "鄂尔多斯市", "province": "内蒙", "region": "华北", "lng": 109.9207, "lat": 39.6149, "isCenter": false}, {"name": "包头市", "province": "内蒙", "region": "华北", "lng": 109.842, "lat": 40.6521, "isCenter": false}, {"name": "巴彦淖尔市", "province": "内蒙", "region": "华北", "lng": 107.389, "lat": 40.743, "isCenter": false}, {"name": "乌海市", "province": "内蒙", "region": "华北", "lng": 106.8228, "lat": 39.6737, "isCenter": false}, {"name": "呼伦贝尔市", "province": "内蒙", "region": "华北", "lng": 119.767, "lat": 49.215, "isCenter": false}, {"name": "阿拉善盟", "province": "内蒙", "region": "华北", "lng": 105.728, "lat": 38.851, "isCenter": false}, {"name": "通辽市", "province": "内蒙", "region": "华北", "lng": 122.241, "lat": 43.652, "isCenter": false}, {"name": "兴安盟", "province": "内蒙", "region": "华北", "lng": 122.07, "lat": 46.077, "isCenter": false}, {"name": "锡林郭勒盟", "province": "内蒙", "region": "华北", "lng": 116.09, "lat": 43.944, "isCenter": false}, {"name": "呼和浩特市", "province": "内蒙", "region": "华北", "lng": 111.7492, "lat": 40.8426, "isCenter": true}, {"name": "赤峰市", "province": "内蒙", "region": "华北", "lng": 118.939, "lat": 42.2684, "isCenter": false}, {"name": "乌兰察布市", "province": "内蒙", "region": "华北", "lng": 113.114, "lat": 40.99, "isCenter": false}, {"name": "七台河市", "province": "黑龙江", "region": "东北", "lng": 131.0157, "lat": 45.7756, "isCenter": false}, {"name": "鹤岗市", "province": "黑龙江", "region": "东北", "lng": 130.2854, "lat": 47.3307, "isCenter": false}, {"name": "伊春市", "province": "黑龙江", "region": "东北", "lng": 128.9309, "lat": 47.7285, "isCenter": false}, {"name": "大兴安岭地区", "province": "黑龙江", "region": "东北", "lng": 124.711, "lat": 50.411, "isCenter": false}, {"name": "绥化市", "province": "黑龙江", "region": "东北", "lng": 126.9839, "lat": 46.6304, "isCenter": false}, {"name": "哈尔滨市", "province": "黑龙江", "region": "东北", "lng": 126.535, "lat": 45.8038, "isCenter": true}, {"name": "齐齐哈尔市", "province": "黑龙江", "region": "东北", "lng": 124.4586, "lat": 47.3496, "isCenter": false}, {"name": "黑河市", "province": "黑龙江", "region": "东北", "lng": 127.4991, "lat": 50.2447, "isCenter": false}, {"name": "牡丹江市", "province": "黑龙江", "region": "东北", "lng": 129.6224, "lat": 44.5521, "isCenter": false}, {"name": "鸡西市", "province": "黑龙江", "region": "东北", "lng": 131.0054, "lat": 45.3181, "isCenter": false}, {"name": "佳木斯市", "province": "黑龙江", "region": "东北", "lng": 130.3272, "lat": 46.8076, "isCenter": false}, {"name": "大庆市", "province": "黑龙江", "region": "东北", "lng": 125.012, "lat": 46.5836, "isCenter": false}, {"name": "双鸭山市", "province": "黑龙江", "region": "东北", "lng": 131.1536, "lat": 46.6418, "isCenter": false}, {"name": "白城市", "province": "吉林", "region": "东北", "lng": 122.843, "lat": 45.6238, "isCenter": false}, {"name": "长春市", "province": "吉林", "region": "东北", "lng": 125.3318, "lat": 43.8899, "isCenter": true}, {"name": "吉林市", "province": "吉林", "region": "东北", "lng": 126.5486, "lat": 43.8379, "isCenter": false}, {"name": "松原市", "province": "吉林", "region": "东北", "lng": 124.8282, "lat": 45.1161, "isCenter": false}, {"name": "辽源市", "province": "吉林", "region": "东北", "lng": 125.1493, "lat": 42.8831, "isCenter": false}, {"name": "延边朝鲜族自治州", "province": "吉林", "region": "东北", "lng": 129.51, "lat": 42.89, "isCenter": false}, {"name": "白山市", "province": "吉林", "region": "东北", "lng": 126.4107, "lat": 41.9474, "isCenter": false}, {"name": "通化市", "province": "吉林", "region": "东北", "lng": 125.9372, "lat": 41.7208, "isCenter": false}, {"name": "四平市", "province": "吉林", "region": "东北", "lng": 124.3448, "lat": 43.1631, "isCenter": false}, {"name": "锦州市", "province": "辽宁", "region": "东北", "lng": 121.1357, "lat": 41.1194, "isCenter": false}, {"name": "大连市", "province": "辽宁", "region": "东北", "lng": 121.6147, "lat": 38.914, "isCenter": true}, {"name": "丹东市", "province": "辽宁", "region": "东北", "lng": 124.3836, "lat": 40.1263, "isCenter": false}, {"name": "抚顺市", "province": "辽宁", "region": "东北", "lng": 123.9287, "lat": 41.8761, "isCenter": false}, {"name": "葫芦岛市", "province": "辽宁", "region": "东北", "lng": 120.8565, "lat": 40.7577, "isCenter": false}, {"name": "铁岭市", "province": "辽宁", "region": "东北", "lng": 123.8446, "lat": 42.2707, "isCenter": false}, {"name": "沈阳市", "province": "辽宁", "region": "东北", "lng": 123.4328, "lat": 41.8086, "isCenter": true}, {"name": "营口市", "province": "辽宁", "region": "东北", "lng": 122.2357, "lat": 40.6677, "isCenter": false}, {"name": "盘锦市", "province": "辽宁", "region": "东北", "lng": 122.0707, "lat": 41.1223, "isCenter": true}, {"name": "阜新市", "province": "辽宁", "region": "东北", "lng": 121.6473, "lat": 42.0136, "isCenter": false}, {"name": "本溪市", "province": "辽宁", "region": "东北", "lng": 123.7771, "lat": 41.2991, "isCenter": false}, {"name": "辽阳市", "province": "辽宁", "region": "东北", "lng": 123.188, "lat": 41.2703, "isCenter": false}, {"name": "鞍山市", "province": "辽宁", "region": "东北", "lng": 122.9902, "lat": 41.1113, "isCenter": false}, {"name": "朝阳市", "province": "辽宁", "region": "东北", "lng": 120.451, "lat": 41.5739, "isCenter": false}, {"name": "洛阳市", "province": "河南", "region": "华中", "lng": 112.454, "lat": 34.6195, "isCenter": false}, {"name": "三门峡市", "province": "河南", "region": "华中", "lng": 111.1907, "lat": 34.7745, "isCenter": false}, {"name": "漯河市", "province": "河南", "region": "华中", "lng": 114.0265, "lat": 33.5773, "isCenter": true}, {"name": "许昌市", "province": "河南", "region": "华中", "lng": 113.85, "lat": 34.0372, "isCenter": false}, {"name": "南阳市", "province": "河南", "region": "华中", "lng": 112.5283, "lat": 32.9907, "isCenter": false}, {"name": "信阳市", "province": "河南", "region": "华中", "lng": 114.0728, "lat": 32.12, "isCenter": false}, {"name": "济源市", "province": "河南", "region": "华中", "lng": 112.6, "lat": 35.07, "isCenter": false}, {"name": "驻马店市", "province": "河南", "region": "华中", "lng": 114.0289, "lat": 32.9809, "isCenter": false}, {"name": "濮阳市", "province": "河南", "region": "华中", "lng": 115.0133, "lat": 35.7682, "isCenter": false}, {"name": "焦作市", "province": "河南", "region": "华中", "lng": 113.2426, "lat": 35.2289, "isCenter": false}, {"name": "郑州市", "province": "河南", "region": "华中", "lng": 113.6254, "lat": 34.7572, "isCenter": true}, {"name": "安阳市", "province": "河南", "region": "华中", "lng": 114.322, "lat": 36.1035, "isCenter": false}, {"name": "新乡市", "province": "河南", "region": "华中", "lng": 113.9274, "lat": 35.3027, "isCenter": true}, {"name": "鹤壁市", "province": "河南", "region": "华中", "lng": 114.3077, "lat": 35.7481, "isCenter": false}, {"name": "开封市", "province": "河南", "region": "华中", "lng": 114.3535, "lat": 34.8014, "isCenter": false}, {"name": "周口市", "province": "河南", "region": "华中", "lng": 114.7033, "lat": 33.6274, "isCenter": false}, {"name": "平顶山市", "province": "河南", "region": "华中", "lng": 113.19, "lat": 33.77, "isCenter": false}, {"name": "商丘市", "province": "河南", "region": "华中", "lng": 115.6533, "lat": 34.4498, "isCenter": true}, {"name": "十堰市", "province": "湖北", "region": "华中", "lng": 110.7818, "lat": 32.6233, "isCenter": false}, {"name": "襄阳市", "province": "湖北", "region": "华中", "lng": 112.1487, "lat": 32.0425, "isCenter": true}, {"name": "宜昌市", "province": "湖北", "region": "华中", "lng": 111.2982, "lat": 30.7026, "isCenter": false}, {"name": "荆门市", "province": "湖北", "region": "华中", "lng": 112.193, "lat": 30.9735, "isCenter": false}, {"name": "黄冈市", "province": "湖北", "region": "华中", "lng": 114.8724, "lat": 30.4559, "isCenter": false}, {"name": "天门市", "province": "湖北", "region": "华中", "lng": 113.17, "lat": 30.66, "isCenter": false}, {"name": "孝感市", "province": "湖北", "region": "华中", "lng": 113.9268, "lat": 30.9259, "isCenter": false}, {"name": "潜江市", "province": "湖北", "region": "华中", "lng": 112.9, "lat": 30.42, "isCenter": false}, {"name": "恩施土家族苗族自治州", "province": "湖北", "region": "华中", "lng": 109.49, "lat": 30.27, "isCenter": false}, {"name": "武汉市", "province": "湖北", "region": "华中", "lng": 114.3054, "lat": 30.5931, "isCenter": true}, {"name": "仙桃市", "province": "湖北", "region": "华中", "lng": 113.45, "lat": 30.36, "isCenter": false}, {"name": "荆州市", "province": "湖北", "region": "华中", "lng": 112.2439, "lat": 30.3432, "isCenter": true}, {"name": "随州市", "province": "湖北", "region": "华中", "lng": 113.3714, "lat": 31.6988, "isCenter": false}, {"name": "神农架林区", "province": "湖北", "region": "华中", "lng": 110.68, "lat": 31.74, "isCenter": false}, {"name": "咸宁市", "province": "湖北", "region": "华中", "lng": 114.3239, "lat": 29.8208, "isCenter": false}, {"name": "鄂州市", "province": "湖北", "region": "华中", "lng": 114.8907, "lat": 30.3855, "isCenter": false}, {"name": "黄石市", "province": "湖北", "region": "华中", "lng": 115.073, "lat": 30.2189, "isCenter": false}, {"name": "岳阳市", "province": "湖南", "region": "华中", "lng": 113.1106, "lat": 29.3726, "isCenter": false}, {"name": "益阳市", "province": "湖南", "region": "华中", "lng": 112.3683, "lat": 28.5506, "isCenter": false}, {"name": "衡阳市", "province": "湖南", "region": "华中", "lng": 112.5786, "lat": 26.8974, "isCenter": true}, {"name": "娄底市", "province": "湖南", "region": "华中", "lng": 111.99, "lat": 27.7384, "isCenter": false}, {"name": "常德市", "province": "湖南", "region": "华中", "lng": 111.6972, "lat": 29.0402, "isCenter": true}, {"name": "张家界市", "province": "湖南", "region": "华中", "lng": 110.479, "lat": 29.117, "isCenter": false}, {"name": "怀化市", "province": "湖南", "region": "华中", "lng": 109.9824, "lat": 27.542, "isCenter": false}, {"name": "湘西土家族苗族自治州", "province": "湖南", "region": "华中", "lng": 109.74, "lat": 28.32, "isCenter": false}, {"name": "长沙市", "province": "湖南", "region": "华中", "lng": 112.9388, "lat": 28.2282, "isCenter": true}, {"name": "湘潭市", "province": "湖南", "region": "华中", "lng": 112.944, "lat": 27.857, "isCenter": false}, {"name": "株洲市", "province": "湖南", "region": "华中", "lng": 113.1341, "lat": 27.8273, "isCenter": false}, {"name": "邵阳市", "province": "湖南", "region": "华中", "lng": 111.4744, "lat": 27.2371, "isCenter": false}, {"name": "郴州市", "province": "湖南", "region": "华中", "lng": 113.0348, "lat": 25.7922, "isCenter": false}, {"name": "永州市", "province": "湖南", "region": "华中", "lng": 111.5547, "lat": 26.422, "isCenter": false}, {"name": "聊城市", "province": "山东", "region": "华东", "lng": 115.9788, "lat": 36.4571, "isCenter": false}, {"name": "淄博市", "province": "山东", "region": "华东", "lng": 118.0312, "lat": 36.8064, "isCenter": false}, {"name": "临沂市", "province": "山东", "region": "华东", "lng": 118.3464, "lat": 35.0577, "isCenter": true}, {"name": "青岛市", "province": "山东", "region": "华东", "lng": 120.3826, "lat": 36.0671, "isCenter": false}, {"name": "威海市", "province": "山东", "region": "华东", "lng": 122.117, "lat": 37.513, "isCenter": false}, {"name": "烟台市", "province": "山东", "region": "华东", "lng": 121.3968, "lat": 37.4634, "isCenter": false}, {"name": "潍坊市", "province": "山东", "region": "华东", "lng": 119.1071, "lat": 36.7031, "isCenter": true}, {"name": "东营市", "province": "山东", "region": "华东", "lng": 118.665, "lat": 37.434, "isCenter": false}, {"name": "滨州市", "province": "山东", "region": "华东", "lng": 117.971, "lat": 37.382, "isCenter": false}, {"name": "日照市", "province": "山东", "region": "华东", "lng": 119.527, "lat": 35.416, "isCenter": false}, {"name": "枣庄市", "province": "山东", "region": "华东", "lng": 117.323, "lat": 34.81, "isCenter": false}, {"name": "德州市", "province": "山东", "region": "华东", "lng": 116.307, "lat": 37.453, "isCenter": false}, {"name": "济南市", "province": "山东", "region": "华东", "lng": 117.0009, "lat": 36.6758, "isCenter": true}, {"name": "菏泽市", "province": "山东", "region": "华东", "lng": 115.4694, "lat": 35.2465, "isCenter": true}, {"name": "泰安市", "province": "山东", "region": "华东", "lng": 117.1364, "lat": 36.1968, "isCenter": false}, {"name": "济宁市", "province": "山东", "region": "华东", "lng": 116.5803, "lat": 35.4153, "isCenter": false}, {"name": "连云港市", "province": "江苏", "region": "华东", "lng": 119.2216, "lat": 34.5967, "isCenter": false}, {"name": "宿迁市", "province": "江苏", "region": "华东", "lng": 118.2751, "lat": 33.963, "isCenter": false}, {"name": "南京市", "province": "江苏", "region": "华东", "lng": 118.7803, "lat": 32.0415, "isCenter": true}, {"name": "南通市", "province": "江苏", "region": "华东", "lng": 120.8677, "lat": 32.0189, "isCenter": true}, {"name": "淮安市", "province": "江苏", "region": "华东", "lng": 119.0213, "lat": 33.6102, "isCenter": true}, {"name": "扬州市", "province": "江苏", "region": "华东", "lng": 119.4127, "lat": 32.3887, "isCenter": false}, {"name": "泰州市", "province": "江苏", "region": "华东", "lng": 119.9151, "lat": 32.4819, "isCenter": false}, {"name": "盐城市", "province": "江苏", "region": "华东", "lng": 120.1648, "lat": 33.3776, "isCenter": false}, {"name": "镇江市", "province": "江苏", "region": "华东", "lng": 119.4468, "lat": 32.1915, "isCenter": false}, {"name": "苏州市", "province": "江苏", "region": "华东", "lng": 120.6195, "lat": 31.2989, "isCenter": true}, {"name": "无锡市", "province": "江苏", "region": "华东", "lng": 120.2883, "lat": 31.57, "isCenter": true}, {"name": "常州市", "province": "江苏", "region": "华东", "lng": 119.9731, "lat": 31.8107, "isCenter": false}, {"name": "徐州市", "province": "江苏", "region": "华东", "lng": 117.1822, "lat": 34.2623, "isCenter": true}, {"name": "淮北市", "province": "安徽", "region": "华东", "lng": 116.79, "lat": 33.97, "isCenter": false}, {"name": "铜陵市", "province": "安徽", "region": "华东", "lng": 117.8116, "lat": 30.9298, "isCenter": false}, {"name": "安庆市", "province": "安徽", "region": "华东", "lng": 117.0537, "lat": 30.5151, "isCenter": true}, {"name": "池州市", "province": "安徽", "region": "华东", "lng": 117.487, "lat": 30.6565, "isCenter": false}, {"name": "马鞍山市", "province": "安徽", "region": "华东", "lng": 118.5066, "lat": 31.6704, "isCenter": false}, {"name": "阜阳市", "province": "安徽", "region": "华东", "lng": 115.8198, "lat": 32.9009, "isCenter": false}, {"name": "黄山市", "province": "安徽", "region": "华东", "lng": 118.3377, "lat": 29.7147, "isCenter": false}, {"name": "六安市", "province": "安徽", "region": "华东", "lng": 116.5085, "lat": 31.7558, "isCenter": false}, {"name": "淮南市", "province": "安徽", "region": "华东", "lng": 116.99, "lat": 32.63, "isCenter": false}, {"name": "蚌埠市", "province": "安徽", "region": "华东", "lng": 117.3571, "lat": 32.9295, "isCenter": true}, {"name": "芜湖市", "province": "安徽", "region": "华东", "lng": 118.3752, "lat": 31.3682, "isCenter": true}, {"name": "滁州市", "province": "安徽", "region": "华东", "lng": 118.3164, "lat": 32.3036, "isCenter": false}, {"name": "合肥市", "province": "安徽", "region": "华东", "lng": 117.2827, "lat": 31.8612, "isCenter": true}, {"name": "宣城市", "province": "安徽", "region": "华东", "lng": 118.758, "lat": 30.941, "isCenter": false}, {"name": "亳州市", "province": "安徽", "region": "华东", "lng": 115.78, "lat": 33.87, "isCenter": false}, {"name": "宿州市", "province": "安徽", "region": "华东", "lng": 116.98, "lat": 33.64, "isCenter": false}, {"name": "舟山市", "province": "浙江", "region": "华东", "lng": 122.207, "lat": 29.985, "isCenter": false}, {"name": "嘉兴市", "province": "浙江", "region": "华东", "lng": 120.7509, "lat": 30.7455, "isCenter": true}, {"name": "温州市", "province": "浙江", "region": "华东", "lng": 120.6484, "lat": 28.0195, "isCenter": true}, {"name": "台州市", "province": "浙江", "region": "华东", "lng": 121.4207, "lat": 28.656, "isCenter": false}, {"name": "宁波市", "province": "浙江", "region": "华东", "lng": 121.5498, "lat": 29.8683, "isCenter": true}, {"name": "丽水市", "province": "浙江", "region": "华东", "lng": 119.922, "lat": 28.4517, "isCenter": false}, {"name": "湖州市", "province": "浙江", "region": "华东", "lng": 120.0872, "lat": 30.8928, "isCenter": false}, {"name": "衢州市", "province": "浙江", "region": "华东", "lng": 118.8729, "lat": 28.9412, "isCenter": false}, {"name": "杭州市", "province": "浙江", "region": "华东", "lng": 120.1551, "lat": 30.2741, "isCenter": true}, {"name": "金华市", "province": "浙江", "region": "华东", "lng": 119.647, "lat": 29.079, "isCenter": false}, {"name": "绍兴市", "province": "浙江", "region": "华东", "lng": 120.5821, "lat": 30.03, "isCenter": false}, {"name": "抚州市", "province": "江西", "region": "华东", "lng": 116.358, "lat": 27.984, "isCenter": false}, {"name": "九江市", "province": "江西", "region": "华东", "lng": 115.9929, "lat": 29.7121, "isCenter": false}, {"name": "赣州市", "province": "江西", "region": "华东", "lng": 114.9394, "lat": 25.8314, "isCenter": true}, {"name": "鹰潭市", "province": "江西", "region": "华东", "lng": 117.068, "lat": 28.258, "isCenter": false}, {"name": "景德镇市", "province": "江西", "region": "华东", "lng": 117.177, "lat": 29.275, "isCenter": false}, {"name": "上饶市", "province": "江西", "region": "华东", "lng": 117.972, "lat": 28.4578, "isCenter": false}, {"name": "萍乡市", "province": "江西", "region": "华东", "lng": 113.852, "lat": 27.623, "isCenter": false}, {"name": "宜春市", "province": "江西", "region": "华东", "lng": 114.391, "lat": 27.804, "isCenter": false}, {"name": "南昌市", "province": "江西", "region": "华东", "lng": 115.858, "lat": 28.6829, "isCenter": true}, {"name": "吉安市", "province": "江西", "region": "华东", "lng": 114.986, "lat": 27.113, "isCenter": false}, {"name": "新余市", "province": "江西", "region": "华东", "lng": 114.93, "lat": 27.815, "isCenter": false}, {"name": "宁德市", "province": "福建", "region": "华南", "lng": 119.527, "lat": 26.66, "isCenter": false}, {"name": "南平市", "province": "福建", "region": "华南", "lng": 118.1786, "lat": 26.6356, "isCenter": false}, {"name": "莆田市", "province": "福建", "region": "华南", "lng": 119.0153, "lat": 25.4396, "isCenter": false}, {"name": "龙岩市", "province": "福建", "region": "华南", "lng": 117.017, "lat": 25.075, "isCenter": false}, {"name": "福州市", "province": "福建", "region": "华南", "lng": 119.3062, "lat": 26.0745, "isCenter": true}, {"name": "三明市", "province": "福建", "region": "华南", "lng": 117.635, "lat": 26.265, "isCenter": false}, {"name": "泉州市", "province": "福建", "region": "华南", "lng": 118.5894, "lat": 24.9003, "isCenter": true}, {"name": "厦门市", "province": "福建", "region": "华南", "lng": 118.09, "lat": 24.48, "isCenter": true}, {"name": "漳州市", "province": "福建", "region": "华南", "lng": 117.677, "lat": 24.5136, "isCenter": false}, {"name": "汕头市", "province": "广东", "region": "华南", "lng": 116.6732, "lat": 23.3619, "isCenter": false}, {"name": "佛山市", "province": "广东", "region": "华南", "lng": 113.1301, "lat": 23.0215, "isCenter": true}, {"name": "肇庆市", "province": "广东", "region": "华南", "lng": 112.4734, "lat": 23.0472, "isCenter": false}, {"name": "惠州市", "province": "广东", "region": "华南", "lng": 114.4133, "lat": 23.1115, "isCenter": false}, {"name": "深圳市", "province": "广东", "region": "华南", "lng": 114.0579, "lat": 22.5431, "isCenter": true}, {"name": "湛江市", "province": "广东", "region": "华南", "lng": 110.3645, "lat": 21.2712, "isCenter": true}, {"name": "珠海市", "province": "广东", "region": "华南", "lng": 113.5767, "lat": 22.2707, "isCenter": false}, {"name": "潮州市", "province": "广东", "region": "华南", "lng": 116.6337, "lat": 23.6612, "isCenter": false}, {"name": "茂名市", "province": "广东", "region": "华南", "lng": 110.9193, "lat": 21.6616, "isCenter": false}, {"name": "江门市", "province": "广东", "region": "华南", "lng": 113.0814, "lat": 22.5777, "isCenter": false}, {"name": "河源市", "province": "广东", "region": "华南", "lng": 114.6983, "lat": 23.7466, "isCenter": false}, {"name": "云浮市", "province": "广东", "region": "华南", "lng": 112.0444, "lat": 22.9304, "isCenter": false}, {"name": "汕尾市", "province": "广东", "region": "华南", "lng": 115.7844, "lat": 22.7753, "isCenter": false}, {"name": "阳江市", "province": "广东", "region": "华南", "lng": 111.9751, "lat": 22.0105, "isCenter": false}, {"name": "揭阳市", "province": "广东", "region": "华南", "lng": 116.3586, "lat": 23.5444, "isCenter": true}, {"name": "梅州市", "province": "广东", "region": "华南", "lng": 116.1176, "lat": 24.2914, "isCenter": false}, {"name": "广州市", "province": "广东", "region": "华南", "lng": 113.2644, "lat": 23.1291, "isCenter": true}, {"name": "韶关市", "province": "广东", "region": "华南", "lng": 113.59, "lat": 24.81, "isCenter": false}, {"name": "清远市", "province": "广东", "region": "华南", "lng": 113.0553, "lat": 23.6822, "isCenter": false}, {"name": "中山市", "province": "广东", "region": "华南", "lng": 113.3823, "lat": 22.5211, "isCenter": false}, {"name": "东莞市", "province": "广东", "region": "华南", "lng": 113.7518, "lat": 23.0207, "isCenter": true}, {"name": "百色市", "province": "广西", "region": "华南", "lng": 106.6296, "lat": 23.9016, "isCenter": false}, {"name": "北海市", "province": "广西", "region": "华南", "lng": 109.1193, "lat": 21.4816, "isCenter": false}, {"name": "钦州市", "province": "广西", "region": "华南", "lng": 108.6242, "lat": 21.9709, "isCenter": false}, {"name": "柳州市", "province": "广西", "region": "华南", "lng": 109.4287, "lat": 24.3264, "isCenter": true}, {"name": "来宾市", "province": "广西", "region": "华南", "lng": 109.2259, "lat": 23.7493, "isCenter": false}, {"name": "南宁市", "province": "广西", "region": "华南", "lng": 108.3275, "lat": 22.8278, "isCenter": true}, {"name": "梧州市", "province": "广西", "region": "华南", "lng": 111.3193, "lat": 23.4763, "isCenter": false}, {"name": "桂林市", "province": "广西", "region": "华南", "lng": 110.2992, "lat": 25.2742, "isCenter": false}, {"name": "崇左市", "province": "广西", "region": "华南", "lng": 107.3671, "lat": 22.3964, "isCenter": false}, {"name": "防城港市", "province": "广西", "region": "华南", "lng": 108.3544, "lat": 21.687, "isCenter": false}, {"name": "贺州市", "province": "广西", "region": "华南", "lng": 111.544, "lat": 24.4164, "isCenter": false}, {"name": "玉林市", "province": "广西", "region": "华南", "lng": 110.1512, "lat": 22.635, "isCenter": false}, {"name": "贵港市", "province": "广西", "region": "华南", "lng": 109.5974, "lat": 23.1182, "isCenter": false}, {"name": "河池市", "province": "广西", "region": "华南", "lng": 108.0743, "lat": 24.7077, "isCenter": false}, {"name": "东方市", "province": "海南", "region": "华南", "lng": 108.64, "lat": 19.1, "isCenter": false}, {"name": "屯昌县", "province": "海南", "region": "华南", "lng": 110.1, "lat": 19.36, "isCenter": false}, {"name": "万宁市", "province": "海南", "region": "华南", "lng": 110.39, "lat": 18.8, "isCenter": false}, {"name": "临高县", "province": "海南", "region": "华南", "lng": 109.69, "lat": 19.91, "isCenter": false}, {"name": "昌江黎族自治县", "province": "海南", "region": "华南", "lng": 109.07, "lat": 19.26, "isCenter": false}, {"name": "定安县", "province": "海南", "region": "华南", "lng": 110.36, "lat": 19.69, "isCenter": false}, {"name": "白沙黎族自治县", "province": "海南", "region": "华南", "lng": 109.45, "lat": 19.23, "isCenter": false}, {"name": "琼海市", "province": "海南", "region": "华南", "lng": 110.47, "lat": 19.26, "isCenter": false}, {"name": "琼中黎族苗族自治县", "province": "海南", "region": "华南", "lng": 109.84, "lat": 19.04, "isCenter": false}, {"name": "儋州市", "province": "海南", "region": "华南", "lng": 109.576, "lat": 19.518, "isCenter": false}, {"name": "乐东黎族自治县", "province": "海南", "region": "华南", "lng": 109.17, "lat": 18.75, "isCenter": false}, {"name": "澄迈县", "province": "海南", "region": "华南", "lng": 110.0, "lat": 19.75, "isCenter": false}, {"name": "三亚市", "province": "海南", "region": "华南", "lng": 109.5119, "lat": 18.2528, "isCenter": false}, {"name": "陵水黎族自治县", "province": "海南", "region": "华南", "lng": 110.04, "lat": 18.51, "isCenter": false}, {"name": "文昌市", "province": "海南", "region": "华南", "lng": 110.78, "lat": 19.55, "isCenter": false}, {"name": "三沙市", "province": "海南", "region": "华南", "lng": 112.333, "lat": 16.833, "isCenter": false}, {"name": "海口市", "province": "海南", "region": "华南", "lng": 110.3492, "lat": 20.0238, "isCenter": true}, {"name": "保亭黎族苗族自治县", "province": "海南", "region": "华南", "lng": 109.7, "lat": 18.64, "isCenter": false}, {"name": "五指山市", "province": "海南", "region": "华南", "lng": 109.52, "lat": 18.78, "isCenter": false}, {"name": "义乌", "province": "浙江", "region": "华东", "lng": 120.07, "lat": 29.31, "isCenter": true, "isExtra": true}, {"name": "浦东", "province": "上海", "region": "华东", "lng": 121.54, "lat": 31.22, "isCenter": true, "isExtra": true}, {"name": "上虞", "province": "浙江", "region": "华东", "lng": 120.87, "lat": 30.03, "isCenter": true, "isExtra": true}, {"name": "临海", "province": "浙江", "region": "华东", "lng": 121.14, "lat": 28.86, "isCenter": true, "isExtra": true}, {"name": "横峰", "province": "江西", "region": "华中", "lng": 117.62, "lat": 28.42, "isCenter": true, "isExtra": true}, {"name": "武昌", "province": "湖北", "region": "华中", "lng": 114.31, "lat": 30.55, "isCenter": true, "isExtra": true}, {"name": "肃宁", "province": "河北", "region": "华北", "lng": 115.82, "lat": 38.42, "isCenter": true, "isExtra": true}, {"name": "北京市", "province": "北京", "region": "华北", "lng": 116.4, "lat": 39.9, "isCenter": true}, {"name": "上海市", "province": "上海", "region": "华东", "lng": 121.47, "lat": 31.23, "isCenter": true}, {"name": "天津市", "province": "天津", "region": "华北", "lng": 117.2, "lat": 39.13, "isCenter": true}, {"name": "重庆市", "province": "重庆", "region": "西南", "lng": 106.55, "lat": 29.56, "isCenter": true}];
+const REGION_PROVINCES = {"西南": ["云南", "贵州", "四川", "西藏", "重庆"], "西北": ["陕西", "甘肃", "宁夏", "青海", "新疆"], "华北": ["河北", "山西", "内蒙", "北京", "天津"], "东北": ["黑龙江", "吉林", "辽宁"], "华中": ["河南", "湖北", "湖南", "江西"], "华东": ["山东", "江苏", "安徽", "浙江", "江西", "上海"], "华南": ["福建", "广东", "广西", "海南"]};
+const ALL_REGIONS = ["全部","华东","华中","华南","西南","华北","西北","东北"];
+const CAPITAL_NAMES = ["北京市","天津市","石家庄市","太原市","呼和浩特市","沈阳市","长春市","哈尔滨市","上海市","南京市","杭州市","合肥市","福州市","南昌市","济南市","郑州市","武汉市","长沙市","广州市","南宁市","海口市","重庆市","成都市","贵阳市","昆明市","拉萨市","西安市","兰州市","西宁市","银川市","乌鲁木齐市"];
+
+document.getElementById('totalCount').textContent = CITIES.length;
+
+let map;
+let routePoints = [];
+let currentDriving = null;
+let cityMarkers = [];
+let currentRegion = "全部";
+let currentProvince = "全部";
+let searchKeyword = "";
+let isPlanning = false;
+let CAPITALS = [];
+
+const tipDom = document.getElementById('tip');
+const panel = document.getElementById('panel');
+
+window.onload = function() {
+  if(!window.AMap) { alert("高德地图加载失败，请检查网络"); return; }
+  initMap();
+  initFilters();
+  CAPITALS = CITIES.filter(function(c) { return CAPITAL_NAMES.indexOf(c.name) >= 0; });
+  renderCityList();
+};
+
+
+// 侧边栏收回/展开
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const btn = document.querySelector('.sidebar-toggle');
+  sidebar.classList.toggle('collapsed');
+  if(sidebar.classList.contains('collapsed')) {
+    btn.innerHTML = '▶';
+    btn.title = '展开侧边栏';
+  } else {
+    btn.innerHTML = '◀';
+    btn.title = '收回侧边栏';
+  }
+  // 通知地图重新计算尺寸
+  setTimeout(function(){ if(map) map.resize(); }, 300);
+}
+
+// 横屏模式交互状态
+let landscapeInteract = { active:false, startX:0, startY:0, lastX:0, lastY:0, moved:false };
+
+function getLandscapeCoordTransform() {
+  const rect = document.getElementById('map').getBoundingClientRect();
+  return {
+    vcx: rect.x + rect.width / 2,
+    vcy: rect.y + rect.height / 2,
+    lcx: rect.height / 2,
+    lcy: rect.width / 2
+  };
+}
+
+function onLandscapeStart(e) {
+  landscapeInteract.active = true;
+  landscapeInteract.moved = false;
+  const p = e.touches ? e.touches[0] : e;
+  landscapeInteract.startX = landscapeInteract.lastX = p.clientX;
+  landscapeInteract.startY = landscapeInteract.lastY = p.clientY;
+  e.preventDefault();
+}
+
+function onLandscapeMove(e) {
+  if(!landscapeInteract.active) return;
+  const p = e.touches ? e.touches[0] : e;
+  const dvx = p.clientX - landscapeInteract.lastX;
+  const dvy = p.clientY - landscapeInteract.lastY;
+  landscapeInteract.lastX = p.clientX;
+  landscapeInteract.lastY = p.clientY;
+  if(Math.abs(p.clientX - landscapeInteract.startX) > 5 || Math.abs(p.clientY - landscapeInteract.startY) > 5) {
+    landscapeInteract.moved = true;
+  }
+  const dpx = dvy;
+  const dpy = -dvx;
+  if(map) map.panBy(dpx, dpy);
+  e.preventDefault();
+}
+
+function onLandscapeEnd(e) {
+  if(!landscapeInteract.active) return;
+  landscapeInteract.active = false;
+  // 横屏模式下只支持拖拽和缩放，不支持点击城市
+  e.preventDefault();
+}
+
+function handleLandscapeClick(vx, vy) {
+  const t = getLandscapeCoordTransform();
+  const rx = vx - t.vcx;
+  const ry = vy - t.vcy;
+  const px = -ry + t.lcx;
+  const py = rx + t.lcy;
+  try {
+    const lnglat = map.containerToLngLat(new AMap.Pixel(px, py));
+    let nearest = null, minDist = Infinity;
+    for(const city of CITIES) {
+      const d = Math.sqrt(Math.pow(city.lng - lnglat.lng, 2) + Math.pow(city.lat - lnglat.lat, 2));
+      if(d < minDist) { minDist = d; nearest = city; }
+    }
+    if(nearest && minDist < 1.5) {
+      handleCityClick(nearest);
+    }
+  } catch(err) {}
+}
+
+function enableLandscapeInteract() {
+  const overlay = document.getElementById('landscapeOverlay');
+  overlay.style.display = 'block';
+  overlay.addEventListener('mousedown', onLandscapeStart);
+  window.addEventListener('mousemove', onLandscapeMove);
+  window.addEventListener('mouseup', onLandscapeEnd);
+  overlay.addEventListener('touchstart', onLandscapeStart, {passive:false});
+  window.addEventListener('touchmove', onLandscapeMove, {passive:false});
+  window.addEventListener('touchend', onLandscapeEnd);
+}
+function disableLandscapeInteract() {
+  const overlay = document.getElementById('landscapeOverlay');
+  overlay.style.display = 'none';
+  overlay.removeEventListener('mousedown', onLandscapeStart);
+  window.removeEventListener('mousemove', onLandscapeMove);
+  window.removeEventListener('mouseup', onLandscapeEnd);
+  overlay.removeEventListener('touchstart', onLandscapeStart);
+  window.removeEventListener('touchmove', onLandscapeMove);
+  window.removeEventListener('touchend', onLandscapeEnd);
+}
+
+// 横屏全屏模式切换
+function toggleFullscreen() {
+  document.body.classList.toggle('landscape-fullscreen');
+  const btn = document.getElementById('fullscreenBtn');
+  const zoomCtl = document.getElementById('landscapeZoom');
+  const tip = document.getElementById('landscapeTip');
+  if(document.body.classList.contains('landscape-fullscreen')) {
+    btn.innerHTML = '⛶ 退出横屏';
+    btn.title = '退出横屏全屏模式';
+    zoomCtl.style.display = 'flex';
+    tip.style.display = 'block';
+    if(map) map.setStatus({dragEnable:false});
+    enableLandscapeInteract();
+  } else {
+    btn.innerHTML = '⛶ 横屏全屏';
+    btn.title = '进入横屏全屏模式（旋转90度，隐藏侧边栏和顶部栏）';
+    zoomCtl.style.display = 'none';
+    tip.style.display = 'none';
+    if(map) map.setStatus({dragEnable:true});
+    disableLandscapeInteract();
+  }
+  setTimeout(function(){ if(map) map.resize(); }, 350);
+}
+function initMap() {
+  map = new AMap.Map("map", { zoom: 5, center: [108, 36], resizeEnable: true });
+  map.addControl(new AMap.Scale());
+  map.addControl(new AMap.ToolBar({position: "RB"}));
+
+  CITIES.forEach(function(city) {
+    const marker = new AMap.CircleMarker({
+      center: [city.lng, city.lat],
+      radius: city.isCenter ? 8 : 4,
+      fillColor: "#2563eb",
+      fillOpacity: city.isCenter ? 0.95 : 0.75,
+      strokeColor: "#fff",
+      strokeWeight: city.isCenter ? 2 : 1.5,
+      cursor: "pointer",
+      extData: city,
+      zIndex: city.isCenter ? 120 : 90
+    });
+    marker.on("click", function(e) { handleCityClick(e.target.getExtData()); });
+    marker.setMap(map);
+    cityMarkers.push(marker);
+  });
+
+  document.getElementById("clearBtn").onclick = resetAll;
+  document.getElementById("clearRouteBtn").onclick = clearRoute;
+  document.getElementById("optimizeBtn").onclick = optimizeRouteOrderBtn;
+  document.getElementById("panelClose").onclick = function() { panel.classList.remove("open"); };
+  document.getElementById("distClose").onclick = function() { document.getElementById("distPanel").classList.remove("open"); };
+  document.getElementById("zoomInBtn").onclick = function() { if(map) map.zoomIn(); };
+  document.getElementById("zoomOutBtn").onclick = function() { if(map) map.zoomOut(); };
+}
+
+
+// 筛选栏收起/展开
+function toggleFilter() {
+  const area = document.getElementById('filterArea');
+  const icon = document.getElementById('filterToggleIcon');
+  area.classList.toggle('collapsed');
+  if(area.classList.contains('collapsed')) {
+    icon.innerHTML = '▼ 展开';
+  } else {
+    icon.innerHTML = '▲ 收起';
+  }
+}
+
+function initFilters() {
+  const regionContainer = document.getElementById('regionTabs');
+  ALL_REGIONS.forEach(function(region) {
+    const count = region === "全部" ? CITIES.length : CITIES.filter(c => c.region === region).length;
+    const tab = document.createElement('span');
+    tab.className = 'filter-tab' + (region === "全部" ? ' active' : '');
+    tab.textContent = region + '(' + count + ')';
+    tab.onclick = function() {
+      document.querySelectorAll('#regionTabs .filter-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentRegion = region;
+      currentProvince = "全部";
+      renderProvinceTabs();
+      renderCityList();
+    };
+    regionContainer.appendChild(tab);
+  });
+  renderProvinceTabs();
+  document.getElementById('searchInput').addEventListener('input', function(e) {
+    searchKeyword = e.target.value.trim();
+    renderCityList();
+  });
+}
+
+function renderProvinceTabs() {
+  const container = document.getElementById('provinceTabs');
+  container.innerHTML = '';
+  let provinces = ["全部"];
+  if(currentRegion === "全部") {
+    CITIES.forEach(function(c) { if(!provinces.includes(c.province)) provinces.push(c.province); });
+  } else {
+    provinces = provinces.concat(REGION_PROVINCES[currentRegion] || []);
+  }
+  provinces.forEach(function(prov) {
+    const count = prov === "全部" ?
+      (currentRegion === "全部" ? CITIES.length : CITIES.filter(c => c.region === currentRegion).length) :
+      CITIES.filter(c => c.province === prov).length;
+    const tab = document.createElement('span');
+    tab.className = 'filter-tab' + (prov === "全部" ? ' active' : '');
+    tab.textContent = prov + '(' + count + ')';
+    tab.onclick = function() {
+      document.querySelectorAll('#provinceTabs .filter-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentProvince = prov;
+      renderCityList();
+    };
+    container.appendChild(tab);
+  });
+}
+
+function renderCityList(scrollToCity) {
+  const list = document.getElementById('cityList');
+  list.innerHTML = '';
+  let filtered = CITIES;
+  if(currentRegion !== "全部") filtered = filtered.filter(c => c.region === currentRegion);
+  if(currentProvince !== "全部") filtered = filtered.filter(c => c.province === currentProvince);
+  if(searchKeyword) {
+    const kw = searchKeyword.toLowerCase();
+    filtered = filtered.filter(c => c.name.toLowerCase().includes(kw) || c.province.includes(kw));
+  }
+  filtered.sort(function(a, b) { return (b.isCenter?1:0) - (a.isCenter?1:0); });
+
+  if(filtered.length === 0) {
+    list.innerHTML = '<div class="empty-tip">未找到匹配的城市</div>';
+  } else {
+    filtered.forEach(function(city) {
+      const routeIdx = routePoints.findIndex(function(p) { return p.city.name === city.name; });
+      const item = document.createElement('div');
+      item.className = 'city-item' + (routeIdx >= 0 ? ' in-route' : '') + (city.isCenter ? ' is-center' : '');
+      item.dataset.cityName = city.name;
+      item.innerHTML =
+        (routeIdx >= 0 ? '<span class="route-num">' + (routeIdx+1) + '</span>' : '') +
+        '<span class="city-name">' + (city.isCenter ? '<span class="center-star">★</span>' : '') + city.name + (city.isCenter ? '<span class="city-center-tag">中心</span>' : '') + '</span>' +
+        '<span class="city-province">' + city.province + '</span>' +
+        '<span class="dist-btn" title="查看到各省会距离" style="margin-left:4px;cursor:pointer;color:#16a34a;font-size:13px;padding:0 2px;">&#128207;</span>';
+      item.onclick = function() {
+        handleCityClick(city);
+      };
+      item.querySelector('.dist-btn').onclick = function(e) {
+        e.stopPropagation();
+        showDistancesToCapitals(city);
+      };
+      list.appendChild(item);
+    });
+  }
+  document.getElementById('cityCount').textContent = '显示 ' + filtered.length + ' / ' + CITIES.length + ' 个城市';
+
+  if(scrollToCity) {
+    setTimeout(function() {
+      const el = list.querySelector('[data-city-name="' + scrollToCity + '"]');
+      if(el) {
+        el.scrollIntoView({behavior:'smooth', block:'center'});
+        el.classList.add('flash');
+        setTimeout(function(){ el.classList.remove('flash'); }, 1300);
+      }
+    }, 50);
+  }
+}
+
+function renderRouteBar() {
+  const bar = document.getElementById('routePointsBar');
+  document.getElementById('routeCount').textContent = routePoints.length;
+  if(routePoints.length === 0) {
+    bar.innerHTML = '<span class="route-empty">尚未选择城市，点击下方列表或地图上的点开始</span>';
+    return;
+  }
+  bar.innerHTML = '';
+  routePoints.forEach(function(p, idx) {
+    if(idx > 0) {
+      const arrow = document.createElement('span');
+      arrow.className = 'route-arrow';
+      arrow.textContent = '→';
+      bar.appendChild(arrow);
+    }
+    const tag = document.createElement('span');
+    tag.className = 'route-point-tag';
+    tag.title = '点击取消此点及之后的点';
+    tag.innerHTML = '<span class="num">' + (idx+1) + '</span>' + p.city.name;
+    tag.onclick = function() { removePointAt(idx); };
+    bar.appendChild(tag);
+  });
+}
+
+// 球面距离
+function geoDist(a, b) {
+  const R = 6371;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLng = (b.lng - a.lng) * Math.PI / 180;
+  const lat1 = a.lat * Math.PI / 180;
+  const lat2 = b.lat * Math.PI / 180;
+  const h = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+// ===== Dijkstra TSP 最优顺序 =====
+function optimizeRouteOrder(points) {
+  const n = points.length;
+  if(n <= 2) return points.slice();
+  const dist = [];
+  for(let i = 0; i < n; i++) {
+    dist[i] = [];
+    for(let j = 0; j < n; j++) dist[i][j] = geoDist(points[i].city, points[j].city);
+  }
+  if(n <= 12) return dijkstraTSP(points, dist);
+  let result = nearestNeighbor(points, dist);
+  return twoOpt(result, dist);
+}
+
+function dijkstraTSP(points, dist) {
+  const n = points.length;
+  const fullMask = (1 << n) - 1;
+  const stateSize = 1 << n;
+  const startState = 1;
+  const distMap = new Map();
+  const prevMap = new Map();
+  distMap.set(startState, 0);
+  const pq = [{state: startState, d: 0}];
+  function heapPush(item) {
+    pq.push(item);
+    let i = pq.length - 1;
+    while(i > 0) {
+      const parent = Math.floor((i-1)/2);
+      if(pq[parent].d <= pq[i].d) break;
+      [pq[parent], pq[i]] = [pq[i], pq[parent]];
+      i = parent;
+    }
+  }
+  function heapPop() {
+    if(pq.length === 0) return null;
+    const top = pq[0];
+    const last = pq.pop();
+    if(pq.length > 0) {
+      pq[0] = last;
+      let i = 0;
+      while(true) {
+        let smallest = i;
+        const l = 2*i+1, r = 2*i+2;
+        if(l < pq.length && pq[l].d < pq[smallest].d) smallest = l;
+        if(r < pq.length && pq[r].d < pq[smallest].d) smallest = r;
+        if(smallest === i) break;
+        [pq[i], pq[smallest]] = [pq[smallest], pq[i]];
+        i = smallest;
+      }
+    }
+    return top;
+  }
+  let finalState = -1, finalDist = Infinity;
+  while(pq.length > 0) {
+    const {state, d} = heapPop();
+    if(d > (distMap.get(state) || Infinity)) continue;
+    const current = Math.floor(state / stateSize);
+    const mask = state % stateSize;
+    if(mask === fullMask) {
+      if(d < finalDist) { finalDist = d; finalState = state; }
+      continue;
+    }
+    for(let next = 0; next < n; next++) {
+      if(mask & (1 << next)) continue;
+      const newMask = mask | (1 << next);
+      const newState = next * stateSize + newMask;
+      const newDist = d + dist[current][next];
+      if(newDist < (distMap.get(newState) || Infinity)) {
+        distMap.set(newState, newDist);
+        prevMap.set(newState, state);
+        heapPush({state: newState, d: newDist});
+      }
+    }
+  }
+  const order = [];
+  let s = finalState;
+  while(s !== undefined) {
+    order.unshift(Math.floor(s / stateSize));
+    s = prevMap.get(s);
+  }
+  return order.map(i => points[i]);
+}
+
+function nearestNeighbor(points, dist) {
+  const n = points.length;
+  const result = [points[0]];
+  const visited = new Set([0]);
+  let current = 0;
+  while(visited.size < n) {
+    let next = -1, minD = Infinity;
+    for(let j = 0; j < n; j++) {
+      if(!visited.has(j) && dist[current][j] < minD) { minD = dist[current][j]; next = j; }
+    }
+    visited.add(next);
+    result.push(points[next]);
+    current = next;
+  }
+  return result;
+}
+
+function twoOpt(points, dist) {
+  const n = points.length;
+  let improved = true;
+  let best = points.slice();
+  while(improved) {
+    improved = false;
+    for(let i = 1; i < n - 2; i++) {
+      for(let j = i + 1; j < n - 1; j++) {
+        const dBefore = dist[i-1][i] + dist[j][j+1];
+        const dAfter = dist[i-1][j] + dist[i][j+1];
+        if(dAfter < dBefore - 0.01) {
+          best = best.slice(0, i).concat(best.slice(i, j+1).reverse()).concat(best.slice(j+1));
+          improved = true;
+        }
+      }
+    }
+  }
+  return best;
+}
+
+// ===== 核心：单Driving实例多点路线规划 =====
+function planFullRoute() {
+  if(routePoints.length < 2) {
+    if(currentDriving) { currentDriving.clear(); currentDriving = null; }
+    panel.classList.remove("open");
+    return;
+  }
+
+  // 清除旧路线
+  if(currentDriving) {
+    currentDriving.clear();
+    currentDriving = null;
+  }
+
+  isPlanning = true;
+
+  // 起点、终点、途经点
+  const origin = [routePoints[0].city.lng, routePoints[0].city.lat];
+  const destination = [routePoints[routePoints.length-1].city.lng, routePoints[routePoints.length-1].city.lat];
+  const waypoints = routePoints.slice(1, -1).map(function(p) { return [p.city.lng, p.city.lat]; });
+
+  // 创建Driving实例
+  currentDriving = new AMap.Driving({
+    map: map,
+    autoFitView: true,
+    hideMarkers: true,
+    policy: AMap.DrivingPolicy.LEAST_TIME
+  });
+  currentDriving.search(origin, destination, {waypoints: waypoints}, routeCallback);
+}
+
+function routeCallback(status, result) {
+  isPlanning = false;
+  if(status === "complete" && result.routes && result.routes.length > 0) {
+    const route = result.routes[0];
+    updateRouteSummary(route);
+    tipDom.innerHTML = "✅ <b>" + routePoints[0].city.name + " → " + routePoints[routePoints.length-1].city.name +
+      "</b>（经" + (routePoints.length-2) + "个途经点），总里程 <b style='color:#dc2626;'>" +
+      (route.distance/1000).toFixed(1) + " km</b>，约 <b>" +
+      Math.floor(route.time/3600) + "时" + Math.floor((route.time%3600)/60) + "分</b>";
+  } else {
+    tipDom.innerHTML = "❌ 路线规划失败，部分点之间可能无可用驾车道路（如海岛/偏远地区）";
+    panel.classList.remove("open");
+  }
+}
+
+function updateRouteSummary(route) {
+  document.getElementById("pTitle").textContent = routePoints.length + "点路线汇总";
+  const totalKm = (route.distance / 1000).toFixed(1);
+  const totalH = Math.floor(route.time / 3600);
+  const totalM = Math.floor((route.time % 3600) / 60);
+
+  document.getElementById("pMeta").innerHTML =
+    "<span>共 <b>" + routePoints.length + "</b> 个点 · <b>" + (routePoints.length-1) + "</b> 段路线</span><br>" +
+    "<span>总里程 <b style='color:#dc2626;'>" + totalKm + " km</b></span> · " +
+    "<span>总预计 <b>" + totalH + "时" + totalM + "分</b></span>";
+
+  const segList = document.getElementById("segList");
+  segList.innerHTML = "";
+  // 显示路线点序列
+  for(let i = 0; i < routePoints.length; i++) {
+    const li = document.createElement("li");
+    const p = routePoints[i];
+    let label = "第" + (i+1) + "点：" + p.city.name + "（" + p.city.province + "）";
+    if(i === 0) label += " · 起点";
+    else if(i === routePoints.length - 1) label += " · 终点";
+    else label += " · 途经";
+    li.innerHTML = "<span>" + label + "</span>";
+    segList.appendChild(li);
+  }
+  // 显示导航步骤（前10条）
+  if(route.steps && route.steps.length > 0) {
+    const header = document.createElement("li");
+    header.style.cssText = "background:#f9fafb;font-weight:600;color:#6b7280;";
+    header.textContent = "导航步骤（前10条）：";
+    segList.appendChild(header);
+    route.steps.slice(0, 10).forEach(function(step, idx) {
+      const li = document.createElement("li");
+      const sd = step.distance > 1000 ? (step.distance/1000).toFixed(1)+"km" : step.distance+"m";
+      li.innerHTML = "<span>" + (idx+1) + ". " + (step.instruction || "") + "</span><span class='seg-dist'>" + sd + "</span>";
+      segList.appendChild(li);
+    });
+  }
+  panel.classList.add("open");
+}
+
+function renumberMarkers() {
+  routePoints.forEach(function(p, i) {
+    p.marker.setContent('<div style="background:#16a34a;color:#fff;border:2px solid #fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.35);cursor:pointer;">' + (i+1) + '</div>');
+  });
+}
+
+// ===== 交互 =====
+function handleCityClick(city) {
+  document.getElementById("distPanel").classList.remove("open");
+  const idx = routePoints.findIndex(function(p) { return p.city.name === city.name; });
+  if(idx >= 0) {
+    removePointAt(idx);
+  } else {
+    addPoint(city);
+  }
+}
+
+function addPoint(city) {
+  const marker = new AMap.Marker({
+    position: [city.lng, city.lat],
+    content: '<div style="background:#16a34a;color:#fff;border:2px solid #fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.35);cursor:pointer;">' + (routePoints.length+1) + '</div>',
+    offset: new AMap.Pixel(-14, -14),
+    zIndex: 300 + routePoints.length
+  });
+  marker.on("click", function() {
+    const i = routePoints.findIndex(function(p) { return p.city.name === city.name; });
+    if(i >= 0) removePointAt(i);
+  });
+  marker.setMap(map);
+  routePoints.push({city: city, marker: marker});
+
+  // 3个点及以上自动优化顺序
+  if(routePoints.length >= 3) {
+    const optimized = optimizeRouteOrder(routePoints);
+    let changed = false;
+    for(let i = 0; i < optimized.length; i++) {
+      if(optimized[i].city.name !== routePoints[i].city.name) { changed = true; break; }
+    }
+    if(changed) {
+      routePoints = optimized;
+      renumberMarkers();
+      tipDom.innerHTML = "🔄 已自动优化路线顺序（Dijkstra），共 <b>" + routePoints.length + "</b> 个点，正在规划...";
+      renderRouteBar();
+      renderCityList(city.name);
+      planFullRoute();
+      return;
+    }
+  }
+
+  // 顺序未变或只有2个点，直接规划
+  if(routePoints.length >= 2) {
+    tipDom.innerHTML = "🚗 正在规划路线（" + routePoints.length + "个点）...";
+    planFullRoute();
+  } else {
+    map.setZoomAndCenter(6, [city.lng, city.lat], false, 300);
+    tipDom.innerHTML = "✅ 起点：<b>" + city.name + "</b>（" + city.province + "），请继续点击添加下一个点";
+  }
+  renderRouteBar();
+  renderCityList(city.name);
+}
+
+function removePointAt(idx) {
+  const removed = routePoints.splice(idx);
+  removed.forEach(function(p) { if(p.marker) map.remove(p.marker); });
+  renumberMarkers();
+  tipDom.innerHTML = routePoints.length > 0 ?
+    "已取消第 " + (idx+1) + " 点及之后的点，当前 " + routePoints.length + " 个点，重新规划..." :
+    "📌 路线已清空，点击城市重新开始";
+  renderRouteBar();
+  renderCityList();
+  planFullRoute();
+}
+
+function optimizeRouteOrderBtn() {
+  if(routePoints.length < 3) {
+    tipDom.innerHTML = "⚠️ 至少需要3个点才能优化顺序";
+    return;
+  }
+  const optimized = optimizeRouteOrder(routePoints);
+  let changed = false;
+  for(let i = 0; i < optimized.length; i++) {
+    if(optimized[i].city.name !== routePoints[i].city.name) { changed = true; break; }
+  }
+  if(!changed) {
+    tipDom.innerHTML = "✅ 当前顺序已是最优（Dijkstra）";
+    return;
+  }
+  routePoints = optimized;
+  renumberMarkers();
+  renderRouteBar();
+  renderCityList();
+  tipDom.innerHTML = "🔄 已优化路线顺序，正在重新规划...";
+  planFullRoute();
+}
+
+function clearRoute() {
+  routePoints.forEach(function(p) { if(p.marker) map.remove(p.marker); });
+  routePoints = [];
+  if(currentDriving) { currentDriving.clear(); currentDriving = null; }
+  panel.classList.remove("open");
+  tipDom.textContent = "📌 路线已清空，点击城市重新开始";
+  renderRouteBar();
+  renderCityList();
+}
+
+function resetAll() {
+  clearRoute();
+  currentRegion="全部";currentProvince="全部";searchKeyword="";document.getElementById("searchInput").value="";document.querySelectorAll("#regionTabs .filter-tab").forEach(function(t,i){t.classList.toggle("active",i===0);});renderProvinceTabs();renderCityList();
+  map.setZoomAndCenter(5, [108, 36], false, 300);
+}
+
+// ===== 到各省会距离 =====
+function showDistancesToCapitals(city) {
+  const panel = document.getElementById('distPanel');
+  document.getElementById('distTitle').textContent = city.name + " → 各省会距离";
+  const list = document.getElementById('distList');
+  list.innerHTML = '';
+  const results = CAPITALS.map(function(cap) {
+    return {city: cap, dist: geoDist(city, cap)};
+  }).sort(function(a, b) { return a.dist - b.dist; });
+
+  results.forEach(function(r, idx) {
+    const li = document.createElement('li');
+    li.innerHTML =
+      '<span class="dist-rank' + (idx < 3 ? ' top3' : '') + '">' + (idx+1) + '</span>' +
+      '<span class="dist-name">' + r.city.name + '</span>' +
+      '<span class="dist-region">' + r.city.region + '</span>' +
+      '<span class="dist-val">' + r.dist.toFixed(0) + ' km</span>';
+    li.onclick = function() {
+      document.getElementById('distPanel').classList.remove('open');
+      handleCityClick(city);
+      setTimeout(function() { handleCityClick(r.city); }, 150);
+    };
+    list.appendChild(li);
+  });
+  panel.classList.add('open');
+}
+</script>
+<button id="fullscreenBtn" class="fullscreen-btn" onclick="toggleFullscreen()">⛶ 横屏全屏</button>
+</body>
+</html>
