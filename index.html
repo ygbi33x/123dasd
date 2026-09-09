@@ -1276,12 +1276,13 @@ function addAllCapitalsAsDestinations() {
     return;
   }
   const newDests = [];
+  const baseIdx = radialDestinations.length;
   for(let i = 0; i < CAPITALS.length; i++) {
     const cap = CAPITALS[i];
     if(radialOrigin.city.name === cap.name) continue;
     if(radialDestinations.findIndex(function(d) { return d.city.name === cap.name; }) >= 0) continue;
     
-    const idx = radialDestinations.length + 1 + newDests.length;
+    const idx = baseIdx + newDests.length + 1;
     const marker = new AMap.Marker({
       position: [cap.lng, cap.lat],
       content: '<div style="background:#2563eb;color:#fff;border:2px solid #fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer;">' + idx + '</div>',
@@ -1356,12 +1357,13 @@ function addAllCentersAsDestinations() {
   }
   const centers = CITIES.filter(function(c) { return c.isCenter; });
   const newDests = [];
+  const baseIdx = radialDestinations.length;
   for(let i = 0; i < centers.length; i++) {
     const center = centers[i];
     if(radialOrigin.city.name === center.name) continue;
     if(radialDestinations.findIndex(function(d) { return d.city.name === center.name; }) >= 0) continue;
     
-    const idx = radialDestinations.length + 1 + newDests.length;
+    const idx = baseIdx + newDests.length + 1;
     const marker = new AMap.Marker({
       position: [center.lng, center.lat],
       content: '<div style="background:#2563eb;color:#fff;border:2px solid #fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer;">' + idx + '</div>',
