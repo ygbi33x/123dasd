@@ -1307,66 +1307,77 @@ function planRadialRoutes() {
     return;
   }
   
-  let completed = 0;
-  const total = radialDestinations.length;
+  // 串行规划，避免并发限流
+  planRadialNext(0, version);
+}
+
+function planRadialNext(index, version) {
+  if(version !== radialPlanVersion) return;
   
-  for(let i = 0; i < radialDestinations.length; i++) {
-    const dest = radialDestinations[i];
-    const driving = new AMap.Driving({
-      map: null,
-      autoFitView: false,
-      hideMarkers: true,
-      policy: AMap.DrivingPolicy.LEAST_TIME
-    });
+  if(index >= radialDestinations.length) {
+    // 全部规划完成
+    updateRadialSummary();
+    if(radialPolylines.length > 0) {
+      map.setFitView(radialPolylines);
+    }
+    tipDom.innerHTML = '✅ 全部 ' + radialDestinations.length + ' 条路线规划完成，共 ' + radialPolylines.length + ' 条成功';
+    return;
+  }
+  
+  const dest = radialDestinations[index];
+  tipDom.innerHTML = '🚗 正在规划第 ' + (index+1) + '/' + radialDestinations.length + ' 条：' + radialOrigin.city.name + ' → ' + dest.city.name + '...';
+  
+  const driving = new AMap.Driving({
+    map: null,
+    autoFitView: false,
+    hideMarkers: true,
+    policy: AMap.DrivingPolicy.LEAST_TIME
+  });
+  
+  driving.search([radialOrigin.city.lng, radialOrigin.city.lat], [dest.city.lng, dest.city.lat], function(status, result) {
+    if(version !== radialPlanVersion) return;
     
-    driving.search([radialOrigin.city.lng, radialOrigin.city.lat], [dest.city.lng, dest.city.lat], function(status, result) {
-      if(version !== radialPlanVersion) return;
-      
-      if(status === "complete" && result.routes && result.routes.length > 0) {
-        dest.route = result.routes[0];
-        // 绘制该段路线
-        const route = result.routes[0];
-        if(route.steps && route.steps.length > 0) {
-          const allPath = [];
-          for(let j = 0; j < route.steps.length; j++) {
-            if(route.steps[j].path) {
-              for(let k = 0; k < route.steps[j].path.length; k++) {
-                allPath.push(route.steps[j].path[k]);
-              }
+    if(status === "complete" && result.routes && result.routes.length > 0) {
+      dest.route = result.routes[0];
+      // 绘制该段路线
+      const route = result.routes[0];
+      if(route.steps && route.steps.length > 0) {
+        const allPath = [];
+        for(let j = 0; j < route.steps.length; j++) {
+          if(route.steps[j].path) {
+            for(let k = 0; k < route.steps[j].path.length; k++) {
+              allPath.push(route.steps[j].path[k]);
             }
           }
-          if(allPath.length > 0) {
-            const polyline = new AMap.Polyline({
-              path: allPath,
-              strokeColor: '#7c3aed',
-              strokeWeight: 5,
-              strokeOpacity: 0.7,
-              lineJoin: 'round',
-              lineCap: 'round',
-              zIndex: 90,
-              cursor: 'pointer'
-            });
-            polyline.on('click', function(e) {
-              showRadialSegmentInfo(dest, allPath[Math.floor(allPath.length/2)]);
-            });
-            polyline.setMap(map);
-            radialPolylines.push(polyline);
-          }
         }
-      } else {
-        dest.route = null;
-      }
-      
-      completed++;
-      if(completed >= total) {
-        updateRadialSummary();
-        // 自适应视野
-        if(radialPolylines.length > 0) {
-          map.setFitView(radialPolylines);
+        if(allPath.length > 0) {
+          const polyline = new AMap.Polyline({
+            path: allPath,
+            strokeColor: '#7c3aed',
+            strokeWeight: 5,
+            strokeOpacity: 0.7,
+            lineJoin: 'round',
+            lineCap: 'round',
+            zIndex: 90,
+            cursor: 'pointer'
+          });
+          polyline.on('click', function(e) {
+            showRadialSegmentInfo(dest, allPath[Math.floor(allPath.length/2)]);
+          });
+          polyline.setMap(map);
+          radialPolylines.push(polyline);
         }
       }
-    });
-  }
+    } else {
+      dest.route = null;
+    }
+    
+    updateRadialSummary();
+    // 规划下一个，延迟300ms避免限流
+    setTimeout(function() {
+      planRadialNext(index + 1, version);
+    }, 300);
+  });
 }
 
 function showRadialSegmentInfo(dest, position) {
