@@ -24,6 +24,10 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 .route-bar-actions{display:flex;gap:6px;align-items:center;}
 .route-bar-clear{font-size:11px;color:#dc2626;cursor:pointer;font-weight:400;}
 .route-bar-clear:hover{text-decoration:underline;}
+.route-collapse-btn{font-size:12px;color:#6b7280;cursor:pointer;padding:0 4px;}
+.route-collapse-btn:hover{color:#1f2937;}
+.route-points.collapsed{display:none;}
+.province-tabs-collapsed{max-height:56px;overflow:hidden;}
 .route-optimize{font-size:11px;color:#2563eb;cursor:pointer;font-weight:400;padding:1px 6px;border:1px solid #93c5fd;border-radius:8px;background:#fff;}
 .route-optimize:hover{background:#dbeafe;}
 .route-points{display:flex;flex-wrap:wrap;gap:4px;align-items:center;}
@@ -208,6 +212,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
       <div class="route-bar-title">
         <span>已选路线（<span id="routeCount">0</span>个点）</span>
         <div class="route-bar-actions">
+          <span class="route-collapse-btn" id="routeCollapseBtn" onclick="toggleRouteBar()">▼</span>
           <span class="route-optimize" id="optimizeBtn" title="用Dijkstra算法自动优化访问顺序">🔄 优化顺序</span>
           <span class="route-bar-clear" id="clearRouteBtn">清空</span>
         </div>
@@ -229,7 +234,10 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         <div class="filter-tabs" id="regionTabs"></div>
       </div>
       <div class="filter-section">
-        <div class="filter-label">省区</div>
+        <div class="filter-label" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>省区</span>
+          <span class="province-collapse-btn" id="provinceCollapseBtn" onclick="toggleProvinceFilter()" style="cursor:pointer;font-size:12px;color:#6b7280;">▼ 收起</span>
+        </div>
         <div class="filter-tabs" id="provinceTabs"></div>
       </div>
     </div>
@@ -515,6 +523,32 @@ function toggleFilter() {
     icon.innerHTML = '▼ 展开';
   } else {
     icon.innerHTML = '▲ 收起';
+  }
+}
+
+// 收起/展开已选路线
+function toggleRouteBar() {
+  const bar = document.getElementById('routePointsBar');
+  const btn = document.getElementById('routeCollapseBtn');
+  bar.classList.toggle('collapsed');
+  if(bar.classList.contains('collapsed')) {
+    btn.innerHTML = '▶';
+    btn.title = '展开';
+  } else {
+    btn.innerHTML = '▼';
+    btn.title = '收起';
+  }
+}
+
+// 收起/展开省区筛选（收起后只留两行）
+function toggleProvinceFilter() {
+  const tabs = document.getElementById('provinceTabs');
+  const btn = document.getElementById('provinceCollapseBtn');
+  tabs.classList.toggle('province-tabs-collapsed');
+  if(tabs.classList.contains('province-tabs-collapsed')) {
+    btn.innerHTML = '▶ 展开';
+  } else {
+    btn.innerHTML = '▼ 收起';
   }
 }
 
@@ -1326,8 +1360,7 @@ let radialQueueIndex = 0;
 // 只规划单条路线（增量添加时用）
 function planSingleRadialRoute(destObj) {
   if(!radialOrigin) return;
-  radialPlanVersion++;
-  const version = radialPlanVersion;
+  const version = radialPlanVersion; // 使用当前版本号，不递增
   
   const driving = new AMap.Driving({
     map: null,
