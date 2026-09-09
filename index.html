@@ -1155,13 +1155,22 @@ function handleRadialCityClick(city) {
     return;
   }
   
-  // 如果点击的是已选目的地，取消该目的地
+  // 如果点击的是已选目的地，取消该目的地（只移除这一条）
   const destIdx = radialDestinations.findIndex(function(d) { return d.city.name === city.name; });
   if(destIdx >= 0) {
     const removed = radialDestinations.splice(destIdx, 1)[0];
     if(removed.marker) map.remove(removed.marker);
     if(removed.label) map.remove(removed.label);
-    scheduleRadialPlan();
+    // 移除对应的路线
+    if(removed.polyline) {
+      const pIdx = radialPolylines.indexOf(removed.polyline);
+      if(pIdx >= 0) radialPolylines.splice(pIdx, 1);
+      map.remove(removed.polyline);
+    }
+    // 重新编号
+    renumberRadialDestinations();
+    tipDom.innerHTML = '🗑️ 已取消目的地：<b>' + city.name + '</b>（剩余' + radialDestinations.length + '个）';
+    updateRadialSummary();
     renderRouteBar();
     renderCityList();
     return;
@@ -1182,7 +1191,7 @@ function handleRadialCityClick(city) {
     tipDom.innerHTML = '✅ 出发地：<b>' + city.name + '</b>，继续点击添加目的地';
     map.setZoomAndCenter(6, [city.lng, city.lat], false, 300);
   } else {
-    // 添加为目的地
+    // 添加为目的地，只规划这一条
     const idx = radialDestinations.length + 1;
     const marker = new AMap.Marker({
       position: [city.lng, city.lat],
@@ -1193,12 +1202,20 @@ function handleRadialCityClick(city) {
     marker.on("click", function() { handleRadialCityClick(city); });
     marker.setMap(map);
     const label = createCityLabel(city, [city.lng, city.lat]);
-    radialDestinations.push({city: city, marker: marker, label: label, route: null});
-    tipDom.innerHTML = '✅ 已添加目的地：<b>' + city.name + '</b>（共' + radialDestinations.length + '个），正在规划路线...';
-    scheduleRadialPlan();
+    const destObj = {city: city, marker: marker, label: label, route: null, polyline: null};
+    radialDestinations.push(destObj);
+    tipDom.innerHTML = '✅ 已添加目的地：<b>' + city.name + '</b>（共' + radialDestinations.length + '个），正在规划...';
+    // 只规划新增的这一条
+    planSingleRadialRoute(destObj);
   }
   renderRouteBar();
   renderCityList();
+}
+
+function renumberRadialDestinations() {
+  for(let i = 0; i < radialDestinations.length; i++) {
+    radialDestinations[i].marker.setContent('<div style="background:#2563eb;color:#fff;border:2px solid #fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer;">' + (i+1) + '</div>');
+  }
 }
 
 function scheduleRadialPlan() {
@@ -1214,15 +1231,13 @@ function addAllCapitalsAsDestinations() {
     tipDom.innerHTML = '⚠️ 请先点击选择出发地';
     return;
   }
-  let added = 0;
+  const newDests = [];
   for(let i = 0; i < CAPITALS.length; i++) {
     const cap = CAPITALS[i];
-    // 跳过出发地本身
     if(radialOrigin.city.name === cap.name) continue;
-    // 跳过已添加的
     if(radialDestinations.findIndex(function(d) { return d.city.name === cap.name; }) >= 0) continue;
     
-    const idx = radialDestinations.length + 1;
+    const idx = radialDestinations.length + 1 + newDests.length;
     const marker = new AMap.Marker({
       position: [cap.lng, cap.lat],
       content: '<div style="background:#2563eb;color:#fff;border:2px solid #fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer;">' + idx + '</div>',
@@ -1232,13 +1247,27 @@ function addAllCapitalsAsDestinations() {
     marker.on("click", function() { handleRadialCityClick(cap); });
     marker.setMap(map);
     const label = createCityLabel(cap, [cap.lng, cap.lat]);
-    radialDestinations.push({city: cap, marker: marker, label: label, route: null});
-    added++;
+    const destObj = {city: cap, marker: marker, label: label, route: null, polyline: null};
+    radialDestinations.push(destObj);
+    newDests.push(destObj);
   }
-  tipDom.innerHTML = '✅ 已添加 ' + added + ' 个省会为目的地（共' + radialDestinations.length + '个），正在规划路线...';
-  scheduleRadialPlan();
+  tipDom.innerHTML = '✅ 已添加 ' + newDests.length + ' 个省会（共' + radialDestinations.length + '个），正在逐个规划...';
   renderRouteBar();
   renderCityList();
+  // 逐个规划新增的，间隔100ms
+  planBatchRadialRoutes(newDests, 0);
+}
+
+// 批量增量规划
+function planBatchRadialRoutes(destList, index) {
+  if(index >= destList.length) {
+    tipDom.innerHTML = '✅ 批量规划完成，共 ' + radialPolylines.length + ' 条路线';
+    return;
+  }
+  planSingleRadialRoute(destList[index]);
+  setTimeout(function() {
+    planBatchRadialRoutes(destList, index + 1);
+  }, 100);
 }
 
 // 便捷：添加所有中心城市为目的地
@@ -1248,15 +1277,13 @@ function addAllCentersAsDestinations() {
     return;
   }
   const centers = CITIES.filter(function(c) { return c.isCenter; });
-  let added = 0;
+  const newDests = [];
   for(let i = 0; i < centers.length; i++) {
     const center = centers[i];
-    // 跳过出发地本身
     if(radialOrigin.city.name === center.name) continue;
-    // 跳过已添加的
     if(radialDestinations.findIndex(function(d) { return d.city.name === center.name; }) >= 0) continue;
     
-    const idx = radialDestinations.length + 1;
+    const idx = radialDestinations.length + 1 + newDests.length;
     const marker = new AMap.Marker({
       position: [center.lng, center.lat],
       content: '<div style="background:#2563eb;color:#fff;border:2px solid #fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer;">' + idx + '</div>',
@@ -1266,13 +1293,14 @@ function addAllCentersAsDestinations() {
     marker.on("click", function() { handleRadialCityClick(center); });
     marker.setMap(map);
     const label = createCityLabel(center, [center.lng, center.lat]);
-    radialDestinations.push({city: center, marker: marker, label: label, route: null});
-    added++;
+    const destObj = {city: center, marker: marker, label: label, route: null, polyline: null};
+    radialDestinations.push(destObj);
+    newDests.push(destObj);
   }
-  tipDom.innerHTML = '✅ 已添加 ' + added + ' 个中心城市为目的地（共' + radialDestinations.length + '个），正在规划路线...';
-  scheduleRadialPlan();
+  tipDom.innerHTML = '✅ 已添加 ' + newDests.length + ' 个中心城市（共' + radialDestinations.length + '个），正在逐个规划...';
   renderRouteBar();
   renderCityList();
+  planBatchRadialRoutes(newDests, 0);
 }
 
 // 便捷：清空目的地（保留出发地）
@@ -1294,6 +1322,62 @@ function clearRadialDestinations() {
 }
 
 let radialQueueIndex = 0;
+
+// 只规划单条路线（增量添加时用）
+function planSingleRadialRoute(destObj) {
+  if(!radialOrigin) return;
+  radialPlanVersion++;
+  const version = radialPlanVersion;
+  
+  const driving = new AMap.Driving({
+    map: null,
+    autoFitView: false,
+    hideMarkers: true,
+    policy: AMap.DrivingPolicy.LEAST_TIME
+  });
+  
+  driving.search([radialOrigin.city.lng, radialOrigin.city.lat], [destObj.city.lng, destObj.city.lat], function(status, result) {
+    if(version !== radialPlanVersion) return;
+    
+    if(status === "complete" && result.routes && result.routes.length > 0) {
+      destObj.route = result.routes[0];
+      const route = result.routes[0];
+      if(route.steps && route.steps.length > 0) {
+        const allPath = [];
+        for(let j = 0; j < route.steps.length; j++) {
+          if(route.steps[j].path) {
+            for(let k = 0; k < route.steps[j].path.length; k++) {
+              allPath.push(route.steps[j].path[k]);
+            }
+          }
+        }
+        if(allPath.length > 0) {
+          const polyline = new AMap.Polyline({
+            path: allPath,
+            strokeColor: '#7c3aed',
+            strokeWeight: 5,
+            strokeOpacity: 0.7,
+            lineJoin: 'round',
+            lineCap: 'round',
+            zIndex: 90,
+            cursor: 'pointer'
+          });
+          polyline.on('click', function(e) {
+            showRadialSegmentInfo(destObj, allPath[Math.floor(allPath.length/2)]);
+          });
+          polyline.setMap(map);
+          destObj.polyline = polyline;
+          radialPolylines.push(polyline);
+        }
+      }
+      tipDom.innerHTML = '✅ ' + radialOrigin.city.name + ' → ' + destObj.city.name + '：' + (destObj.route.distance/1000).toFixed(1) + ' km';
+    } else {
+      destObj.route = null;
+      tipDom.innerHTML = '❌ ' + radialOrigin.city.name + ' → ' + destObj.city.name + ' 规划失败';
+    }
+    updateRadialSummary();
+  });
+}
 
 function planRadialRoutes() {
   // 清除旧路线
