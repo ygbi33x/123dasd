@@ -469,9 +469,7 @@ function initMap() {
       zIndex: city.isCenter ? 120 : 90
     });
     marker.on("click", function(e) {
-      const c = e.target.getExtData();
-      showCityLabel(c, e.target.getCenter());
-      handleCityClick(c);
+      handleCityClick(e.target.getExtData());
     });
     marker.setMap(map);
     cityMarkers.push(marker);
@@ -989,15 +987,8 @@ function renumberMarkers() {
 }
 
 // ===== 交互 =====
-let currentCityLabel = null;
-
-function showCityLabel(city, position) {
-  if(currentCityLabel) {
-    map.remove(currentCityLabel);
-    currentCityLabel = null;
-  }
-  
-  currentCityLabel = new AMap.Text({
+function createCityLabel(city, position) {
+  const label = new AMap.Text({
     text: city.name,
     position: position,
     anchor: 'top-center',
@@ -1014,7 +1005,8 @@ function showCityLabel(city, position) {
     },
     zIndex: 200
   });
-  currentCityLabel.setMap(map);
+  label.setMap(map);
+  return label;
 }
 
 function handleCityClick(city) {
@@ -1039,7 +1031,10 @@ function addPoint(city) {
     if(i >= 0) removePointAt(i);
   });
   marker.setMap(map);
-  routePoints.push({city: city, marker: marker});
+  
+  // 创建城市名称标签，常驻显示在标记下方
+  const label = createCityLabel(city, [city.lng, city.lat]);
+  routePoints.push({city: city, marker: marker, label: label});
 
   // 3个点及以上自动优化顺序
   if(routePoints.length >= 3) {
@@ -1073,7 +1068,10 @@ function addPoint(city) {
 
 function removePointAt(idx) {
   const removed = routePoints.splice(idx, 1);
-  removed.forEach(function(p) { if(p.marker) map.remove(p.marker); });
+  removed.forEach(function(p) {
+    if(p.marker) map.remove(p.marker);
+    if(p.label) map.remove(p.label);
+  });
   renumberMarkers();
   tipDom.innerHTML = routePoints.length > 0 ?
     "已取消第 " + (idx+1) + " 点，当前 " + routePoints.length + " 个点，重新规划..." :
@@ -1106,11 +1104,13 @@ function optimizeRouteOrderBtn() {
 }
 
 function clearRoute() {
-  routePoints.forEach(function(p) { if(p.marker) map.remove(p.marker); });
+  routePoints.forEach(function(p) {
+    if(p.marker) map.remove(p.marker);
+    if(p.label) map.remove(p.label);
+  });
   routePoints = [];
   if(currentDriving) { currentDriving.clear(); currentDriving = null; }
   clearRoutePolylines();
-  if(currentCityLabel) { map.remove(currentCityLabel); currentCityLabel = null; }
   panel.classList.remove("open");
   tipDom.textContent = "📌 路线已清空，点击城市重新开始";
   renderRouteBar();
