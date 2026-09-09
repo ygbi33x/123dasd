@@ -731,6 +731,16 @@ function geoDist(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+// 格式化时间：秒 -> X时X分
+function formatTime(seconds) {
+  if(!seconds || seconds <= 0) return '-';
+  const totalMin = Math.ceil(seconds / 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if(h > 0) return h + '时' + m + '分';
+  return m + '分';
+}
+
 // ===== Dijkstra TSP 最优顺序 =====
 function optimizeRouteOrder(points) {
   const n = points.length;
@@ -1047,11 +1057,11 @@ function updateFullRouteSummary() {
   for(let i = 0; i < routeSegments.length; i++) {
     const seg = routeSegments[i];
     const km = seg.route ? (seg.route.distance / 1000).toFixed(1) : '-';
-    const min = seg.route ? Math.ceil(seg.route.time / 60) : '-';
+    const timeStr = seg.route ? formatTime(seg.route.time) : '-';
     segList.innerHTML += '<div class="seg-item"><span class="seg-idx">' + (i+1) + '</span>' +
       '<span class="seg-name">' + seg.startCity.name + ' → ' + seg.endCity.name + '</span>' +
       '<span class="seg-dist">' + km + ' km</span>' +
-      '<span class="seg-time">' + min + '分</span></div>';
+      '<span class="seg-time">' + timeStr + '</span></div>';
   }
 }
 
@@ -1093,7 +1103,7 @@ function showSegmentInfo(seg, position) {
   }
   
   const distanceKm = (seg.distance / 1000).toFixed(1);
-  const timeMin = Math.ceil(seg.time / 60);
+  const timeStr = formatTime(seg.time);
   const startName = seg.startCity ? seg.startCity.name : '未知';
   const endName = seg.endCity ? seg.endCity.name : '未知';
   
@@ -1103,7 +1113,7 @@ function showSegmentInfo(seg, position) {
     '<div>🚩 出发地：<b>' + startName + '</b></div>' +
     '<div>🏁 目的地：<b>' + endName + '</b></div>' +
     '<div>📏 距离：<b>' + distanceKm + ' km</b></div>' +
-    '<div>⏱️ 预计：<b>' + timeMin + ' 分钟</b></div>' +
+    '<div>⏱️ 预计：<b>' + timeStr + '</b></div>' +
     '</div></div>';
   
   segmentInfoWindow = new AMap.InfoWindow({
@@ -1295,13 +1305,47 @@ function addAllCapitalsAsDestinations() {
 // 批量增量规划
 function planBatchRadialRoutes(destList, index) {
   if(index >= destList.length) {
-    tipDom.innerHTML = '✅ 批量规划完成，共 ' + radialPolylines.length + ' 条路线';
+    // 第一轮完成，检查失败的进行重试
+    const failed = radialDestinations.filter(function(d) { return !d.route; });
+    if(failed.length > 0) {
+      tipDom.innerHTML = '🔄 第一轮完成，' + failed.length + ' 条失败，正在重试...';
+      setTimeout(function() {
+        retryFailedRadialRoutes(failed, 0);
+      }, 500);
+    } else {
+      tipDom.innerHTML = '✅ 全部规划完成，共 ' + radialPolylines.length + ' 条路线';
+      if(radialPolylines.length > 0) map.setFitView(radialPolylines);
+    }
     return;
   }
-  planSingleRadialRoute(destList[index]);
-  setTimeout(function() {
-    planBatchRadialRoutes(destList, index + 1);
-  }, 100);
+  const destObj = destList[index];
+  tipDom.innerHTML = '🚗 正在规划第 ' + (index+1) + '/' + destList.length + ' 条：' + radialOrigin.city.name + ' → ' + destObj.city.name;
+  planSingleRadialRoute(destObj, function() {
+    setTimeout(function() {
+      planBatchRadialRoutes(destList, index + 1);
+    }, 150);
+  });
+}
+
+// 重试失败的路线
+function retryFailedRadialRoutes(failedList, index) {
+  if(index >= failedList.length) {
+    const stillFailed = radialDestinations.filter(function(d) { return !d.route; });
+    if(stillFailed.length > 0) {
+      tipDom.innerHTML = '⚠️ 规划完成，' + stillFailed.length + ' 条失败（可能无直达道路）';
+    } else {
+      tipDom.innerHTML = '✅ 全部规划完成，共 ' + radialPolylines.length + ' 条路线';
+    }
+    if(radialPolylines.length > 0) map.setFitView(radialPolylines);
+    return;
+  }
+  const destObj = failedList[index];
+  tipDom.innerHTML = '🔄 重试第 ' + (index+1) + '/' + failedList.length + ' 条：' + destObj.city.name;
+  planSingleRadialRoute(destObj, function() {
+    setTimeout(function() {
+      retryFailedRadialRoutes(failedList, index + 1);
+    }, 200);
+  });
 }
 
 // 便捷：添加所有中心城市为目的地
@@ -1358,8 +1402,8 @@ function clearRadialDestinations() {
 let radialQueueIndex = 0;
 
 // 只规划单条路线（增量添加时用）
-function planSingleRadialRoute(destObj) {
-  if(!radialOrigin) return;
+function planSingleRadialRoute(destObj, callback) {
+  if(!radialOrigin) { if(callback) callback(); return; }
   const version = radialPlanVersion; // 使用当前版本号，不递增
   
   const driving = new AMap.Driving({
@@ -1370,7 +1414,7 @@ function planSingleRadialRoute(destObj) {
   });
   
   driving.search([radialOrigin.city.lng, radialOrigin.city.lat], [destObj.city.lng, destObj.city.lat], function(status, result) {
-    if(version !== radialPlanVersion) return;
+    if(version !== radialPlanVersion) { if(callback) callback(); return; }
     
     if(status === "complete" && result.routes && result.routes.length > 0) {
       destObj.route = result.routes[0];
@@ -1403,12 +1447,11 @@ function planSingleRadialRoute(destObj) {
           radialPolylines.push(polyline);
         }
       }
-      tipDom.innerHTML = '✅ ' + radialOrigin.city.name + ' → ' + destObj.city.name + '：' + (destObj.route.distance/1000).toFixed(1) + ' km';
     } else {
       destObj.route = null;
-      tipDom.innerHTML = '❌ ' + radialOrigin.city.name + ' → ' + destObj.city.name + ' 规划失败';
     }
     updateRadialSummary();
+    if(callback) callback();
   });
 }
 
@@ -1514,7 +1557,7 @@ function showRadialSegmentInfo(dest, position) {
   }
   
   const km = (dest.route.distance / 1000).toFixed(1);
-  const min = Math.ceil(dest.route.time / 60);
+  const timeStr = formatTime(dest.route.time);
   
   const content = '<div style="padding:10px 14px;min-width:180px;">' +
     '<div style="font-weight:700;font-size:15px;color:#1f2937;margin-bottom:6px;">路线详情</div>' +
@@ -1522,7 +1565,7 @@ function showRadialSegmentInfo(dest, position) {
     '<div>🚩 出发地：<b>' + radialOrigin.city.name + '</b></div>' +
     '<div>🏁 目的地：<b>' + dest.city.name + '</b></div>' +
     '<div>📏 距离：<b>' + km + ' km</b></div>' +
-    '<div>⏱️ 预计：<b>' + min + ' 分钟</b></div>' +
+    '<div>⏱️ 预计：<b>' + timeStr + '</b></div>' +
     '</div></div>';
   
   segmentInfoWindow = new AMap.InfoWindow({
@@ -1559,11 +1602,11 @@ function updateRadialSummary() {
   for(let i = 0; i < radialDestinations.length; i++) {
     const dest = radialDestinations[i];
     const km = dest.route ? (dest.route.distance / 1000).toFixed(1) : '-';
-    const min = dest.route ? Math.ceil(dest.route.time / 60) : '-';
+    const timeStr = dest.route ? formatTime(dest.route.time) : '-';
     segList.innerHTML += '<div class="seg-item"><span class="seg-idx">' + (i+1) + '</span>' +
       '<span class="seg-name">' + dest.city.name + '</span>' +
       '<span class="seg-dist">' + km + ' km</span>' +
-      '<span class="seg-time">' + min + '分</span></div>';
+      '<span class="seg-time">' + timeStr + '</span></div>';
   }
   panel.classList.add("open");
   
