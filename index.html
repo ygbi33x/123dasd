@@ -849,45 +849,73 @@ function drawRouteWithTraffic(route) {
   clearRoutePolylines();
   if(!route || !route.steps) return;
   
-  const allPaths = [];
+  // 合并相邻同路况的段，减少分段数量
+  const mergedSegments = [];
   for(let i = 0; i < route.steps.length; i++) {
     const step = route.steps[i];
-    if(step.path && step.path.length > 0) {
-      const trafficStatus = step.traffic_status || 0;
-      const color = TRAFFIC_COLORS[trafficStatus] || '#22c55e';
-      
-      const polyline = new AMap.Polyline({
-        path: step.path,
-        strokeColor: color,
-        strokeWeight: 7,
-        strokeOpacity: 0.85,
-        lineJoin: 'round',
-        lineCap: 'round',
-        zIndex: 100,
-        cursor: 'pointer'
-      });
-      
-      // 点击路段显示详情
-      polyline.on('click', function(e) {
-        const midIdx = Math.floor(step.path.length / 2);
-        const midPos = step.path[midIdx];
-        showSegmentInfo(step, midPos);
-      });
-      
-      // hover效果
-      polyline.on('mouseover', function() {
-        polyline.setOptions({strokeWeight: 9, strokeOpacity: 1});
-      });
-      polyline.on('mouseout', function() {
-        polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.85});
-      });
-      
-      polyline.setMap(map);
-      routePolylines.push(polyline);
-      
-      for(let j = 0; j < step.path.length; j++) {
-        allPaths.push(step.path[j]);
+    if(!step.path || step.path.length === 0) continue;
+    
+    const trafficStatus = step.traffic_status || 0;
+    const lastSeg = mergedSegments.length > 0 ? mergedSegments[mergedSegments.length - 1] : null;
+    
+    if(lastSeg && lastSeg.traffic_status === trafficStatus) {
+      // 合并到上一段
+      for(let j = 1; j < step.path.length; j++) {
+        lastSeg.path.push(step.path[j]);
       }
+      lastSeg.distance += step.distance || 0;
+      lastSeg.time += step.time || 0;
+      if(step.road && !lastSeg.road) lastSeg.road = step.road;
+      if(step.instruction) lastSeg.instruction = step.instruction;
+    } else {
+      // 新建段
+      mergedSegments.push({
+        path: step.path.slice(),
+        traffic_status: trafficStatus,
+        distance: step.distance || 0,
+        time: step.time || 0,
+        road: step.road || '',
+        instruction: step.instruction || ''
+      });
+    }
+  }
+  
+  const allPaths = [];
+  for(let i = 0; i < mergedSegments.length; i++) {
+    const seg = mergedSegments[i];
+    const color = TRAFFIC_COLORS[seg.traffic_status] || '#22c55e';
+    
+    const polyline = new AMap.Polyline({
+      path: seg.path,
+      strokeColor: color,
+      strokeWeight: 7,
+      strokeOpacity: 0.85,
+      lineJoin: 'round',
+      lineCap: 'round',
+      zIndex: 100,
+      cursor: 'pointer'
+    });
+    
+    // 点击路段显示详情
+    polyline.on('click', function(e) {
+      const midIdx = Math.floor(seg.path.length / 2);
+      const midPos = seg.path[midIdx];
+      showSegmentInfo(seg, midPos);
+    });
+    
+    // hover效果
+    polyline.on('mouseover', function() {
+      polyline.setOptions({strokeWeight: 9, strokeOpacity: 1});
+    });
+    polyline.on('mouseout', function() {
+      polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.85});
+    });
+    
+    polyline.setMap(map);
+    routePolylines.push(polyline);
+    
+    for(let j = 0; j < seg.path.length; j++) {
+      allPaths.push(seg.path[j]);
     }
   }
   
