@@ -1205,7 +1205,7 @@ function scheduleRadialPlan() {
   if(radialPlanTimer) clearTimeout(radialPlanTimer);
   radialPlanTimer = setTimeout(function() {
     planRadialRoutes();
-  }, 300);
+  }, 150);
 }
 
 // 便捷：添加所有省会为目的地
@@ -1293,6 +1293,8 @@ function clearRadialDestinations() {
   updateRadialSummary();
 }
 
+let radialQueueIndex = 0;
+
 function planRadialRoutes() {
   // 清除旧路线
   for(let i = 0; i < radialPolylines.length; i++) {
@@ -1307,14 +1309,15 @@ function planRadialRoutes() {
     return;
   }
   
-  // 串行规划，避免并发限流
-  planRadialNext(0, version);
+  // 串行规划，间隔100ms避免限流
+  radialQueueIndex = 0;
+  planRadialNext(version);
 }
 
-function planRadialNext(index, version) {
+function planRadialNext(version) {
   if(version !== radialPlanVersion) return;
   
-  if(index >= radialDestinations.length) {
+  if(radialQueueIndex >= radialDestinations.length) {
     // 全部规划完成
     updateRadialSummary();
     if(radialPolylines.length > 0) {
@@ -1324,7 +1327,9 @@ function planRadialNext(index, version) {
     return;
   }
   
+  const index = radialQueueIndex++;
   const dest = radialDestinations[index];
+  
   tipDom.innerHTML = '🚗 正在规划第 ' + (index+1) + '/' + radialDestinations.length + ' 条：' + radialOrigin.city.name + ' → ' + dest.city.name + '...';
   
   const driving = new AMap.Driving({
@@ -1373,10 +1378,10 @@ function planRadialNext(index, version) {
     }
     
     updateRadialSummary();
-    // 规划下一个，延迟300ms避免限流
+    // 延迟100ms启动下一个，避免限流
     setTimeout(function() {
-      planRadialNext(index + 1, version);
-    }, 300);
+      planRadialNext(version);
+    }, 100);
   });
 }
 
