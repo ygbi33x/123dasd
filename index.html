@@ -752,6 +752,10 @@ function twoOpt(points, dist) {
 }
 
 // ===== 核心：单Driving实例多点路线规划 =====
+let routeSegments = []; // 存储每段路线：{startCity, endCity, route}
+let segmentPlanIndex = 0;
+let planVersion = 0; // 规划版本号，用于取消旧的规划
+
 function planFullRoute() {
   if(routePoints.length < 2) {
     if(currentDriving) { currentDriving.clear(); currentDriving = null; }
@@ -764,22 +768,191 @@ function planFullRoute() {
     currentDriving.clear();
     currentDriving = null;
   }
+  clearRoutePolylines();
+  routeSegments = [];
+  
+  // 递增版本号，旧的规划回调会被忽略
+  planVersion++;
 
   isPlanning = true;
+  segmentPlanIndex = 0;
+  
+  // 分段规划：每两个相邻城市之间单独规划
+  planNextSegment(planVersion);
+}
 
-  // 起点、终点、途经点
-  const origin = [routePoints[0].city.lng, routePoints[0].city.lat];
-  const destination = [routePoints[routePoints.length-1].city.lng, routePoints[routePoints.length-1].city.lat];
-  const waypoints = routePoints.slice(1, -1).map(function(p) { return [p.city.lng, p.city.lat]; });
-
-  // 创建Driving实例（不自动绘制路线，自己按路况着色）
-  currentDriving = new AMap.Driving({
+function planNextSegment(version) {
+  // 如果版本号不匹配，说明有新的规划开始，放弃当前规划
+  if(version !== planVersion) return;
+  
+  if(segmentPlanIndex >= routePoints.length - 1) {
+    // 所有段规划完成，统一绘制
+    isPlanning = false;
+    drawAllSegments();
+    updateFullRouteSummary();
+    return;
+  }
+  
+  const start = routePoints[segmentPlanIndex].city;
+  const end = routePoints[segmentPlanIndex + 1].city;
+  
+  const driving = new AMap.Driving({
     map: null,
     autoFitView: false,
     hideMarkers: true,
     policy: AMap.DrivingPolicy.REAL_TRAFFIC || AMap.DrivingPolicy.LEAST_TIME
   });
-  currentDriving.search(origin, destination, {waypoints: waypoints}, routeCallback);
+  
+  driving.search([start.lng, start.lat], [end.lng, end.lat], function(status, result) {
+    // 检查版本号
+    if(version !== planVersion) return;
+    
+    if(status === "complete" && result.routes && result.routes.length > 0) {
+      routeSegments.push({
+        startCity: start,
+        endCity: end,
+        route: result.routes[0]
+      });
+    } else {
+      // 该段规划失败，记录空路线
+      routeSegments.push({
+        startCity: start,
+        endCity: end,
+        route: null
+      });
+    }
+    segmentPlanIndex++;
+    planNextSegment(version);
+  });
+}
+
+function drawAllSegments() {
+  clearRoutePolylines();
+  const allPaths = [];
+  
+  for(let s = 0; s < routeSegments.length; s++) {
+    const seg = routeSegments[s];
+    if(!seg.route || !seg.route.steps) continue;
+    
+    // 合并相邻同路况的段
+    const mergedSegments = [];
+    for(let i = 0; i < seg.route.steps.length; i++) {
+      const step = seg.route.steps[i];
+      if(!step.path || step.path.length === 0) continue;
+      
+      const trafficStatus = step.traffic_status || 0;
+      const lastSeg = mergedSegments.length > 0 ? mergedSegments[mergedSegments.length - 1] : null;
+      
+      if(lastSeg && lastSeg.traffic_status === trafficStatus) {
+        for(let j = 1; j < step.path.length; j++) {
+          lastSeg.path.push(step.path[j]);
+        }
+        lastSeg.distance += step.distance || 0;
+        lastSeg.time += step.time || 0;
+        lastSeg.endPos = step.path[step.path.length - 1];
+      } else {
+        mergedSegments.push({
+          path: step.path.slice(),
+          traffic_status: trafficStatus,
+          distance: step.distance || 0,
+          time: step.time || 0,
+          startPos: step.path[0],
+          endPos: step.path[step.path.length - 1],
+          startCity: seg.startCity,
+          endCity: seg.endCity
+        });
+      }
+    }
+    
+    // 绘制每段
+    for(let i = 0; i < mergedSegments.length; i++) {
+      const mseg = mergedSegments[i];
+      const color = TRAFFIC_COLORS[mseg.traffic_status] || '#22c55e';
+      
+      const polyline = new AMap.Polyline({
+        path: mseg.path,
+        strokeColor: color,
+        strokeWeight: 7,
+        strokeOpacity: 0.85,
+        lineJoin: 'round',
+        lineCap: 'round',
+        zIndex: 100,
+        cursor: 'pointer'
+      });
+      
+      polyline.on('click', function(e) {
+        const midIdx = Math.floor(mseg.path.length / 2);
+        const midPos = mseg.path[midIdx];
+        showSegmentInfo(mseg, midPos);
+      });
+      
+      polyline.on('mouseover', function() {
+        polyline.setOptions({strokeWeight: 9, strokeOpacity: 1});
+      });
+      polyline.on('mouseout', function() {
+        polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.85});
+      });
+      
+      polyline.setMap(map);
+      routePolylines.push(polyline);
+      
+      for(let j = 0; j < mseg.path.length; j++) {
+        allPaths.push(mseg.path[j]);
+      }
+    }
+  }
+  
+  // 自适应视野
+  if(allPaths.length > 0) {
+    map.setFitView([new AMap.Polyline({path: allPaths})]);
+  }
+}
+
+function updateFullRouteSummary() {
+  let totalDistance = 0;
+  let totalTime = 0;
+  let successCount = 0;
+  
+  for(let i = 0; i < routeSegments.length; i++) {
+    if(routeSegments[i].route) {
+      totalDistance += routeSegments[i].route.distance || 0;
+      totalTime += routeSegments[i].route.time || 0;
+      successCount++;
+    }
+  }
+  
+  if(successCount === 0) {
+    tipDom.innerHTML = "❌ 路线规划失败，部分点之间可能无可用驾车道路";
+    panel.classList.remove("open");
+    return;
+  }
+  
+  const totalKm = (totalDistance / 1000).toFixed(1);
+  const totalH = Math.floor(totalTime / 3600);
+  const totalM = Math.floor((totalTime % 3600) / 60);
+  
+  tipDom.innerHTML = "✅ <b>" + routePoints[0].city.name + " → " + routePoints[routePoints.length-1].city.name +
+    "</b>（经" + (routePoints.length-2) + "个途经点），总里程 <b style='color:#dc2626;'>" +
+    totalKm + " km</b>，约 <b>" + totalH + "时" + totalM + "分</b>";
+  
+  // 更新汇总面板
+  document.getElementById("pTitle").textContent = routePoints.length + "点路线汇总";
+  document.getElementById("pMeta").innerHTML =
+    "<span>共 <b>" + routePoints.length + "</b> 个点 · <b>" + (routePoints.length-1) + "</b> 段路线</span><br>" +
+    "<span>总里程 <b style='color:#dc2626;'>" + totalKm + " km</b></span> · " +
+    "<span>总预计 <b>" + totalH + "时" + totalM + "分</b></span>";
+  
+  const segList = document.getElementById("segList");
+  segList.innerHTML = "";
+  for(let i = 0; i < routeSegments.length; i++) {
+    const seg = routeSegments[i];
+    const km = seg.route ? (seg.route.distance / 1000).toFixed(1) : '-';
+    const min = seg.route ? Math.ceil(seg.route.time / 60) : '-';
+    segList.innerHTML += '<div class="seg-item"><span class="seg-idx">' + (i+1) + '</span>' +
+      '<span class="seg-name">' + seg.startCity.name + ' → ' + seg.endCity.name + '</span>' +
+      '<span class="seg-dist">' + km + ' km</span>' +
+      '<span class="seg-time">' + min + '分</span></div>';
+  }
 }
 
 // 路况颜色映射
@@ -821,13 +994,14 @@ function showSegmentInfo(seg, position) {
   
   const distanceKm = (seg.distance / 1000).toFixed(1);
   const timeMin = Math.ceil(seg.time / 60);
+  const startName = seg.startCity ? seg.startCity.name : '未知';
+  const endName = seg.endCity ? seg.endCity.name : '未知';
   
-  // 先显示基础信息，再异步获取城市名
   const content = '<div style="padding:10px 14px;min-width:200px;">' +
     '<div style="font-weight:700;font-size:15px;color:#1f2937;margin-bottom:6px;">路段详情</div>' +
     '<div style="font-size:13px;color:#374151;line-height:1.8;">' +
-    '<div>🚩 出发地：<span id="segStart">定位中...</span></div>' +
-    '<div>🏁 目的地：<span id="segEnd">定位中...</span></div>' +
+    '<div>🚩 出发地：<b>' + startName + '</b></div>' +
+    '<div>🏁 目的地：<b>' + endName + '</b></div>' +
     '<div>📏 距离：<b>' + distanceKm + ' km</b></div>' +
     '<div>⏱️ 预计：<b>' + timeMin + ' 分钟</b></div>' +
     '</div></div>';
@@ -838,165 +1012,6 @@ function showSegmentInfo(seg, position) {
     closeWhenClickMap: true
   });
   segmentInfoWindow.open(map, position);
-  
-  // 逆地理编码获取起点和终点城市名
-  AMap.plugin('AMap.Geocoder', function() {
-    const geocoder = new AMap.Geocoder({ radius: 1000 });
-    
-    geocoder.getAddress(seg.startPos, function(status, result) {
-      if(status === 'complete' && result.regeocode) {
-        const addr = result.regeocode.addressComponent;
-        const cityName = addr.city || addr.province || addr.district || '未知';
-        const el = document.getElementById('segStart');
-        if(el) el.textContent = cityName;
-      }
-    });
-    
-    geocoder.getAddress(seg.endPos, function(status, result) {
-      if(status === 'complete' && result.regeocode) {
-        const addr = result.regeocode.addressComponent;
-        const cityName = addr.city || addr.province || addr.district || '未知';
-        const el = document.getElementById('segEnd');
-        if(el) el.textContent = cityName;
-      }
-    });
-  });
-}
-
-function drawRouteWithTraffic(route) {
-  clearRoutePolylines();
-  if(!route || !route.steps) return;
-  
-  // 合并相邻同路况的段，减少分段数量
-  const mergedSegments = [];
-  for(let i = 0; i < route.steps.length; i++) {
-    const step = route.steps[i];
-    if(!step.path || step.path.length === 0) continue;
-    
-    const trafficStatus = step.traffic_status || 0;
-    const lastSeg = mergedSegments.length > 0 ? mergedSegments[mergedSegments.length - 1] : null;
-    
-    if(lastSeg && lastSeg.traffic_status === trafficStatus) {
-      // 合并到上一段
-      for(let j = 1; j < step.path.length; j++) {
-        lastSeg.path.push(step.path[j]);
-      }
-      lastSeg.distance += step.distance || 0;
-      lastSeg.time += step.time || 0;
-      lastSeg.endPos = step.path[step.path.length - 1];
-    } else {
-      // 新建段
-      mergedSegments.push({
-        path: step.path.slice(),
-        traffic_status: trafficStatus,
-        distance: step.distance || 0,
-        time: step.time || 0,
-        startPos: step.path[0],
-        endPos: step.path[step.path.length - 1]
-      });
-    }
-  }
-  
-  const allPaths = [];
-  for(let i = 0; i < mergedSegments.length; i++) {
-    const seg = mergedSegments[i];
-    const color = TRAFFIC_COLORS[seg.traffic_status] || '#22c55e';
-    
-    const polyline = new AMap.Polyline({
-      path: seg.path,
-      strokeColor: color,
-      strokeWeight: 7,
-      strokeOpacity: 0.85,
-      lineJoin: 'round',
-      lineCap: 'round',
-      zIndex: 100,
-      cursor: 'pointer'
-    });
-    
-    // 点击路段显示详情
-    polyline.on('click', function(e) {
-      const midIdx = Math.floor(seg.path.length / 2);
-      const midPos = seg.path[midIdx];
-      showSegmentInfo(seg, midPos);
-    });
-    
-    // hover效果
-    polyline.on('mouseover', function() {
-      polyline.setOptions({strokeWeight: 9, strokeOpacity: 1});
-    });
-    polyline.on('mouseout', function() {
-      polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.85});
-    });
-    
-    polyline.setMap(map);
-    routePolylines.push(polyline);
-    
-    for(let j = 0; j < seg.path.length; j++) {
-      allPaths.push(seg.path[j]);
-    }
-  }
-  
-  // 自适应视野
-  if(allPaths.length > 0) {
-    map.setFitView([new AMap.Polyline({path: allPaths})]);
-  }
-}
-
-function routeCallback(status, result) {
-  isPlanning = false;
-  if(status === "complete" && result.routes && result.routes.length > 0) {
-    const route = result.routes[0];
-    updateRouteSummary(route);
-    drawRouteWithTraffic(route);
-    tipDom.innerHTML = "✅ <b>" + routePoints[0].city.name + " → " + routePoints[routePoints.length-1].city.name +
-      "</b>（经" + (routePoints.length-2) + "个途经点），总里程 <b style='color:#dc2626;'>" +
-      (route.distance/1000).toFixed(1) + " km</b>，约 <b>" +
-      Math.floor(route.time/3600) + "时" + Math.floor((route.time%3600)/60) + "分</b>";
-  } else {
-    clearRoutePolylines();
-    tipDom.innerHTML = "❌ 路线规划失败，部分点之间可能无可用驾车道路（如海岛/偏远地区）";
-    panel.classList.remove("open");
-  }
-}
-
-function updateRouteSummary(route) {
-  document.getElementById("pTitle").textContent = routePoints.length + "点路线汇总";
-  const totalKm = (route.distance / 1000).toFixed(1);
-  const totalH = Math.floor(route.time / 3600);
-  const totalM = Math.floor((route.time % 3600) / 60);
-
-  document.getElementById("pMeta").innerHTML =
-    "<span>共 <b>" + routePoints.length + "</b> 个点 · <b>" + (routePoints.length-1) + "</b> 段路线</span><br>" +
-    "<span>总里程 <b style='color:#dc2626;'>" + totalKm + " km</b></span> · " +
-    "<span>总预计 <b>" + totalH + "时" + totalM + "分</b></span>";
-
-  const segList = document.getElementById("segList");
-  segList.innerHTML = "";
-  // 显示路线点序列
-  for(let i = 0; i < routePoints.length; i++) {
-    const li = document.createElement("li");
-    const p = routePoints[i];
-    let label = "第" + (i+1) + "点：" + p.city.name + "（" + p.city.province + "）";
-    if(i === 0) label += " · 起点";
-    else if(i === routePoints.length - 1) label += " · 终点";
-    else label += " · 途经";
-    li.innerHTML = "<span>" + label + "</span>";
-    segList.appendChild(li);
-  }
-  // 显示导航步骤（前10条）
-  if(route.steps && route.steps.length > 0) {
-    const header = document.createElement("li");
-    header.style.cssText = "background:#f9fafb;font-weight:600;color:#6b7280;";
-    header.textContent = "导航步骤（前10条）：";
-    segList.appendChild(header);
-    route.steps.slice(0, 10).forEach(function(step, idx) {
-      const li = document.createElement("li");
-      const sd = step.distance > 1000 ? (step.distance/1000).toFixed(1)+"km" : step.distance+"m";
-      li.innerHTML = "<span>" + (idx+1) + ". " + (step.instruction || "") + "</span><span class='seg-dist'>" + sd + "</span>";
-      segList.appendChild(li);
-    });
-  }
-  panel.classList.add("open");
 }
 
 function renumberMarkers() {
