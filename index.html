@@ -90,6 +90,15 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 .btn.mode.radial:hover{background:#be185d;}
 .btn.quick-btn{background:#059669;font-size:12px;padding:6px 12px;}
 .btn.quick-btn:hover{background:#047857;}
+.btn.more-btn{background:#6b7280;}
+.btn.more-btn:hover{background:#4b5563;}
+.more-menu-wrap{position:relative;}
+.more-menu{display:none;position:absolute;top:calc(100% + 4px);right:0;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:300;min-width:140px;overflow:hidden;}
+.more-menu.open{display:block;}
+.more-item{padding:8px 14px;font-size:13px;color:#374151;cursor:pointer;white-space:nowrap;}
+.more-item:hover{background:#f3f4f6;}
+.more-item.danger{color:#dc2626;border-top:1px solid #f3f4f6;}
+.more-item.danger:hover{background:#fef2f2;}
 .radial-quick{display:flex;}
 .lg-line{display:inline-block;width:20px;height:4px;border-radius:2px;vertical-align:middle;margin-right:4px;}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:#374151;margin-top:3px;}
@@ -277,33 +286,35 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
     <div class="header" id="mainHeader">
       <div class="title-row">
         <div style="display:flex;align-items:center;gap:10px;">
-          <div>
-            <div class="title">全国物流路由规划</div>
-            <div class="subtitle">高德地图底图 · 多点连续路线 · 放射状路由 · 自动优化最短顺序</div>
+          <div class="title">全国物流路由规划</div>
+        </div>
+        <button class="header-collapse-btn" onclick="toggleHeader()" title="收起顶部栏">▼</button>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+        <button class="btn mode" id="modeBtn" onclick="toggleMode()">🔀 多点路线</button>
+        <button class="btn traffic" id="trafficBtn" onclick="toggleTraffic()">🚦 路况</button>
+        <div class="more-menu-wrap">
+          <button class="btn more-btn" onclick="toggleMoreMenu()">⋯ 更多</button>
+          <div class="more-menu" id="moreMenu">
+            <div class="more-item" onclick="toggleMapStyle();toggleMoreMenu()">🗺️ 地图样式</div>
+            <div class="more-item" onclick="exportMapImage();toggleMoreMenu()">📷 导出图片</div>
+            <div class="more-item" onclick="toggleLegend()">📋 图例</div>
+            <div class="more-item danger" onclick="resetAll();toggleMoreMenu()">🔄 全部重置</div>
           </div>
-          <button class="header-collapse-btn" id="headerCollapseBtn" onclick="toggleHeader()" title="收起顶部栏">▼ 收起</button>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <button class="btn mode" id="modeBtn" onclick="toggleMode()">🔀 多点路线</button>
-          <button class="btn traffic" id="trafficBtn" onclick="toggleTraffic()">🚦 实时路况</button>
-          <button class="btn map-style" id="mapStyleBtn" onclick="toggleMapStyle()">🗺️ 地图样式</button>
-          <button class="btn export" id="exportBtn" onclick="exportMapImage()">📷 导出图片</button>
-          <button class="btn reset" id="clearBtn">全部重置</button>
         </div>
       </div>
-      <div class="controls">
-        <div class="tip" id="tip">📌 点击城市添加到路线；再点已选城市只取消该点；多点自动优化最短顺序</div>
-        <div class="radial-quick" id="radialQuick" style="display:none;margin-top:8px;gap:8px;flex-wrap:wrap;">
-          <button class="btn quick-btn" onclick="addAllCapitalsAsDestinations()">🏛️ 目的地=所有省会</button>
-          <button class="btn quick-btn" onclick="addAllCentersAsDestinations()">⭐ 目的地=所有中心</button>
-          <button class="btn quick-btn" onclick="clearRadialDestinations()">🗑️ 清空目的地</button>
+      <div class="controls" style="margin-top:2px;">
+        <div class="tip" id="tip">点击城市添加路线，再点取消</div>
+        <div class="radial-quick" id="radialQuick" style="display:none;margin-top:4px;gap:6px;flex-wrap:wrap;">
+          <button class="btn quick-btn" onclick="addAllCapitalsAsDestinations()">🏛️ 省会</button>
+          <button class="btn quick-btn" onclick="addAllCentersAsDestinations()">⭐ 中心</button>
+          <button class="btn quick-btn" onclick="clearRadialDestinations()">🗑️ 清空</button>
         </div>
       </div>
-      <div class="legend">
-        <div class="lg-item"><span class="lg-dot" style="background:#2563eb;width:12px;height:12px;"></span>中心城市</div>
-        <div class="lg-item"><span class="lg-dot" style="background:#93c5fd;width:6px;height:6px;opacity:0.5;"></span>普通地级市</div>
+      <div class="legend" id="legend" style="display:none;">
+        <div class="lg-item"><span class="lg-dot" style="background:#2563eb;width:10px;height:10px;"></span>中心</div>
+        <div class="lg-item"><span class="lg-dot" style="background:#93c5fd;width:5px;height:5px;opacity:0.5;"></span>地级市</div>
         <div class="lg-item"><span class="lg-dot" style="background:#dc2626;"></span>起点</div>
-        <div class="lg-item"><span class="lg-dot" style="background:#f59e0b;"></span>途经点</div>
         <div class="lg-item"><span class="lg-dot" style="background:#16a34a;"></span>终点</div>
         <div class="lg-item"><span class="lg-line" style="background:#22c55e;"></span>畅通</div>
         <div class="lg-item"><span class="lg-line" style="background:#eab308;"></span>缓行</div>
@@ -506,6 +517,43 @@ function toggleHeader() {
   }
 }
 
+// 更多菜单切换
+function toggleMoreMenu() {
+  const menu = document.getElementById('moreMenu');
+  menu.classList.toggle('open');
+}
+
+// 图例切换
+function toggleLegend() {
+  const legend = document.getElementById('legend');
+  legend.style.display = legend.style.display === 'none' ? 'flex' : 'none';
+}
+
+// 全部重置
+function resetAll() {
+  if(confirm('确定要重置所有路线和选择吗？')) {
+    clearAllRoutes();
+    clearRadialDestinations();
+    selectedCities = [];
+    radialOrigin = null;
+    radialDestinations = [];
+    updateSelectedList();
+    updateRadialList();
+    if(map) map.clearMap();
+    initMarkers();
+    document.getElementById('tip').textContent = '点击城市添加路线，再点取消';
+  }
+}
+
+// 点击外部关闭更多菜单
+document.addEventListener('click', function(e) {
+  const menu = document.getElementById('moreMenu');
+  const wrap = document.querySelector('.more-menu-wrap');
+  if(menu && menu.classList.contains('open') && wrap && !wrap.contains(e.target)) {
+    menu.classList.remove('open');
+  }
+});
+
 // 横屏全屏模式切换
 function toggleFullscreen() {
   document.body.classList.toggle('landscape-fullscreen');
@@ -565,7 +613,6 @@ function initMap() {
     cityMarkers.push(marker);
   });
 
-  document.getElementById("clearBtn").onclick = resetAll;
   document.getElementById("clearRouteBtn").onclick = clearRoute;
   document.getElementById("optimizeBtn").onclick = optimizeRouteOrderBtn;
   document.getElementById("panelClose").onclick = function() { panel.classList.remove("open"); };
