@@ -206,16 +206,16 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
   .sidebar-toggle{width:24px;height:44px;font-size:12px;right:-12px;}
 }
 
-/* 横屏按钮 */
-.fullscreen-btn{position:fixed;bottom:16px;left:16px;z-index:9999;background:#2563eb;color:#fff;border:none;border-radius:24px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(37,99,235,.4);transition:transform .15s,background .15s;}
-.fullscreen-btn:hover{background:#1d4ed8;}
+/* 横屏按钮（正常模式隐藏，入口在更多菜单；横屏模式显示在右上角） */
+.fullscreen-btn{display:none;position:fixed;top:12px;right:12px;z-index:10000;background:#6b7280;color:#fff;border:none;border-radius:20px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3);transition:transform .15s,background .15s;}
+.fullscreen-btn:hover{background:#4b5563;}
 .fullscreen-btn:active{transform:scale(.95);}
 
 /* 横屏全屏模式：旋转90度 + 隐藏侧边栏和顶部栏 */
 body.landscape-fullscreen #app{transform:rotate(90deg);transform-origin:center center;width:100vh;height:100vw;position:fixed;top:50%;left:50%;margin-top:-50vw;margin-left:-50vh;}
 body.landscape-fullscreen .sidebar{display:none !important;}
 body.landscape-fullscreen .header{display:none !important;}
-body.landscape-fullscreen .fullscreen-btn{position:fixed;bottom:12px;left:12px;top:auto;z-index:10000;background:#6b7280;}
+body.landscape-fullscreen .fullscreen-btn{display:block;position:fixed;top:12px;right:12px;z-index:10000;background:#6b7280;}
 body.landscape-fullscreen #panel{top:10px;right:10px;left:auto;max-height:70vh;}
 body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75vh;}
 
@@ -303,6 +303,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
             <div class="more-item" onclick="toggleMapStyle();toggleMoreMenu()">🗺️ 地图样式</div>
             <div class="more-item" onclick="exportMapImage();toggleMoreMenu()">📷 导出图片</div>
             <div class="more-item" onclick="toggleBrowserFullscreen();toggleMoreMenu()">⛶ 一键全屏</div>
+            <div class="more-item" onclick="toggleFullscreen();toggleMoreMenu()">📱 横屏模式</div>
             <div class="more-item" onclick="toggleLegend()">📋 图例</div>
             <div class="more-item danger" onclick="resetAll();toggleMoreMenu()">🔄 全部重置</div>
           </div>
