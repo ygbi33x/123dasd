@@ -825,6 +825,46 @@ function formatTime(seconds) {
   return m + '分';
 }
 
+// 计算点到折线的最近距离（用于找到点击位置最近的路线）
+function distToPolyline(point, path) {
+  let minDist = Infinity;
+  for(let i = 0; i < path.length - 1; i++) {
+    const d = distToSegment(point, path[i], path[i+1]);
+    if(d < minDist) minDist = d;
+  }
+  return minDist;
+}
+
+function distToSegment(p, a, b) {
+  const dx = b.lng - a.lng;
+  const dy = b.lat - a.lat;
+  const lenSq = dx*dx + dy*dy;
+  if(lenSq === 0) return Math.sqrt((p.lng-a.lng)**2 + (p.lat-a.lat)**2);
+  let t = ((p.lng-a.lng)*dx + (p.lat-a.lat)*dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  const cx = a.lng + t*dx;
+  const cy = a.lat + t*dy;
+  return Math.sqrt((p.lng-cx)**2 + (p.lat-cy)**2);
+}
+
+// 找到点击位置最近的放射状路线
+function findNearestRadialRoute(clickLng, clickLat) {
+  let nearest = null;
+  let minDist = Infinity;
+  for(let i = 0; i < radialDestinations.length; i++) {
+    const dest = radialDestinations[i];
+    if(!dest.route || !dest.polyline) continue;
+    const path = dest.polyline.getPath();
+    if(!path || path.length === 0) continue;
+    const d = distToPolyline({lng: clickLng, lat: clickLat}, path);
+    if(d < minDist) {
+      minDist = d;
+      nearest = dest;
+    }
+  }
+  return nearest;
+}
+
 // ===== Dijkstra TSP 最优顺序 =====
 function optimizeRouteOrder(points) {
   const n = points.length;
@@ -1538,7 +1578,12 @@ function planSingleRadialRoute(destObj, callback) {
             cursor: 'pointer'
           });
           polyline.on('click', function(e) {
-            showRadialSegmentInfo(destObj, allPath[Math.floor(allPath.length/2)]);
+            const lng = e.lnglat.getLng();
+            const lat = e.lnglat.getLat();
+            const nearest = findNearestRadialRoute(lng, lat);
+            if(nearest) {
+              showRadialSegmentInfo(nearest, [lng, lat]);
+            }
           });
           polyline.setMap(map);
           destObj.polyline = polyline;
@@ -1626,7 +1671,12 @@ function planRadialNext(version) {
             cursor: 'pointer'
           });
           polyline.on('click', function(e) {
-            showRadialSegmentInfo(dest, allPath[Math.floor(allPath.length/2)]);
+            const lng = e.lnglat.getLng();
+            const lat = e.lnglat.getLat();
+            const nearest = findNearestRadialRoute(lng, lat);
+            if(nearest) {
+              showRadialSegmentInfo(nearest, [lng, lat]);
+            }
           });
           polyline.setMap(map);
           radialPolylines.push(polyline);
