@@ -62,7 +62,10 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 .city-count{padding:6px 14px;font-size:11px;color:#9ca3af;border-top:1px solid #f3f4f6;background:#fafbfc;}
 .empty-tip{padding:20px 14px;text-align:center;color:#9ca3af;font-size:12px;}
 .main{flex:1;display:flex;flex-direction:column;min-width:0;}
-.header{background:#fff;border-bottom:1px solid #e5e7eb;padding:6px 16px;box-shadow:0 1px 4px rgba(0,0,0,.06);z-index:50;flex-shrink:0;}
+.header{background:#fff;border-bottom:1px solid #e5e7eb;padding:6px 16px;box-shadow:0 1px 4px rgba(0,0,0,.06);z-index:50;flex-shrink:0;position:relative;}
+.header-collapse-btn{position:absolute;top:4px;right:8px;cursor:pointer;font-size:14px;color:#6b7280;padding:2px 6px;border-radius:4px;z-index:10;}
+.header-collapse-btn:hover{background:#f3f4f6;color:#1f2937;}
+.header.collapsed{display:none;}
 .title-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
 .title{font-size:15px;font-weight:700;color:#1a1a2e;}
 .subtitle{font-size:11px;color:#6b7280;}
@@ -89,7 +92,7 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 #map{flex:1;min-height:0;z-index:1;}
 #panel{position:absolute;right:14px;top:100px;width:280px;max-width:86vw;max-height:50vh;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.14);z-index:200;display:none;overflow:hidden;flex-direction:column;}
 #panel.open{display:flex;}
-#panelHead{padding:8px 14px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:8px;background:#f9fafb;}
+#panelHead{padding:8px 14px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:8px;background:#f9fafb;cursor:move;user-select:none;}
 #pTitle{font-size:13px;font-weight:700;color:#1a1a2e;flex:1;}
 #panelClose{cursor:pointer;color:#9ca3af;font-size:16px;padding:0 2px;}
 #panelClose:hover{color:#111;}
@@ -246,7 +249,8 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
     </div>
   </div>
   <div class="main">
-    <div class="header">
+    <div class="header" id="mainHeader">
+      <div class="header-collapse-btn" id="headerCollapseBtn" onclick="toggleHeader()">▼</div>
       <div class="title-row">
         <div>
           <div class="title">全国物流路由规划</div>
@@ -275,6 +279,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         <div class="lg-item"><span class="lg-line" style="background:#ef4444;"></span>拥堵</div>
       </div>
     </div>
+    <div id="headerExpandBtn" onclick="toggleHeader()" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:100;background:#2563eb;color:#fff;border:none;border-radius:16px;padding:6px 16px;font-size:12px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2);">▲ 展开顶栏</div>
 <div id="map"></div>
 <div id="landscapeOverlay" style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;z-index:500;background:transparent;touch-action:none;"></div>
 <div id="landscapeZoom" style="display:none;position:fixed;left:12px;bottom:12px;z-index:10000;display:flex;flex-direction:column;gap:8px;">
@@ -456,6 +461,23 @@ function disableLandscapeInteract() {
   window.removeEventListener('touchend', onLandscapeEnd);
 }
 
+// 顶部栏收回/展开
+function toggleHeader() {
+  const header = document.getElementById('mainHeader');
+  const expandBtn = document.getElementById('headerExpandBtn');
+  const collapseBtn = document.getElementById('headerCollapseBtn');
+  header.classList.toggle('collapsed');
+  if(header.classList.contains('collapsed')) {
+    expandBtn.style.display = 'block';
+    collapseBtn.innerHTML = '▲';
+    collapseBtn.title = '展开';
+  } else {
+    expandBtn.style.display = 'none';
+    collapseBtn.innerHTML = '▼';
+    collapseBtn.title = '收起';
+  }
+}
+
 // 横屏全屏模式切换
 function toggleFullscreen() {
   document.body.classList.toggle('landscape-fullscreen');
@@ -511,6 +533,71 @@ function initMap() {
   document.getElementById("distClose").onclick = function() { document.getElementById("distPanel").classList.remove("open"); };
   document.getElementById("zoomInBtn").onclick = function() { if(map) map.zoomIn(); };
   document.getElementById("zoomOutBtn").onclick = function() { if(map) map.zoomOut(); };
+  
+  // Panel拖动功能
+  initPanelDrag();
+}
+
+// Panel拖动
+let panelDrag = { active:false, startX:0, startY:0, origLeft:0, origTop:0 };
+function initPanelDrag() {
+  const head = document.getElementById('panelHead');
+  const panel = document.getElementById('panel');
+  
+  head.addEventListener('mousedown', function(e) {
+    if(e.target.id === 'panelClose') return;
+    panelDrag.active = true;
+    panelDrag.startX = e.clientX;
+    panelDrag.startY = e.clientY;
+    const rect = panel.getBoundingClientRect();
+    panelDrag.origLeft = rect.left;
+    panelDrag.origTop = rect.top;
+    panel.style.right = 'auto';
+    panel.style.left = panelDrag.origLeft + 'px';
+    panel.style.top = panelDrag.origTop + 'px';
+    e.preventDefault();
+  });
+  
+  document.addEventListener('mousemove', function(e) {
+    if(!panelDrag.active) return;
+    const dx = e.clientX - panelDrag.startX;
+    const dy = e.clientY - panelDrag.startY;
+    panel.style.left = (panelDrag.origLeft + dx) + 'px';
+    panel.style.top = (panelDrag.origTop + dy) + 'px';
+  });
+  
+  document.addEventListener('mouseup', function() {
+    panelDrag.active = false;
+  });
+  
+  // 触摸支持
+  head.addEventListener('touchstart', function(e) {
+    if(e.target.id === 'panelClose') return;
+    const t = e.touches[0];
+    panelDrag.active = true;
+    panelDrag.startX = t.clientX;
+    panelDrag.startY = t.clientY;
+    const rect = panel.getBoundingClientRect();
+    panelDrag.origLeft = rect.left;
+    panelDrag.origTop = rect.top;
+    panel.style.right = 'auto';
+    panel.style.left = panelDrag.origLeft + 'px';
+    panel.style.top = panelDrag.origTop + 'px';
+  });
+  
+  document.addEventListener('touchmove', function(e) {
+    if(!panelDrag.active) return;
+    const t = e.touches[0];
+    const dx = t.clientX - panelDrag.startX;
+    const dy = t.clientY - panelDrag.startY;
+    panel.style.left = (panelDrag.origLeft + dx) + 'px';
+    panel.style.top = (panelDrag.origTop + dy) + 'px';
+    e.preventDefault();
+  }, {passive:false});
+  
+  document.addEventListener('touchend', function() {
+    panelDrag.active = false;
+  });
 }
 
 
@@ -1464,6 +1551,7 @@ function planSingleRadialRoute(destObj, callback) {
     } else {
       destObj.route = null;
     }
+    sortRadialByDistance();
     updateRadialSummary();
     if(callback) callback();
   });
