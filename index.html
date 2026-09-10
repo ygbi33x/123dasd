@@ -45,6 +45,8 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 .filter-tab{padding:2px 7px;font-size:11px;border:1px solid #d1d5db;border-radius:10px;cursor:pointer;color:#6b7280;background:#fff;transition:.15s;}
 .filter-tab:hover{border-color:#2385de;color:#2385de;}
 .filter-tab.active{background:#2385de;color:#fff;border-color:#2385de;}
+.type-filter{display:flex;gap:4px;}
+.type-filter .filter-tab{flex:1;text-align:center;padding:3px 4px;}
 .city-list{flex:1;overflow-y:auto;padding:2px 0;scroll-behavior:smooth;}
 .city-item{display:flex;align-items:center;padding:5px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f9fafb;transition:.15s;}
 .city-item:hover{background:#f0f7ff;}
@@ -248,6 +250,14 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         <input type="text" id="searchInput" placeholder="搜索城市名称..." />
       </div>
       <div class="filter-section">
+        <div class="filter-label">城市类型</div>
+        <div class="type-filter">
+          <span class="filter-tab active" data-type="all" onclick="setCityTypeFilter('all')">全部</span>
+          <span class="filter-tab" data-type="center" onclick="setCityTypeFilter('center')">仅中心</span>
+          <span class="filter-tab" data-type="capital" onclick="setCityTypeFilter('capital')">仅省会</span>
+        </div>
+      </div>
+      <div class="filter-section">
         <div class="filter-label">大区</div>
         <div class="filter-tabs" id="regionTabs"></div>
       </div>
@@ -357,6 +367,7 @@ let cityMarkers = [];
 let currentRegion = "全部";
 let currentProvince = "全部";
 let searchKeyword = "";
+let cityTypeFilter = "all";
 let isPlanning = false;
 let CAPITALS = [];
 
@@ -667,6 +678,14 @@ function toggleProvinceFilter() {
   }
 }
 
+function setCityTypeFilter(type) {
+  cityTypeFilter = type;
+  document.querySelectorAll('.type-filter .filter-tab').forEach(function(t) {
+    t.classList.toggle('active', t.dataset.type === type);
+  });
+  renderCityList();
+}
+
 function initFilters() {
   const regionContainer = document.getElementById('regionTabs');
   ALL_REGIONS.forEach(function(region) {
@@ -721,6 +740,8 @@ function renderCityList(scrollToCity) {
   const list = document.getElementById('cityList');
   list.innerHTML = '';
   let filtered = CITIES;
+  if(cityTypeFilter === 'center') filtered = filtered.filter(c => c.isCenter);
+  if(cityTypeFilter === 'capital') filtered = filtered.filter(c => CAPITALS.some(cap => cap.name === c.name));
   if(currentRegion !== "全部") filtered = filtered.filter(c => c.region === currentRegion);
   if(currentProvince !== "全部") filtered = filtered.filter(c => c.province === currentProvince);
   if(searchKeyword) {
@@ -1919,12 +1940,8 @@ function addAllCentersAsRoutePoints() {
   renderRouteBar();
   renderCityList();
   if(routePoints.length >= 2) {
-    if(routePoints.length >= 3) {
-      const optimized = optimizeRouteOrder(routePoints);
-      routePoints = optimized;
-      renumberMarkers();
-    }
-    tipDom.innerHTML = '✅ 已添加 ' + added + ' 个中心城市（共' + routePoints.length + '个点），正在规划路线...';
+    // 不做Dijkstra全局优化，直接按列表顺序连接，每段用驾车最短路径
+    tipDom.innerHTML = '✅ 已添加 ' + added + ' 个中心城市（共' + routePoints.length + '个点），正在按顺序规划路线...';
     planFullRoute();
   } else {
     tipDom.innerHTML = '✅ 已添加 ' + added + ' 个中心城市';
