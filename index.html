@@ -2243,41 +2243,7 @@ function exportMapImage() {
           ctx.drawImage(c, offsetX, offsetY, cRect.width, cRect.height);
         }
         
-        // 绘制所有城市标记和名字
-        for(let i = 0; i < CITIES.length; i++) {
-          const city = CITIES[i];
-          const pos = map.lngLatToContainer([city.lng, city.lat]);
-          const x = pos.getX();
-          const y = pos.getY();
-          
-          // 只绘制在地图可视范围内的城市
-          if(x < -20 || x > mapRect.width + 20 || y < -20 || y > mapRect.height + 20) continue;
-          
-          // 绘制城市圆点
-          if(city.isCenter) {
-            ctx.beginPath();
-            ctx.arc(x, y, 5, 0, Math.PI * 2);
-            ctx.fillStyle = '#2563eb';
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-          } else {
-            ctx.beginPath();
-            ctx.arc(x, y, 3, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(37, 99, 235, 0.6)';
-            ctx.fill();
-          }
-          
-          // 绘制城市名字（11px小字体，标记正下方）
-          ctx.font = '11px sans-serif';
-          ctx.fillStyle = '#374151';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.fillText(city.name, x, y + 6);
-        }
-        
-        // 绘制已选路线点标记（起点、途经点、终点）
+        // 绘制已选路线点标记（起点、途经点、终点）和城市名字
         if(routePoints && routePoints.length > 0) {
           for(let i = 0; i < routePoints.length; i++) {
             const city = routePoints[i].city;
@@ -2310,6 +2276,13 @@ function exportMapImage() {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(label, x, y);
+            
+            // 绘制城市名字（12px，标记正下方）
+            ctx.font = '12px sans-serif';
+            ctx.fillStyle = '#111';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(city.name, x, y + 14);
           }
         }
         
