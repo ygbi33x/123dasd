@@ -540,13 +540,8 @@ function toggleLegend() {
 // 全部重置
 function resetAll() {
   if(confirm('确定要重置所有路线和选择吗？')) {
-    clearAllRoutes();
+    clearRoute();
     clearRadialDestinations();
-    selectedCities = [];
-    radialOrigin = null;
-    radialDestinations = [];
-    updateSelectedList();
-    updateRadialList();
     if(map) map.clearMap();
     initMarkers();
     document.getElementById('tip').textContent = '点击城市添加路线，再点取消';
@@ -2194,10 +2189,9 @@ function toggleMapStyle() {
 
 // 导出地图图片
 function exportMapImage() {
-  const btn = document.getElementById('exportBtn');
-  const originalText = btn.innerHTML;
-  btn.innerHTML = '⏳ 生成中...';
-  btn.disabled = true;
+  const tipDom = document.getElementById('tip');
+  const originalTip = tipDom.innerHTML;
+  tipDom.innerHTML = '⏳ 正在生成图片...';
   
   // 先关闭信息窗口和面板，避免遮挡
   if(segmentInfoWindow) segmentInfoWindow.close();
@@ -2208,30 +2202,32 @@ function exportMapImage() {
   const sidebar = document.querySelector('.sidebar');
   const header = document.querySelector('.header');
   const fullscreenBtn = document.getElementById('fullscreenBtn');
+  const sidebarExpandBtn = document.getElementById('sidebarExpandBtn');
   const originalSidebarDisplay = sidebar.style.display;
   const originalHeaderDisplay = header.style.display;
   const originalFullscreenDisplay = fullscreenBtn.style.display;
+  const originalSidebarExpandDisplay = sidebarExpandBtn ? sidebarExpandBtn.style.display : '';
   
   sidebar.style.display = 'none';
   header.style.display = 'none';
   fullscreenBtn.style.display = 'none';
+  if(sidebarExpandBtn) sidebarExpandBtn.style.display = 'none';
   
   setTimeout(function() {
     try {
-      // 方案1：手动合并地图canvas层（最可靠）
       const mapEl = document.getElementById('map');
       const mapRect = mapEl.getBoundingClientRect();
       const canvases = mapEl.querySelectorAll('canvas');
       
-      if(canvases.length > 0) {
-        // 创建导出canvas
+      if(canvases.length > 0 && map) {
+        // 创建导出canvas（2倍清晰度）
         const exportCanvas = document.createElement('canvas');
         exportCanvas.width = mapRect.width * 2;
         exportCanvas.height = mapRect.height * 2;
         const ctx = exportCanvas.getContext('2d');
         ctx.scale(2, 2);
         
-        // 按z-index顺序绘制所有canvas
+        // 按z-index顺序绘制所有canvas层
         const canvasList = Array.from(canvases).sort(function(a, b) {
           const za = parseInt(a.style.zIndex) || 0;
           const zb = parseInt(b.style.zIndex) || 0;
@@ -2246,7 +2242,77 @@ function exportMapImage() {
           ctx.drawImage(c, offsetX, offsetY, cRect.width, cRect.height);
         }
         
-        // 导出
+        // 绘制所有城市标记和名字
+        for(let i = 0; i < CITIES.length; i++) {
+          const city = CITIES[i];
+          const pos = map.lngLatToContainer([city.lng, city.lat]);
+          const x = pos.getX();
+          const y = pos.getY();
+          
+          // 只绘制在地图可视范围内的城市
+          if(x < -20 || x > mapRect.width + 20 || y < -20 || y > mapRect.height + 20) continue;
+          
+          // 绘制城市圆点
+          if(city.isCenter) {
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#2563eb';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          } else {
+            ctx.beginPath();
+            ctx.arc(x, y, 3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(37, 99, 235, 0.6)';
+            ctx.fill();
+          }
+          
+          // 绘制城市名字（11px小字体，标记正下方）
+          ctx.font = '11px sans-serif';
+          ctx.fillStyle = '#374151';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillText(city.name, x, y + 6);
+        }
+        
+        // 绘制已选路线点标记（起点、途经点、终点）
+        if(routePoints && routePoints.length > 0) {
+          for(let i = 0; i < routePoints.length; i++) {
+            const city = routePoints[i].city;
+            const pos = map.lngLatToContainer([city.lng, city.lat]);
+            const x = pos.getX();
+            const y = pos.getY();
+            
+            let color = '#f59e0b'; // 途经点橙色
+            let label = (i + 1).toString();
+            if(i === 0) {
+              color = '#dc2626'; // 起点红色
+              label = '起';
+            } else if(i === routePoints.length - 1) {
+              color = '#16a34a'; // 终点绿色
+              label = '终';
+            }
+            
+            // 绘制标记圆点
+            ctx.beginPath();
+            ctx.arc(x, y, 10, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // 绘制编号
+            ctx.font = 'bold 10px sans-serif';
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, x, y);
+          }
+        }
+        
+        // 导出图片
         const link = document.createElement('a');
         link.download = '物流路由地图_' + new Date().toISOString().slice(0,10) + '.png';
         link.href = exportCanvas.toDataURL('image/png');
@@ -2256,53 +2322,23 @@ function exportMapImage() {
         sidebar.style.display = originalSidebarDisplay;
         header.style.display = originalHeaderDisplay;
         fullscreenBtn.style.display = originalFullscreenDisplay;
+        if(sidebarExpandBtn) sidebarExpandBtn.style.display = originalSidebarExpandDisplay;
         
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-        tipDom.innerHTML = '📷 地图图片已导出';
+        tipDom.innerHTML = '📷 地图图片已导出（含城市名称）';
+        setTimeout(function(){ tipDom.innerHTML = originalTip; }, 3000);
       } else {
-        // 方案2：使用html2canvas
-        html2canvas(document.body, {
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#fff',
-          scale: 2,
-          logging: false
-        }).then(function(canvas) {
-          // 恢复UI
-          sidebar.style.display = originalSidebarDisplay;
-          header.style.display = originalHeaderDisplay;
-          fullscreenBtn.style.display = originalFullscreenDisplay;
-          
-          const link = document.createElement('a');
-          link.download = '物流路由地图_' + new Date().toISOString().slice(0,10) + '.png';
-          link.href = canvas.toDataURL('image/png');
-          link.click();
-          btn.innerHTML = originalText;
-          btn.disabled = false;
-          tipDom.innerHTML = '📷 地图图片已导出';
-        }).catch(function(err) {
-          // 恢复UI
-          sidebar.style.display = originalSidebarDisplay;
-          header.style.display = originalHeaderDisplay;
-          fullscreenBtn.style.display = originalFullscreenDisplay;
-          
-          console.error('导出失败:', err);
-          btn.innerHTML = originalText;
-          btn.disabled = false;
-          tipDom.innerHTML = '❌ 导出失败，请使用浏览器截图功能（Ctrl+Shift+A）';
-        });
+        throw new Error('未找到地图canvas');
       }
     } catch(err) {
       // 恢复UI
       sidebar.style.display = originalSidebarDisplay;
       header.style.display = originalHeaderDisplay;
       fullscreenBtn.style.display = originalFullscreenDisplay;
+      if(sidebarExpandBtn) sidebarExpandBtn.style.display = originalSidebarExpandDisplay;
       
       console.error('导出失败:', err);
-      btn.innerHTML = originalText;
-      btn.disabled = false;
-      tipDom.innerHTML = '❌ 导出失败，请使用浏览器截图功能（Ctrl+Shift+A）';
+      tipDom.innerHTML = '❌ 导出失败: ' + err.message;
+      setTimeout(function(){ tipDom.innerHTML = originalTip; }, 3000);
     }
   }, 500);
 }
