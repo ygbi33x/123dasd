@@ -1076,7 +1076,20 @@ function planNextSegment(version) {
     isPlanning = false;
     drawAllSegments();
     updateFullRouteSummary();
-    tipDom.innerHTML = '✅ 路线规划完成（共' + routeSegments.length + '段）';
+    // 统计直线兜底数量
+    let fallbackCount = 0;
+    for(let i = 0; i < routeSegments.length; i++) {
+      const seg = routeSegments[i];
+      if(seg.route && seg.route.steps && seg.route.steps.length === 1 && 
+         seg.route.steps[0].instruction && seg.route.steps[0].instruction.includes('直线')) {
+        fallbackCount++;
+      }
+    }
+    if(fallbackCount > 0) {
+      tipDom.innerHTML = '✅ 路线规划完成（共' + routeSegments.length + '段，' + fallbackCount + '段直线连接）';
+    } else {
+      tipDom.innerHTML = '✅ 路线规划完成（共' + routeSegments.length + '段，全部真实驾车路线）';
+    }
     return;
   }
   
@@ -1086,6 +1099,13 @@ function planNextSegment(version) {
   // 更新进度提示
   tipDom.innerHTML = '⏳ 正在规划路线 ' + (segmentPlanIndex + 1) + '/' + (routePoints.length - 1) + '：' + start.name + ' → ' + end.name;
   
+  // 带重试的规划函数
+  planSegmentWithRetry(version, start, end, 0);
+}
+
+function planSegmentWithRetry(version, start, end, retryCount) {
+  if(version !== planVersion) return;
+  
   const driving = new AMap.Driving({
     map: null,
     autoFitView: false,
@@ -1093,41 +1113,50 @@ function planNextSegment(version) {
     policy: AMap.DrivingPolicy.LEAST_TIME
   });
   
-  // 设置超时，5秒未响应则用直线兜底
+  // 设置超时，10秒未响应则重试或兜底
   let timeoutId = setTimeout(function() {
     if(version !== planVersion) return;
-    // 超时，用直线兜底
+    handleSegmentResult(version, start, end, retryCount, false, null);
+  }, 10000);
+  
+  driving.search([start.lng, start.lat], [end.lng, end.lat], function(status, result) {
+    clearTimeout(timeoutId);
+    if(version !== planVersion) return;
+    
+    const success = status === "complete" && result.routes && result.routes.length > 0;
+    handleSegmentResult(version, start, end, retryCount, success, success ? result.routes[0] : null);
+  });
+}
+
+function handleSegmentResult(version, start, end, retryCount, success, route) {
+  if(version !== planVersion) return;
+  
+  if(success) {
+    // 规划成功
+    routeSegments.push({
+      startCity: start,
+      endCity: end,
+      route: route
+    });
+    segmentPlanIndex++;
+    // 段间延迟200ms，避免API限流
+    setTimeout(function() { planNextSegment(version); }, 200);
+  } else if(retryCount < 2) {
+    // 失败，重试（最多2次）
+    tipDom.innerHTML = '⏳ 第' + (segmentPlanIndex + 1) + '段规划失败，正在重试（第' + (retryCount + 1) + '次）...';
+    setTimeout(function() {
+      planSegmentWithRetry(version, start, end, retryCount + 1);
+    }, 500);
+  } else {
+    // 重试都失败，用直线兜底
     routeSegments.push({
       startCity: start,
       endCity: end,
       route: createFallbackRoute(start, end)
     });
     segmentPlanIndex++;
-    planNextSegment(version);
-  }, 8000);
-  
-  driving.search([start.lng, start.lat], [end.lng, end.lat], function(status, result) {
-    clearTimeout(timeoutId);
-    // 检查版本号
-    if(version !== planVersion) return;
-    
-    if(status === "complete" && result.routes && result.routes.length > 0) {
-      routeSegments.push({
-        startCity: start,
-        endCity: end,
-        route: result.routes[0]
-      });
-    } else {
-      // 该段规划失败，用直线兜底
-      routeSegments.push({
-        startCity: start,
-        endCity: end,
-        route: createFallbackRoute(start, end)
-      });
-    }
-    segmentPlanIndex++;
-    planNextSegment(version);
-  });
+    setTimeout(function() { planNextSegment(version); }, 200);
+  }
 }
 
 // 创建直线兜底路线
@@ -1898,26 +1927,8 @@ function addPoint(city) {
   const label = createCityLabel(city, [city.lng, city.lat]);
   routePoints.push({city: city, marker: marker, label: label});
 
-  // 3个点及以上自动优化顺序
-  if(routePoints.length >= 3) {
-    const optimized = optimizeRouteOrder(routePoints);
-    let changed = false;
-    for(let i = 0; i < optimized.length; i++) {
-      if(optimized[i].city.name !== routePoints[i].city.name) { changed = true; break; }
-    }
-    if(changed) {
-      routePoints = optimized;
-      renumberMarkers();
-      tipDom.innerHTML = "🔄 已自动优化路线顺序（Dijkstra），共 <b>" + routePoints.length + "</b> 个点，正在规划...";
-      renderRouteBar();
-      renderCityList(city.name);
-      planFullRoute();
-      return;
-    }
-  }
-
-  // 顺序未变或只有2个点，直接规划
-  renumberMarkers(); // 每次添加后都更新标记（起点/途经点/终点）
+  // 直接按顺序规划，不做自动Dijkstra优化（大量城市时会崩溃）
+  renumberMarkers();
   if(routePoints.length >= 2) {
     tipDom.innerHTML = "🚗 正在规划路线（" + routePoints.length + "个点）...";
     planFullRoute();
@@ -1950,8 +1961,17 @@ function addAllCentersAsRoutePoints() {
     tipDom.innerHTML = '⚠️ 请先切换到多点路线模式';
     return;
   }
-  const centers = CITIES.filter(function(c) { return c.isCenter; });
+  // 获取所有中心城市
+  let centers = CITIES.filter(function(c) { return c.isCenter; });
+  // 把浦东移到第一个（出发地）
+  const pudong = centers.find(function(c) { return c.name === '浦东'; });
+  if(pudong) {
+    centers = centers.filter(function(c) { return c.name !== '浦东'; });
+    centers.unshift(pudong);
+  }
+  
   let added = 0;
+  // 添加所有中心城市
   for(let i = 0; i < centers.length; i++) {
     const city = centers[i];
     if(routePoints.findIndex(function(p) { return p.city.name === city.name; }) >= 0) continue;
@@ -1971,12 +1991,31 @@ function addAllCentersAsRoutePoints() {
     routePoints.push({city: city, marker: marker, label: label});
     added++;
   }
+  
+  // 最后再添加浦东作为目的地（闭环）
+  if(pudong) {
+    const marker = new AMap.Marker({
+      position: [pudong.lng, pudong.lat],
+      content: '<div style="background:rgba(220,38,38,0.8);color:#fff;border:2px solid rgba(255,255,255,0.8);border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;">' + (routePoints.length+1) + '</div>',
+      offset: new AMap.Pixel(-14, -14),
+      zIndex: 300 + routePoints.length
+    });
+    marker.on("click", function() {
+      const idx = routePoints.length - 1;
+      if(idx >= 0 && routePoints[idx].city.name === '浦东') removePointAt(idx);
+    });
+    marker.setMap(map);
+    const label = createCityLabel(pudong, [pudong.lng, pudong.lat]);
+    routePoints.push({city: pudong, marker: marker, label: label});
+    added++;
+  }
+  
   renumberMarkers();
   renderRouteBar();
   renderCityList();
   if(routePoints.length >= 2) {
     // 不做Dijkstra全局优化，直接按列表顺序连接，每段用驾车最短路径
-    tipDom.innerHTML = '✅ 已添加 ' + added + ' 个中心城市（共' + routePoints.length + '个点），正在按顺序规划路线...';
+    tipDom.innerHTML = '✅ 已添加 ' + added + ' 个点（浦东出发→回到浦东，共' + routePoints.length + '个点），正在按顺序规划路线...';
     planFullRoute();
   } else {
     tipDom.innerHTML = '✅ 已添加 ' + added + ' 个中心城市';
