@@ -1570,6 +1570,8 @@ const TRAFFIC_COLORS = {
 
 let routePolylines = [];
 let segmentInfoWindow = null;
+let alternativeRoutes = []; // 备选路线polylines
+let activeSegmentIndex = -1; // 当前选中的路线段索引
 
 function clearRoutePolylines() {
   for(let i = 0; i < routePolylines.length; i++) {
@@ -2596,17 +2598,12 @@ function exportMapImage() {
             ctx.textBaseline = 'middle';
             ctx.fillText(label, x, y);
             
-            // 绘制城市名字（14px加粗，标记正下方，带白色背景确保可见）
-            ctx.font = 'bold 14px sans-serif';
-            const textWidth = ctx.measureText(city.name).width;
-            // 白色背景
-            ctx.fillStyle = 'rgba(255,255,255,0.85)';
-            ctx.fillRect(x - textWidth/2 - 4, y + 14, textWidth + 8, 20);
-            // 文字
-            ctx.fillStyle = '#111';
+            // 绘制城市名字（11px，标记正下方，透明无背景）
+            ctx.font = '11px sans-serif';
+            ctx.fillStyle = '#1a1a1a';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
-            ctx.fillText(city.name, x, y + 17);
+            ctx.fillText(city.name, x, y + 13);
           }
         }
         
@@ -2619,14 +2616,11 @@ function exportMapImage() {
           const ox = originPos.getX();
           const oy = originPos.getY();
           
-          ctx.font = 'bold 14px sans-serif';
-          const originTextWidth = ctx.measureText(originCity.name).width;
-          ctx.fillStyle = 'rgba(220,38,38,0.9)';
-          ctx.fillRect(ox - originTextWidth/2 - 4, oy + 14, originTextWidth + 8, 20);
-          ctx.fillStyle = '#fff';
+          ctx.font = '11px sans-serif';
+          ctx.fillStyle = '#dc2626';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
-          ctx.fillText(originCity.name, ox, oy + 17);
+          ctx.fillText(originCity.name, ox, oy + 13);
           
           // 目的地
           for(let i = 0; i < radialDestinations.length; i++) {
@@ -2636,14 +2630,11 @@ function exportMapImage() {
             const dx = destPos.getX();
             const dy = destPos.getY();
             
-            ctx.font = 'bold 13px sans-serif';
-            const destTextWidth = ctx.measureText(destCity.name).width;
-            ctx.fillStyle = 'rgba(37,99,235,0.9)';
-            ctx.fillRect(dx - destTextWidth/2 - 4, dy + 14, destTextWidth + 8, 18);
-            ctx.fillStyle = '#fff';
+            ctx.font = '10px sans-serif';
+            ctx.fillStyle = '#2563eb';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
-            ctx.fillText(destCity.name, dx, dy + 16);
+            ctx.fillText(destCity.name, dx, dy + 12);
           }
         }
         
