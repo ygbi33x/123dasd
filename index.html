@@ -308,9 +308,10 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
   <div class="main">
     <div class="header" id="mainHeader">
       <div class="title-row">
-        <div style="display:flex;align-items:center;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
           <div class="title">全国物流路由规划</div>
           <span id="modeIndicator" style="padding:4px 12px;border-radius:20px;color:#fff;font-size:11px;font-weight:700;background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);box-shadow:0 2px 8px rgba(59,130,246,.3);">🔀 多点路线</span>
+          <span id="trafficIndicator" style="padding:4px 12px;border-radius:20px;color:#fff;font-size:11px;font-weight:700;background:linear-gradient(135deg,#64748b 0%,#475569 100%);box-shadow:0 2px 8px rgba(100,116,139,.3);">🚦 路况关</span>
         </div>
         <div style="display:flex;gap:6px;align-items:center;">
           <div class="more-menu-wrap">
@@ -427,6 +428,7 @@ window.onload = function() {
   initMap();
   initFilters();
   updateModeIndicator();
+  updateTrafficIndicator();
   CAPITALS = CITIES.filter(function(c) { return CAPITAL_NAMES.indexOf(c.name) >= 0; });
   renderCityList();
 };
@@ -2154,15 +2156,12 @@ function clearRoute() {
 
 // 切换实时路况图层
 function toggleTraffic() {
-  const btn = document.getElementById('trafficBtn');
   if(trafficEnabled) {
     if(trafficLayer) {
       trafficLayer.setMap(null);
       trafficLayer = null;
     }
     trafficEnabled = false;
-    btn.classList.remove('active');
-    btn.innerHTML = '🚦 实时路况';
     tipDom.innerHTML = '📌 实时路况已关闭';
   } else {
     // 使用自定义TileLayer加载路况瓦片
@@ -2173,9 +2172,23 @@ function toggleTraffic() {
     });
     trafficLayer.setMap(map);
     trafficEnabled = true;
-    btn.classList.add('active');
-    btn.innerHTML = '🚦 路况开启';
     tipDom.innerHTML = '✅ 实时路况已开启（绿=畅通 黄=缓行 红=拥堵）';
+  }
+  updateTrafficIndicator();
+}
+
+// 更新路况指示器
+function updateTrafficIndicator() {
+  const indicator = document.getElementById('trafficIndicator');
+  if(!indicator) return;
+  if(trafficEnabled) {
+    indicator.textContent = '🚦 路况开';
+    indicator.style.background = 'linear-gradient(135deg,#ef4444 0%,#dc2626 100%)';
+    indicator.style.boxShadow = '0 2px 8px rgba(239,68,68,.4)';
+  } else {
+    indicator.textContent = '🚦 路况关';
+    indicator.style.background = 'linear-gradient(135deg,#64748b 0%,#475569 100%)';
+    indicator.style.boxShadow = '0 2px 8px rgba(100,116,139,.3)';
   }
 }
 
