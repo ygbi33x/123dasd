@@ -71,41 +71,51 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 .city-province{font-size:9px;color:#a8a29e;margin-right:5px;font-weight:600;}
 .city-count{padding:8px 14px;font-size:10px;color:#c2410c;border-top:2px solid #fed7aa;background:linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%);font-weight:700;letter-spacing:.3px;}
 .empty-tip{padding:20px 14px;text-align:center;color:#a8a29e;font-size:11px;font-weight:500;}
-.main{flex:1;display:flex;flex-direction:column;min-width:0;background:#f8fafc;}
-.header{background:linear-gradient(135deg,#fff 0%,#fff7ed 100%);border-bottom:2px solid #f97316;padding:10px 20px;box-shadow:0 2px 12px rgba(249,115,22,.12);z-index:50;flex-shrink:0;position:relative;}
-.header-collapse-btn{cursor:pointer;font-size:12px;color:#92400e;padding:5px 12px;border-radius:8px;border:1px solid #fed7aa;background:#fff7ed;white-space:nowrap;flex-shrink:0;transition:.2s;font-weight:500;}
-.header-collapse-btn:hover{background:#ffedd5;color:#7c2d12;border-color:#fdba74;}
+.main{flex:1;display:flex;flex-direction:column;min-width:0;background:#f0f4f8;}
+.header{background:rgba(255,255,255,.7);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border-bottom:1px solid rgba(0,0,0,.06);padding:10px 20px;box-shadow:0 4px 24px rgba(0,0,0,.06);z-index:50;flex-shrink:0;position:relative;}
+.header-collapse-btn{cursor:pointer;font-size:12px;color:#64748b;padding:6px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.08);background:rgba(255,255,255,.6);white-space:nowrap;flex-shrink:0;transition:.25s;font-weight:500;}
+.header-collapse-btn:hover{background:rgba(59,130,246,.1);color:#2563eb;border-color:rgba(59,130,246,.3);}
 .header.collapsed{display:none;}
 .title-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
-.title{font-size:17px;font-weight:800;background:linear-gradient(135deg,#c2410c 0%,#f97316 50%,#fb923c 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:1px;}
-.subtitle{font-size:11px;color:#92400e;}
+.title{font-size:17px;font-weight:800;background:linear-gradient(135deg,#0ea5e9 0%,#3b82f6 50%,#6366f1 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:1px;}
+.subtitle{font-size:11px;color:#64748b;}
 .controls{display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap;}
-.tip{flex:1;font-size:12px;color:#78350f;min-width:200px;font-weight:500;padding:4px 10px;background:#fff7ed;border-radius:6px;border-left:3px solid #f97316;}
-.btn{padding:7px 16px;border:none;border-radius:8px;cursor:pointer;font-size:12px;color:#fff;font-weight:600;transition:all .2s cubic-bezier(.4,0,.2,1);box-shadow:0 2px 6px rgba(0,0,0,.12);letter-spacing:.3px;}
-.btn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.18);}
-.btn:active{transform:translateY(0);box-shadow:0 1px 3px rgba(0,0,0,.12);}
+.tip{flex:1;font-size:12px;color:#475569;min-width:200px;font-weight:500;padding:5px 12px;background:rgba(255,255,255,.6);border-radius:8px;border:1px solid rgba(0,0,0,.05);}
+.btn{padding:7px 16px;border:none;border-radius:10px;cursor:pointer;font-size:12px;color:#fff;font-weight:600;transition:all .25s cubic-bezier(.4,0,.2,1);box-shadow:0 2px 8px rgba(0,0,0,.1);letter-spacing:.3px;position:relative;overflow:hidden;}
+.btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent);transition:.5s;}
+.btn:hover::before{left:100%;}
+.btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.15);}
+.btn:active{transform:translateY(0);box-shadow:0 2px 6px rgba(0,0,0,.1);}
 .btn.reset{background:linear-gradient(135deg,#64748b 0%,#475569 100%);}
-.btn.reset:hover{background:linear-gradient(135deg,#475569 0%,#334155 100%);}
-.btn.traffic{background:linear-gradient(135deg,#0284c7 0%,#0369a1 100%);}
-.btn.traffic:hover{background:linear-gradient(135deg,#0369a1 0%,#075985 100%);}
-.btn.traffic.active{background:linear-gradient(135deg,#dc2626 0%,#b91c1c 100%);}
-.btn.traffic.active:hover{background:linear-gradient(135deg,#b91c1c 0%,#991b1b 100%);}
-.btn.map-style{background:linear-gradient(135deg,#0284c7 0%,#0369a1 100%);}
-.btn.map-style:hover{background:linear-gradient(135deg,#0369a1 0%,#075985 100%);}
-.btn.export{background:linear-gradient(135deg,#16a34a 0%,#15803d 100%);}
-.btn.export:hover{background:linear-gradient(135deg,#15803d 0%,#166534 100%);}
-.btn.mode{background:linear-gradient(135deg,#f97316 0%,#ea580c 100%);box-shadow:0 2px 8px rgba(249,115,22,.35);}
-.btn.mode:hover{background:linear-gradient(135deg,#ea580c 0%,#c2410c 100%);box-shadow:0 4px 16px rgba(249,115,22,.45);}
-.btn.mode.radial{background:linear-gradient(135deg,#db2777 0%,#be185d 100%);box-shadow:0 2px 8px rgba(219,39,119,.35);}
-.btn.mode.radial:hover{background:linear-gradient(135deg,#be185d 0%,#9d174d 100%);}
-.btn.quick-btn{background:linear-gradient(135deg,#f97316 0%,#ea580c 100%);font-size:12px;padding:6px 14px;box-shadow:0 2px 6px rgba(249,115,22,.3);}
-.btn.quick-btn:hover{background:linear-gradient(135deg,#ea580c 0%,#c2410c 100%);}
+.btn.reset:hover{background:linear-gradient(135deg,#475569 0%,#334155 100%);box-shadow:0 6px 20px rgba(71,85,105,.4);}
+.btn.traffic{background:linear-gradient(135deg,#06b6d4 0%,#0891b2 100%);}
+.btn.traffic:hover{background:linear-gradient(135deg,#0891b2 0%,#0e7490 100%);box-shadow:0 6px 20px rgba(6,182,212,.4);}
+.btn.traffic.active{background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);box-shadow:0 6px 20px rgba(239,68,68,.4);}
+.btn.traffic.active:hover{background:linear-gradient(135deg,#dc2626 0%,#b91c1c 100%);}
+.btn.map-style{background:linear-gradient(135deg,#8b5cf6 0%,#7c3aed 100%);}
+.btn.map-style:hover{background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 100%);box-shadow:0 6px 20px rgba(139,92,246,.4);}
+.btn.export{background:linear-gradient(135deg,#10b981 0%,#059669 100%);}
+.btn.export:hover{background:linear-gradient(135deg,#059669 0%,#047857 100%);box-shadow:0 6px 20px rgba(16,185,129,.4);}
+.btn.mode{background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);box-shadow:0 4px 14px rgba(59,130,246,.35);}
+.btn.mode:hover{background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);box-shadow:0 8px 24px rgba(59,130,246,.5);}
+.btn.mode.radial{background:linear-gradient(135deg,#ec4899 0%,#db2777 100%);box-shadow:0 4px 14px rgba(236,72,153,.35);}
+.btn.mode.radial:hover{background:linear-gradient(135deg,#db2777 0%,#be185d 100%);box-shadow:0 8px 24px rgba(236,72,153,.5);}
+.btn.quick-btn{background:linear-gradient(135deg,#10b981 0%,#059669 100%);font-size:12px;padding:7px 14px;box-shadow:0 3px 10px rgba(16,185,129,.3);}
+.btn.quick-btn:hover{background:linear-gradient(135deg,#059669 0%,#047857 100%);box-shadow:0 6px 18px rgba(16,185,129,.45);}
 .btn.more-btn{background:linear-gradient(135deg,#64748b 0%,#475569 100%);}
-.btn.more-btn:hover{background:linear-gradient(135deg,#475569 0%,#334155 100%);}
+.btn.more-btn:hover{background:linear-gradient(135deg,#475569 0%,#334155 100%);box-shadow:0 6px 20px rgba(71,85,105,.4);}
 .more-menu-wrap{position:relative;}
-.more-menu{display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid #fed7aa;border-radius:12px;box-shadow:0 12px 40px rgba(249,115,22,.18);z-index:300;min-width:160px;overflow:hidden;animation:menuFadeIn .2s ease;}
-@keyframes menuFadeIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+.more-menu{display:none;position:absolute;top:calc(100% + 8px);right:0;background:rgba(255,255,255,.9);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid rgba(0,0,0,.08);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.12);z-index:300;min-width:160px;overflow:hidden;animation:menuFadeIn .25s cubic-bezier(.4,0,.2,1);}
+@keyframes menuFadeIn{from{opacity:0;transform:translateY(-8px) scale(.96);}to{opacity:1;transform:translateY(0) scale(1);}}
 .more-menu.open{display:block;}
+
+/* 可拖动浮动工具栏 */
+.floating-toolbar{position:fixed;top:100px;right:20px;z-index:400;background:rgba(255,255,255,.85);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid rgba(0,0,0,.08);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.12);padding:8px;display:flex;flex-direction:column;gap:6px;min-width:130px;animation:toolbarFadeIn .3s ease;}
+@keyframes toolbarFadeIn{from{opacity:0;transform:translateX(20px);}to{opacity:1;transform:translateX(0);}}
+.toolbar-handle{padding:6px 8px;font-size:10px;color:#94a3b8;text-align:center;cursor:move;user-select:none;border-bottom:1px solid rgba(0,0,0,.06);margin-bottom:4px;font-weight:600;letter-spacing:1px;}
+.toolbar-handle:hover{color:#3b82f6;}
+.floating-toolbar .btn{width:100%;padding:8px 12px;font-size:11px;}
+.floating-toolbar .btn.reset{margin-top:4px;}
 .more-item{padding:11px 18px;font-size:13px;color:#44403c;cursor:pointer;white-space:nowrap;transition:.15s;font-weight:600;}
 .more-item:hover{background:#fff7ed;color:#ea580c;}
 .more-item.danger{color:#dc2626;border-top:1px solid #fed7aa;}
@@ -304,24 +314,21 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         <div style="display:flex;align-items:center;gap:10px;">
           <div class="title">全国物流路由规划</div>
         </div>
-        <button class="header-collapse-btn" onclick="toggleHeader()" title="收起顶部栏">▼</button>
-      </div>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px;">
-        <button class="btn mode" id="modeBtn" onclick="toggleMode()">🔀 多点路线</button>
-        <button class="btn traffic" id="trafficBtn" onclick="toggleTraffic()">🚦 路况</button>
-        <div class="more-menu-wrap">
-          <button class="btn more-btn" onclick="toggleMoreMenu()">⋯ 更多</button>
-          <div class="more-menu" id="moreMenu">
-            <div class="more-item" onclick="toggleMapStyle();toggleMoreMenu()">🗺️ 地图样式</div>
-            <div class="more-item" onclick="exportMapImage();toggleMoreMenu()">📷 导出图片</div>
-            <div class="more-item" onclick="toggleBrowserFullscreen();toggleMoreMenu()">⛶ 一键全屏</div>
-            <div class="more-item" onclick="toggleFullscreen();toggleMoreMenu()">📱 横屏模式</div>
-            <div class="more-item" onclick="toggleLegend()">📋 图例</div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <div class="more-menu-wrap">
+            <button class="btn more-btn" onclick="toggleMoreMenu()">⋯ 更多</button>
+            <div class="more-menu" id="moreMenu">
+              <div class="more-item" onclick="toggleMapStyle();toggleMoreMenu()">🗺️ 地图样式</div>
+              <div class="more-item" onclick="exportMapImage();toggleMoreMenu()">📷 导出图片</div>
+              <div class="more-item" onclick="toggleBrowserFullscreen();toggleMoreMenu()">⛶ 一键全屏</div>
+              <div class="more-item" onclick="toggleFullscreen();toggleMoreMenu()">📱 横屏模式</div>
+              <div class="more-item" onclick="toggleLegend()">📋 图例</div>
+            </div>
           </div>
+          <button class="header-collapse-btn" onclick="toggleHeader()" title="收起顶部栏">▼</button>
         </div>
-        <button class="btn reset" onclick="resetAll()" style="margin-left:auto;">🔄 重置</button>
       </div>
-      <div class="controls" style="margin-top:2px;">
+      <div class="controls" style="margin-top:4px;">
         <div class="tip" id="tip">点击城市添加路线，再点取消</div>
         <div class="radial-quick" id="radialQuick" style="display:none;margin-top:4px;gap:6px;flex-wrap:wrap;">
           <button class="btn quick-btn" onclick="addAllCapitalsAsDestinations()">🏛️ 省会</button>
@@ -339,7 +346,16 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         <div class="lg-item"><span class="lg-line" style="background:#ef4444;"></span>拥堵</div>
       </div>
     </div>
-    <div id="headerExpandBtn" onclick="toggleHeader()" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:100;background:#2563eb;color:#fff;border:none;border-radius:16px;padding:6px 16px;font-size:12px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2);">▲ 展开顶栏</div>
+    <div id="headerExpandBtn" onclick="toggleHeader()" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:100;background:rgba(59,130,246,.9);backdrop-filter:blur(10px);color:#fff;border:none;border-radius:20px;padding:8px 20px;font-size:13px;cursor:pointer;box-shadow:0 4px 16px rgba(59,130,246,.4);font-weight:600;">▲ 展开顶栏</div>
+    
+    <!-- 可拖动浮动工具栏 -->
+    <div class="floating-toolbar" id="floatingToolbar">
+      <div class="toolbar-handle" id="toolbarHandle">⋮⋮ 工具栏</div>
+      <button class="btn mode" id="modeBtn" onclick="toggleMode()">🔀 多点路线</button>
+      <button class="btn traffic" id="trafficBtn" onclick="toggleTraffic()">🚦 实时路况</button>
+      <button class="btn export" onclick="exportMapImage()">📷 导出图片</button>
+      <button class="btn reset" onclick="resetAll()">🔄 全部重置</button>
+    </div>
 <div id="map"></div>
 <div id="landscapeOverlay" style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;z-index:500;background:transparent;touch-action:none;"></div>
 <div id="landscapeZoom" style="display:none;position:fixed;left:12px;bottom:12px;z-index:10000;display:flex;flex-direction:column;gap:8px;">
@@ -417,9 +433,85 @@ window.onload = function() {
   if(!window.AMap) { alert("高德地图加载失败，请检查网络"); return; }
   initMap();
   initFilters();
+  initFloatingToolbar();
   CAPITALS = CITIES.filter(function(c) { return CAPITAL_NAMES.indexOf(c.name) >= 0; });
   renderCityList();
 };
+
+// 浮动工具栏拖动功能
+function initFloatingToolbar() {
+  const toolbar = document.getElementById('floatingToolbar');
+  const handle = document.getElementById('toolbarHandle');
+  if(!toolbar || !handle) return;
+  
+  let isDragging = false;
+  let startX, startY, startLeft, startTop;
+  
+  handle.addEventListener('mousedown', function(e) {
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    const rect = toolbar.getBoundingClientRect();
+    startLeft = rect.left;
+    startTop = rect.top;
+    toolbar.style.transition = 'none';
+    e.preventDefault();
+  });
+  
+  document.addEventListener('mousemove', function(e) {
+    if(!isDragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    let newLeft = startLeft + dx;
+    let newTop = startTop + dy;
+    // 限制在视口范围内
+    newLeft = Math.max(0, Math.min(window.innerWidth - toolbar.offsetWidth, newLeft));
+    newTop = Math.max(0, Math.min(window.innerHeight - toolbar.offsetHeight, newTop));
+    toolbar.style.left = newLeft + 'px';
+    toolbar.style.top = newTop + 'px';
+    toolbar.style.right = 'auto';
+  });
+  
+  document.addEventListener('mouseup', function() {
+    if(isDragging) {
+      isDragging = false;
+      toolbar.style.transition = '';
+    }
+  });
+  
+  // 触摸支持
+  handle.addEventListener('touchstart', function(e) {
+    isDragging = true;
+    const touch = e.touches[0];
+    startX = touch.clientX;
+    startY = touch.clientY;
+    const rect = toolbar.getBoundingClientRect();
+    startLeft = rect.left;
+    startTop = rect.top;
+    toolbar.style.transition = 'none';
+  }, {passive: true});
+  
+  document.addEventListener('touchmove', function(e) {
+    if(!isDragging) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    let newLeft = startLeft + dx;
+    let newTop = startTop + dy;
+    newLeft = Math.max(0, Math.min(window.innerWidth - toolbar.offsetWidth, newLeft));
+    newTop = Math.max(0, Math.min(window.innerHeight - toolbar.offsetHeight, newTop));
+    toolbar.style.left = newLeft + 'px';
+    toolbar.style.top = newTop + 'px';
+    toolbar.style.right = 'auto';
+  }, {passive: true});
+  
+  document.addEventListener('touchend', function() {
+    if(isDragging) {
+      isDragging = false;
+      toolbar.style.transition = '';
+    }
+  });
+}
 
 
 // 侧边栏收回/展开
