@@ -101,6 +101,14 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 .fullscreen-icon-btn{cursor:pointer;font-size:16px;color:#3b82f6;padding:0;border-radius:10px;border:1px solid rgba(59,130,246,.2);background:rgba(59,130,246,.08);backdrop-filter:blur(10px);white-space:nowrap;flex-shrink:0;transition:.25s;font-weight:700;display:flex;align-items:center;justify-content:center;width:32px;height:32px;line-height:1;}
 .fullscreen-icon-btn:hover{background:linear-gradient(135deg,#3b82f6 0%,#6366f1 100%);color:#fff;border-color:transparent;box-shadow:0 4px 12px rgba(59,130,246,.35);transform:scale(1.05);}
 .fullscreen-icon-btn.active{background:linear-gradient(135deg,#3b82f6 0%,#6366f1 100%);color:#fff;}
+.refresh-route-btn{cursor:pointer;font-size:14px;padding:0;border-radius:10px;border:1px solid rgba(34,197,94,.2);background:rgba(34,197,94,.08);backdrop-filter:blur(10px);white-space:nowrap;flex-shrink:0;transition:.25s;font-weight:700;display:flex;align-items:center;justify-content:center;width:32px;height:32px;line-height:1;}
+.refresh-route-btn:hover{background:linear-gradient(135deg,#22c55e 0%,#16a34a 100%);color:#fff;border-color:transparent;box-shadow:0 4px 12px rgba(34,197,94,.35);transform:scale(1.05);}
+.refresh-route-btn:active{transform:scale(0.95);}
+.refresh-route-btn.loading{animation:spin 1s linear infinite;}
+@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+.reset-icon-btn{cursor:pointer;font-size:14px;padding:0;border-radius:10px;border:1px solid rgba(239,68,68,.2);background:rgba(239,68,68,.08);backdrop-filter:blur(10px);white-space:nowrap;flex-shrink:0;transition:.25s;font-weight:700;display:flex;align-items:center;justify-content:center;width:32px;height:32px;line-height:1;}
+.reset-icon-btn:hover{background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);color:#fff;border-color:transparent;box-shadow:0 4px 12px rgba(239,68,68,.35);transform:scale(1.05);}
+.reset-icon-btn:active{transform:scale(0.95);}
 .header.collapsed{display:none;}
 .title-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
 .title{font-size:17px;font-weight:800;background:linear-gradient(135deg,#0ea5e9 0%,#3b82f6 50%,#6366f1 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:1px;}
@@ -400,6 +408,8 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <span id="trafficIndicator" style="padding:4px 12px;border-radius:20px;color:#fff;font-size:11px;font-weight:700;background:linear-gradient(135deg,#64748b 0%,#475569 100%);box-shadow:0 2px 8px rgba(100,116,139,.3);">🚦 路况关</span>
         </div>
         <div style="display:flex;gap:6px;align-items:center;">
+          <button class="refresh-route-btn" onclick="refreshRouteTraffic()" title="刷新路线路况">🔄</button>
+          <button class="reset-icon-btn" onclick="resetAll()" title="全部重置">🗑️</button>
           <button class="fullscreen-icon-btn" onclick="toggleBrowserFullscreen()" title="一键全屏">⛶</button>
           <div class="more-menu-wrap">
             <button class="btn more-btn" onclick="toggleMoreMenu()">☰ 菜单</button>
@@ -407,7 +417,6 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
               <div class="more-item" onclick="toggleMode();toggleMoreMenu()">🔀 切换路线模式</div>
               <div class="more-item" onclick="toggleTraffic();toggleMoreMenu()">🚦 实时路况</div>
               <div class="more-item" onclick="toggleAvoidTraffic();toggleMoreMenu()" id="avoidTrafficMenuItem">🚗 避开拥堵：关</div>
-              <div class="more-item" onclick="resetAll();toggleMoreMenu()">🔄 全部重置</div>
               <div class="more-item" onclick="exportRouteCSV();toggleMoreMenu()">📊 导出路线数据</div>
               <div class="more-item" onclick="shareRouteLink();toggleMoreMenu()">🔗 复制分享链接</div>
               <div class="more-item" onclick="exportMapImage();toggleMoreMenu()">📷 导出图片</div>
@@ -2781,6 +2790,50 @@ function refreshTraffic() {
   enableTrafficLayer();
   const time = new Date().toLocaleTimeString();
   tipDom.innerHTML = '🔄 路况已手动刷新（' + time + '）';
+}
+
+// 刷新路线路况（重新规划当前路线）
+function refreshRouteTraffic() {
+  if(currentMode === 'multi') {
+    if(routePoints.length < 2) {
+      tipDom.innerHTML = '⚠️ 请先规划至少2个城市的路线';
+      return;
+    }
+    // 添加旋转动画
+    const btn = document.querySelector('.refresh-route-btn');
+    if(btn) btn.classList.add('loading');
+    
+    tipDom.innerHTML = '🔄 正在刷新路线路况...';
+    
+    // 同时刷新路况瓦片
+    if(trafficEnabled) enableTrafficLayer();
+    
+    // 重新规划路线
+    setTimeout(function() {
+      planFullRoute();
+      setTimeout(function() {
+        if(btn) btn.classList.remove('loading');
+        tipDom.innerHTML = '✅ 路线路况已刷新（' + new Date().toLocaleTimeString() + '）';
+      }, 1000);
+    }, 300);
+  } else {
+    // 放射状模式
+    if(!radialOrigin || radialDestinations.length === 0) {
+      tipDom.innerHTML = '⚠️ 请先在放射状模式下规划路线';
+      return;
+    }
+    const btn = document.querySelector('.refresh-route-btn');
+    if(btn) btn.classList.add('loading');
+    tipDom.innerHTML = '🔄 正在刷新放射状路线路况...';
+    if(trafficEnabled) enableTrafficLayer();
+    setTimeout(function() {
+      planRadialRoutes();
+      setTimeout(function() {
+        if(btn) btn.classList.remove('loading');
+        tipDom.innerHTML = '✅ 放射状路线路况已刷新（' + new Date().toLocaleTimeString() + '）';
+      }, 2000);
+    }, 300);
+  }
 }
 
 // 切换避开拥堵模式
