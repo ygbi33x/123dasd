@@ -91,6 +91,9 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 .header{background:rgba(255,255,255,.7);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border-bottom:1px solid rgba(0,0,0,.06);padding:10px 20px;box-shadow:0 4px 24px rgba(0,0,0,.06);z-index:50;flex-shrink:0;position:relative;}
 .header-collapse-btn{cursor:pointer;font-size:14px;color:#64748b;padding:6px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.08);background:rgba(255,255,255,.7);backdrop-filter:blur(10px);white-space:nowrap;flex-shrink:0;transition:.25s;font-weight:700;display:flex;align-items:center;justify-content:center;width:32px;height:32px;}
 .header-collapse-btn:hover{background:linear-gradient(135deg,#3b82f6 0%,#6366f1 100%);color:#fff;border-color:transparent;box-shadow:0 4px 12px rgba(59,130,246,.35);}
+.fullscreen-icon-btn{cursor:pointer;font-size:16px;color:#3b82f6;padding:0;border-radius:10px;border:1px solid rgba(59,130,246,.2);background:rgba(59,130,246,.08);backdrop-filter:blur(10px);white-space:nowrap;flex-shrink:0;transition:.25s;font-weight:700;display:flex;align-items:center;justify-content:center;width:32px;height:32px;line-height:1;}
+.fullscreen-icon-btn:hover{background:linear-gradient(135deg,#3b82f6 0%,#6366f1 100%);color:#fff;border-color:transparent;box-shadow:0 4px 12px rgba(59,130,246,.35);transform:scale(1.05);}
+.fullscreen-icon-btn.active{background:linear-gradient(135deg,#3b82f6 0%,#6366f1 100%);color:#fff;}
 .header.collapsed{display:none;}
 .title-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
 .title{font-size:17px;font-weight:800;background:linear-gradient(135deg,#0ea5e9 0%,#3b82f6 50%,#6366f1 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:1px;}
@@ -375,6 +378,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <span id="trafficIndicator" style="padding:4px 12px;border-radius:20px;color:#fff;font-size:11px;font-weight:700;background:linear-gradient(135deg,#64748b 0%,#475569 100%);box-shadow:0 2px 8px rgba(100,116,139,.3);">🚦 路况关</span>
         </div>
         <div style="display:flex;gap:6px;align-items:center;">
+          <button class="fullscreen-icon-btn" onclick="toggleBrowserFullscreen()" title="一键全屏">⛶</button>
           <div class="more-menu-wrap">
             <button class="btn more-btn" onclick="toggleMoreMenu()">☰ 菜单</button>
             <div class="more-menu" id="moreMenu">
@@ -385,7 +389,6 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
               <div class="more-item" onclick="shareRouteLink();toggleMoreMenu()">🔗 复制分享链接</div>
               <div class="more-item" onclick="exportMapImage();toggleMoreMenu()">📷 导出图片</div>
               <div class="more-item" onclick="toggleMapStyle();toggleMoreMenu()">🗺️ 地图样式</div>
-              <div class="more-item" onclick="toggleBrowserFullscreen();toggleMoreMenu()">⛶ 一键全屏</div>
               <div class="more-item" onclick="toggleFullscreen();toggleMoreMenu()">📱 横屏模式</div>
               <div class="more-item" onclick="toggleLegend();toggleMoreMenu()">📋 图例</div>
             </div>
@@ -661,15 +664,150 @@ function toggleFullscreen() {
 }
 
 // 浏览器一键全屏
+let isFullscreenMode = false;
+let headerHoverTimer = null;
+let sidebarHoverTimer = null;
+
 function toggleBrowserFullscreen() {
   if(!document.fullscreenElement) {
     document.documentElement.requestFullscreen().catch(function(err) {
       console.log('全屏失败:', err);
     });
+    enterFullscreenMode();
   } else {
     document.exitFullscreen();
+    exitFullscreenMode();
   }
 }
+
+function enterFullscreenMode() {
+  isFullscreenMode = true;
+  document.querySelector('.fullscreen-icon-btn').classList.add('active');
+  
+  // 自动收起顶栏和侧栏，使用fixed定位不占布局空间
+  const header = document.querySelector('.header');
+  const sidebar = document.querySelector('.sidebar');
+  
+  // 保存原始样式
+  header.dataset.origPosition = header.style.position;
+  header.dataset.origTop = header.style.top;
+  header.dataset.origLeft = header.style.left;
+  header.dataset.origRight = header.style.right;
+  header.dataset.origZIndex = header.style.zIndex;
+  
+  sidebar.dataset.origPosition = sidebar.style.position;
+  sidebar.dataset.origTop = sidebar.style.top;
+  sidebar.dataset.origLeft = sidebar.style.left;
+  sidebar.dataset.origBottom = sidebar.style.bottom;
+  sidebar.dataset.origZIndex = sidebar.style.zIndex;
+  
+  // header固定在顶部
+  header.style.position = 'fixed';
+  header.style.top = '0';
+  header.style.left = '0';
+  header.style.right = '0';
+  header.style.zIndex = '1000';
+  header.style.transform = 'translateY(-100%)';
+  header.style.transition = 'transform .3s ease';
+  
+  // sidebar固定在左侧
+  sidebar.style.position = 'fixed';
+  sidebar.style.top = '0';
+  sidebar.style.left = '0';
+  sidebar.style.bottom = '0';
+  sidebar.style.zIndex = '999';
+  sidebar.style.transform = 'translateX(-100%)';
+  sidebar.style.transition = 'transform .3s ease';
+  
+  // 隐藏展开按钮（全屏模式用鼠标悬停触发）
+  const headerExpandBtn = document.getElementById('headerExpandBtn');
+  if(headerExpandBtn) headerExpandBtn.style.display = 'none';
+  
+  // 添加鼠标悬停检测
+  document.addEventListener('mousemove', fullscreenMouseMove);
+  
+  tipDom.innerHTML = '⛶ 全屏模式：鼠标移到顶部/左侧边缘可弹出面板，移开自动收起';
+}
+
+function exitFullscreenMode() {
+  isFullscreenMode = false;
+  document.querySelector('.fullscreen-icon-btn').classList.remove('active');
+  
+  // 恢复顶栏和侧栏原始样式
+  const header = document.querySelector('.header');
+  const sidebar = document.querySelector('.sidebar');
+  
+  header.style.position = header.dataset.origPosition || '';
+  header.style.top = header.dataset.origTop || '';
+  header.style.left = header.dataset.origLeft || '';
+  header.style.right = header.dataset.origRight || '';
+  header.style.zIndex = header.dataset.origZIndex || '';
+  header.style.transform = '';
+  header.style.transition = '';
+  
+  sidebar.style.position = sidebar.dataset.origPosition || '';
+  sidebar.style.top = sidebar.dataset.origTop || '';
+  sidebar.style.left = sidebar.dataset.origLeft || '';
+  sidebar.style.bottom = sidebar.dataset.origBottom || '';
+  sidebar.style.zIndex = sidebar.dataset.origZIndex || '';
+  sidebar.style.transform = '';
+  sidebar.style.transition = '';
+  
+  // 移除鼠标悬停检测
+  document.removeEventListener('mousemove', fullscreenMouseMove);
+  
+  // 清除定时器
+  if(headerHoverTimer) clearTimeout(headerHoverTimer);
+  if(sidebarHoverTimer) clearTimeout(sidebarHoverTimer);
+}
+
+function fullscreenMouseMove(e) {
+  if(!isFullscreenMode) return;
+  
+  const header = document.querySelector('.header');
+  const sidebar = document.querySelector('.sidebar');
+  
+  // 鼠标移到顶部（20px范围内）显示顶栏
+  if(e.clientY <= 20) {
+    if(headerHoverTimer) {
+      clearTimeout(headerHoverTimer);
+      headerHoverTimer = null;
+    }
+    header.style.transform = 'translateY(0)';
+  } else {
+    // 鼠标不在顶部，延迟500ms后收起
+    if(!headerHoverTimer) {
+      headerHoverTimer = setTimeout(function() {
+        if(isFullscreenMode) header.style.transform = 'translateY(-100%)';
+        headerHoverTimer = null;
+      }, 500);
+    }
+  }
+  
+  // 鼠标移到左侧（20px范围内）显示侧栏
+  if(e.clientX <= 20) {
+    if(sidebarHoverTimer) {
+      clearTimeout(sidebarHoverTimer);
+      sidebarHoverTimer = null;
+    }
+    sidebar.style.transform = 'translateX(0)';
+  } else {
+    // 鼠标不在左侧，延迟500ms后收起
+    if(!sidebarHoverTimer) {
+      sidebarHoverTimer = setTimeout(function() {
+        if(isFullscreenMode) sidebar.style.transform = 'translateX(-100%)';
+        sidebarHoverTimer = null;
+      }, 500);
+    }
+  }
+}
+
+// 监听全屏状态变化
+document.addEventListener('fullscreenchange', function() {
+  if(!document.fullscreenElement && isFullscreenMode) {
+    exitFullscreenMode();
+  }
+});
 function initMap() {
   map = new AMap.Map("map", { zoom: 5, center: [108, 36], resizeEnable: true });
   map.addControl(new AMap.Scale());
