@@ -767,37 +767,49 @@ function fullscreenMouseMove(e) {
   const header = document.querySelector('.header');
   const sidebar = document.querySelector('.sidebar');
   
-  // 鼠标移到顶部（20px范围内）显示顶栏
-  if(e.clientY <= 20) {
+  // 获取顶栏和侧栏的位置和尺寸
+  const headerRect = header.getBoundingClientRect();
+  const sidebarRect = sidebar.getBoundingClientRect();
+  
+  // 判断鼠标是否在顶栏区域内（包括顶部20px触发区）
+  const inHeaderArea = e.clientY <= 20 || 
+    (e.clientY >= headerRect.top && e.clientY <= headerRect.bottom && 
+     e.clientX >= headerRect.left && e.clientX <= headerRect.right);
+  
+  // 判断鼠标是否在侧栏区域内（包括左侧20px触发区）
+  const inSidebarArea = e.clientX <= 20 || 
+    (e.clientX >= sidebarRect.left && e.clientX <= sidebarRect.right && 
+     e.clientY >= sidebarRect.top && e.clientY <= sidebarRect.bottom);
+  
+  // 顶栏显示/隐藏逻辑
+  if(inHeaderArea) {
     if(headerHoverTimer) {
       clearTimeout(headerHoverTimer);
       headerHoverTimer = null;
     }
     header.style.transform = 'translateY(0)';
   } else {
-    // 鼠标不在顶部，延迟500ms后收起
     if(!headerHoverTimer) {
       headerHoverTimer = setTimeout(function() {
         if(isFullscreenMode) header.style.transform = 'translateY(-100%)';
         headerHoverTimer = null;
-      }, 500);
+      }, 300);
     }
   }
   
-  // 鼠标移到左侧（20px范围内）显示侧栏
-  if(e.clientX <= 20) {
+  // 侧栏显示/隐藏逻辑
+  if(inSidebarArea) {
     if(sidebarHoverTimer) {
       clearTimeout(sidebarHoverTimer);
       sidebarHoverTimer = null;
     }
     sidebar.style.transform = 'translateX(0)';
   } else {
-    // 鼠标不在左侧，延迟500ms后收起
     if(!sidebarHoverTimer) {
       sidebarHoverTimer = setTimeout(function() {
         if(isFullscreenMode) sidebar.style.transform = 'translateX(-100%)';
         sidebarHoverTimer = null;
-      }, 500);
+      }, 300);
     }
   }
 }
