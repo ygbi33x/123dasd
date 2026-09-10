@@ -12,12 +12,12 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 .sidebar.collapsed{width:0;min-width:0;overflow:hidden;border:none;box-shadow:none;}
 .sidebar.collapsed .sidebar-content{display:none;}
 .sidebar.collapsed .sidebar-toggle{display:none;}
-.sidebar-toggle{position:absolute;top:50%;right:-12px;transform:translateY(-50%);z-index:200;width:26px;height:52px;background:linear-gradient(135deg,#3b82f6 0%,#6366f1 100%);border:none;border-radius:0 12px 12px 0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;box-shadow:2px 0 12px rgba(59,130,246,.4);transition:.25s;font-weight:700;}
-.sidebar-toggle:hover{background:linear-gradient(135deg,#2563eb 0%,#4f46e5 100%);box-shadow:2px 0 18px rgba(59,130,246,.55);}
+.sidebar-toggle{position:absolute;top:50%;right:-12px;transform:translateY(-50%);z-index:200;width:26px;height:52px;background:rgba(255,255,255,.8);backdrop-filter:blur(10px);border:1px solid rgba(0,0,0,.08);border-left:none;border-radius:0 12px 12px 0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:14px;box-shadow:2px 0 12px rgba(0,0,0,.08);transition:.25s;font-weight:700;}
+.sidebar-toggle:hover{background:linear-gradient(135deg,#3b82f6 0%,#6366f1 100%);color:#fff;border-color:transparent;box-shadow:2px 0 18px rgba(59,130,246,.45);}
 .sidebar-toggle:active{transform:translateY(-50%) scale(.95);}
 /* 侧边栏收起后的浮动展开按钮 */
-.sidebar-expand-btn{display:none;position:absolute;top:50%;left:0;transform:translateY(-50%);z-index:200;width:26px;height:52px;background:linear-gradient(135deg,#3b82f6 0%,#6366f1 100%);border:none;border-radius:0 12px 12px 0;cursor:pointer;align-items:center;justify-content:center;color:#fff;font-size:14px;box-shadow:2px 0 12px rgba(59,130,246,.4);transition:.25s;font-weight:700;}
-.sidebar-expand-btn:hover{background:linear-gradient(135deg,#2563eb 0%,#4f46e5 100%);}
+.sidebar-expand-btn{display:none;position:absolute;top:50%;left:0;transform:translateY(-50%);z-index:200;width:26px;height:52px;background:rgba(255,255,255,.8);backdrop-filter:blur(10px);border:1px solid rgba(0,0,0,.08);border-left:none;border-radius:0 12px 12px 0;cursor:pointer;align-items:center;justify-content:center;color:#64748b;font-size:14px;box-shadow:2px 0 12px rgba(0,0,0,.08);transition:.25s;font-weight:700;}
+.sidebar-expand-btn:hover{background:linear-gradient(135deg,#3b82f6 0%,#6366f1 100%);color:#fff;border-color:transparent;box-shadow:2px 0 18px rgba(59,130,246,.45);}
 .sidebar-content{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
 .sidebar-header{padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.06);background:linear-gradient(135deg,rgba(59,130,246,.08) 0%,rgba(99,102,241,.08) 100%);}
 .sidebar-title{font-size:15px;font-weight:800;background:linear-gradient(135deg,#0ea5e9 0%,#3b82f6 50%,#6366f1 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:2px;letter-spacing:.5px;}
@@ -73,8 +73,8 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 .empty-tip{padding:20px 14px;text-align:center;color:#94a3b8;font-size:11px;font-weight:500;}
 .main{flex:1;display:flex;flex-direction:column;min-width:0;background:#f0f4f8;}
 .header{background:rgba(255,255,255,.7);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border-bottom:1px solid rgba(0,0,0,.06);padding:10px 20px;box-shadow:0 4px 24px rgba(0,0,0,.06);z-index:50;flex-shrink:0;position:relative;}
-.header-collapse-btn{cursor:pointer;font-size:12px;color:#64748b;padding:6px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.08);background:rgba(255,255,255,.6);white-space:nowrap;flex-shrink:0;transition:.25s;font-weight:500;}
-.header-collapse-btn:hover{background:rgba(59,130,246,.1);color:#2563eb;border-color:rgba(59,130,246,.3);}
+.header-collapse-btn{cursor:pointer;font-size:14px;color:#64748b;padding:6px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.08);background:rgba(255,255,255,.7);backdrop-filter:blur(10px);white-space:nowrap;flex-shrink:0;transition:.25s;font-weight:700;display:flex;align-items:center;justify-content:center;width:32px;height:32px;}
+.header-collapse-btn:hover{background:linear-gradient(135deg,#3b82f6 0%,#6366f1 100%);color:#fff;border-color:transparent;box-shadow:0 4px 12px rgba(59,130,246,.35);}
 .header.collapsed{display:none;}
 .title-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
 .title{font-size:17px;font-weight:800;background:linear-gradient(135deg,#0ea5e9 0%,#3b82f6 50%,#6366f1 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:1px;}
@@ -316,18 +316,18 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <div class="title">全国物流路由规划</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;">
-          <button class="btn more-btn" id="toolbarToggleBtn" onclick="toggleFloatingToolbar()" title="显示/隐藏工具栏">🎛️ 工具栏</button>
           <div class="more-menu-wrap">
-            <button class="btn more-btn" onclick="toggleMoreMenu()">⋯ 更多</button>
+            <button class="btn more-btn" onclick="toggleMoreMenu()">☰ 菜单</button>
             <div class="more-menu" id="moreMenu">
+              <div class="more-item" onclick="toggleFloatingToolbar();toggleMoreMenu()">🎛️ 显示/隐藏工具栏</div>
               <div class="more-item" onclick="toggleMapStyle();toggleMoreMenu()">🗺️ 地图样式</div>
               <div class="more-item" onclick="exportMapImage();toggleMoreMenu()">📷 导出图片</div>
               <div class="more-item" onclick="toggleBrowserFullscreen();toggleMoreMenu()">⛶ 一键全屏</div>
               <div class="more-item" onclick="toggleFullscreen();toggleMoreMenu()">📱 横屏模式</div>
-              <div class="more-item" onclick="toggleLegend()">📋 图例</div>
+              <div class="more-item" onclick="toggleLegend();toggleMoreMenu()">📋 图例</div>
             </div>
           </div>
-          <button class="header-collapse-btn" onclick="toggleHeader()" title="收起顶部栏">▼</button>
+          <button class="header-collapse-btn" onclick="toggleHeader()" title="收起顶部栏">▾</button>
         </div>
       </div>
       <div class="controls" style="margin-top:4px;">
@@ -518,16 +518,8 @@ function initFloatingToolbar() {
 // 显示/隐藏浮动工具栏
 function toggleFloatingToolbar() {
   const toolbar = document.getElementById('floatingToolbar');
-  const btn = document.getElementById('toolbarToggleBtn');
   if(!toolbar) return;
   toolbar.classList.toggle('hidden');
-  if(toolbar.classList.contains('hidden')) {
-    btn.style.opacity = '0.6';
-    btn.title = '显示工具栏';
-  } else {
-    btn.style.opacity = '1';
-    btn.title = '隐藏工具栏';
-  }
 }
 
 
