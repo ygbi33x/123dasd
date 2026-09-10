@@ -82,9 +82,6 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 .btn.map-style:hover{background:#6d28d9;}
 .btn.export{background:#059669;}
 .btn.export:hover{background:#047857;}
-.btn.compare{background:#db2777;}
-.btn.compare:hover{background:#be185d;}
-.btn.compare.active{background:#dc2626;}
 .btn.mode{background:#7c3aed;}
 .btn.mode:hover{background:#6d28d9;}
 .btn.mode.radial{background:#db2777;}
@@ -342,7 +339,7 @@ window._AMapSecurityConfig = {
   securityJsCode: "5709f1c855ca34155623c5fe0db7f05a"
 };
 </script>
-<script src="https://webapi.amap.com/maps?v=2.0&key=6ef93fcd8d5b297ae869c20eceaba5a6&plugin=AMap.Driving,AMap.TrafficLayer,AMap.Scale,AMap.ToolBar,AMap.TileLayer.Satellite,AMap.TileLayer.RoadNet"></script>
+<script src="https://webapi.amap.com/maps?v=1.4.15&key=6ef93fcd8d5b297ae869c20eceaba5a6&plugin=AMap.Driving,AMap.TrafficLayer,AMap.Scale,AMap.ToolBar"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <script>
@@ -1983,7 +1980,7 @@ function toggleTraffic() {
     btn.innerHTML = '🚦 实时路况';
     tipDom.innerHTML = '📌 实时路况已关闭';
   } else {
-    // 用TileLayer创建实时路况图层
+    // 使用自定义TileLayer加载路况瓦片
     trafficLayer = new AMap.TileLayer({
       tileUrl: 'https://tm.amap.com/traffic/[z]/[x]/[y].png',
       zIndex: 10,
@@ -2019,8 +2016,15 @@ function toggleMapStyle() {
     map.setMapStyle('amap://styles/normal');
   } else if(next.name === 'satellite') {
     map.setMapStyle('amap://styles/normal');
-    satelliteLayer = new AMap.TileLayer.Satellite();
-    roadNetLayer = new AMap.TileLayer.RoadNet();
+    // 使用自定义TileLayer加载卫星瓦片
+    satelliteLayer = new AMap.TileLayer({
+      tileUrl: 'https://webst01.is.autonavi.com/appmaptile?style=6&x=[x]&y=[y]&z=[z]',
+      zIndex: 1
+    });
+    roadNetLayer = new AMap.TileLayer({
+      tileUrl: 'https://webst01.is.autonavi.com/appmaptile?style=8&x=[x]&y=[y]&z=[z]',
+      zIndex: 2
+    });
     satelliteLayer.setMap(map);
     roadNetLayer.setMap(map);
   } else if(next.name === 'dark') {
@@ -2056,26 +2060,83 @@ function exportMapImage() {
   fullscreenBtn.style.display = 'none';
   
   setTimeout(function() {
-    html2canvas(document.body, {
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#fff',
-      scale: 2,
-      logging: false
-    }).then(function(canvas) {
-      // 恢复UI
-      sidebar.style.display = originalSidebarDisplay;
-      header.style.display = originalHeaderDisplay;
-      fullscreenBtn.style.display = originalFullscreenDisplay;
+    try {
+      // 方案1：手动合并地图canvas层（最可靠）
+      const mapEl = document.getElementById('map');
+      const mapRect = mapEl.getBoundingClientRect();
+      const canvases = mapEl.querySelectorAll('canvas');
       
-      const link = document.createElement('a');
-      link.download = '物流路由地图_' + new Date().toISOString().slice(0,10) + '.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-      btn.innerHTML = originalText;
-      btn.disabled = false;
-      tipDom.innerHTML = '📷 地图图片已导出';
-    }).catch(function(err) {
+      if(canvases.length > 0) {
+        // 创建导出canvas
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = mapRect.width * 2;
+        exportCanvas.height = mapRect.height * 2;
+        const ctx = exportCanvas.getContext('2d');
+        ctx.scale(2, 2);
+        
+        // 按z-index顺序绘制所有canvas
+        const canvasList = Array.from(canvases).sort(function(a, b) {
+          const za = parseInt(a.style.zIndex) || 0;
+          const zb = parseInt(b.style.zIndex) || 0;
+          return za - zb;
+        });
+        
+        for(let i = 0; i < canvasList.length; i++) {
+          const c = canvasList[i];
+          const cRect = c.getBoundingClientRect();
+          const offsetX = cRect.left - mapRect.left;
+          const offsetY = cRect.top - mapRect.top;
+          ctx.drawImage(c, offsetX, offsetY, cRect.width, cRect.height);
+        }
+        
+        // 导出
+        const link = document.createElement('a');
+        link.download = '物流路由地图_' + new Date().toISOString().slice(0,10) + '.png';
+        link.href = exportCanvas.toDataURL('image/png');
+        link.click();
+        
+        // 恢复UI
+        sidebar.style.display = originalSidebarDisplay;
+        header.style.display = originalHeaderDisplay;
+        fullscreenBtn.style.display = originalFullscreenDisplay;
+        
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        tipDom.innerHTML = '📷 地图图片已导出';
+      } else {
+        // 方案2：使用html2canvas
+        html2canvas(document.body, {
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#fff',
+          scale: 2,
+          logging: false
+        }).then(function(canvas) {
+          // 恢复UI
+          sidebar.style.display = originalSidebarDisplay;
+          header.style.display = originalHeaderDisplay;
+          fullscreenBtn.style.display = originalFullscreenDisplay;
+          
+          const link = document.createElement('a');
+          link.download = '物流路由地图_' + new Date().toISOString().slice(0,10) + '.png';
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+          tipDom.innerHTML = '📷 地图图片已导出';
+        }).catch(function(err) {
+          // 恢复UI
+          sidebar.style.display = originalSidebarDisplay;
+          header.style.display = originalHeaderDisplay;
+          fullscreenBtn.style.display = originalFullscreenDisplay;
+          
+          console.error('导出失败:', err);
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+          tipDom.innerHTML = '❌ 导出失败，请使用浏览器截图功能（Ctrl+Shift+A）';
+        });
+      }
+    } catch(err) {
       // 恢复UI
       sidebar.style.display = originalSidebarDisplay;
       header.style.display = originalHeaderDisplay;
@@ -2085,7 +2146,7 @@ function exportMapImage() {
       btn.innerHTML = originalText;
       btn.disabled = false;
       tipDom.innerHTML = '❌ 导出失败，请使用浏览器截图功能（Ctrl+Shift+A）';
-    });
+    }
   }, 500);
 }
 
