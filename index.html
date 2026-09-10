@@ -80,9 +80,6 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 .btn.traffic.active:hover{background:#b91c1c;}
 .btn.map-style{background:#7c3aed;}
 .btn.map-style:hover{background:#6d28d9;}
-.btn.dark-mode{background:#4f46e5;}
-.btn.dark-mode:hover{background:#4338ca;}
-.btn.dark-mode.active{background:#f59e0b;color:#1f2937;}
 .btn.export{background:#059669;}
 .btn.export:hover{background:#047857;}
 .btn.compare{background:#db2777;}
@@ -220,37 +217,6 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
 #compareClose:hover{color:#111;}
 #compareBody{padding:12px 14px;overflow-y:auto;flex:1;}
 
-/* ===== 深色模式 ===== */
-body.dark-mode{background:#111827;}
-body.dark-mode .sidebar{background:#1f2937;border-color:#374151;}
-body.dark-mode .sidebar-title{color:#f9fafb;}
-body.dark-mode .sidebar-sub{color:#9ca3af;}
-body.dark-mode .route-bar{background:#111827;border-color:#374151;}
-body.dark-mode .route-bar-title{color:#e5e7eb;}
-body.dark-mode .route-point{background:#374151;color:#e5e7eb;border-color:#4b5563;}
-body.dark-mode .route-point.origin{background:#7f1d1d;border-color:#991b1b;}
-body.dark-mode .filter-header{background:#111827;border-color:#374151;color:#e5e7eb;}
-body.dark-mode .search-box input{background:#374151;color:#e5e7eb;border-color:#4b5563;}
-body.dark-mode .filter-label{color:#9ca3af;}
-body.dark-mode .filter-tab{background:#374151;color:#d1d5db;border-color:#4b5563;}
-body.dark-mode .filter-tab.active{background:#2563eb;color:#fff;}
-body.dark-mode .city-item{color:#d1d5db;border-bottom-color:#374151;}
-body.dark-mode .city-item:hover{background:#374151;}
-body.dark-mode .city-item.selected{background:#1e3a5f;color:#fff;}
-body.dark-mode .city-count{color:#6b7280;}
-body.dark-mode .header{background:#1f2937;border-color:#374151;}
-body.dark-mode .title{color:#f9fafb;}
-body.dark-mode .subtitle{color:#9ca3af;}
-body.dark-mode .tip{color:#d1d5db;}
-body.dark-mode .legend{color:#9ca3af;}
-body.dark-mode #panel{background:#1f2937;border-color:#374151;color:#e5e7eb;}
-body.dark-mode #panelHead{background:#111827;border-color:#374151;color:#f9fafb;}
-body.dark-mode #distPanel{background:#1f2937;border-color:#374151;color:#e5e7eb;}
-body.dark-mode .seg-item{border-bottom-color:#374151;}
-body.dark-mode .seg-name{color:#d1d5db;}
-body.dark-mode .dist-row{border-bottom-color:#374151;color:#d1d5db;}
-body.dark-mode .header-collapse-btn{background:#374151;color:#d1d5db;border-color:#4b5563;}
-body.dark-mode #headerExpandBtn{background:#374151;color:#d1d5db;}
 </style>
 </head>
 <body>
@@ -314,7 +280,6 @@ body.dark-mode #headerExpandBtn{background:#374151;color:#d1d5db;}
           <button class="btn mode" id="modeBtn" onclick="toggleMode()">🔀 多点路线</button>
           <button class="btn traffic" id="trafficBtn" onclick="toggleTraffic()">🚦 实时路况</button>
           <button class="btn map-style" id="mapStyleBtn" onclick="toggleMapStyle()">🗺️ 地图样式</button>
-          <button class="btn dark-mode" id="darkModeBtn" onclick="toggleDarkMode()">🌙 深色</button>
           <button class="btn export" id="exportBtn" onclick="exportMapImage()">📷 导出图片</button>
           <button class="btn reset" id="clearBtn">全部重置</button>
         </div>
@@ -2061,34 +2026,6 @@ function toggleMapStyle() {
   
   document.getElementById('mapStyleBtn').innerHTML = next.label;
   tipDom.innerHTML = '🗺️ 已切换为' + next.label.replace(/^[^\s]+\s/, '');
-}
-
-// 深色模式
-let darkModeEnabled = false;
-function toggleDarkMode() {
-  darkModeEnabled = !darkModeEnabled;
-  const btn = document.getElementById('darkModeBtn');
-  if(darkModeEnabled) {
-    document.body.classList.add('dark-mode');
-    btn.classList.add('active');
-    btn.innerHTML = '☀️ 浅色';
-    // 自动切换夜景地图
-    if(currentMapStyle !== 'dark') {
-      currentMapStyle = 'dark';
-      map.setMapStyle('amap://styles/dark');
-      document.getElementById('mapStyleBtn').innerHTML = '🌙 夜景地图';
-    }
-  } else {
-    document.body.classList.remove('dark-mode');
-    btn.classList.remove('active');
-    btn.innerHTML = '🌙 深色';
-    // 切回标准地图
-    if(currentMapStyle === 'dark') {
-      currentMapStyle = 'standard';
-      map.setMapStyle('amap://styles/normal');
-      document.getElementById('mapStyleBtn').innerHTML = '🗺️ 标准地图';
-    }
-  }
 }
 
 // 导出地图图片
