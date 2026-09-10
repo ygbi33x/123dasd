@@ -563,16 +563,6 @@ function toggleLegend() {
 }
 
 // 全部重置
-function resetAll() {
-  if(confirm('确定要重置所有路线和选择吗？')) {
-    clearRoute();
-    clearRadialDestinations();
-    if(map) map.clearMap();
-    initMarkers();
-    document.getElementById('tip').textContent = '点击城市添加路线，再点取消';
-  }
-}
-
 // 点击外部关闭更多菜单
 document.addEventListener('click', function(e) {
   const menu = document.getElementById('moreMenu');
@@ -1661,6 +1651,7 @@ function addAllCapitalsAsDestinations() {
 
 // 批量增量规划
 function planBatchRadialRoutes(destList, index) {
+  if(!radialOrigin) return;
   if(index >= destList.length) {
     // 第一轮完成，检查失败的进行重试
     const failed = radialDestinations.filter(function(d) { return !d.route; });
@@ -1677,6 +1668,7 @@ function planBatchRadialRoutes(destList, index) {
     return;
   }
   const destObj = destList[index];
+  if(!radialOrigin) return;
   tipDom.innerHTML = '🚗 正在规划第 ' + (index+1) + '/' + destList.length + ' 条：' + radialOrigin.city.name + ' → ' + destObj.city.name;
   planSingleRadialRoute(destObj, function() {
     setTimeout(function() {
@@ -1687,6 +1679,7 @@ function planBatchRadialRoutes(destList, index) {
 
 // 重试失败的路线
 function retryFailedRadialRoutes(failedList, index) {
+  if(!radialOrigin) return;
   if(index >= failedList.length) {
     const stillFailed = radialDestinations.filter(function(d) { return !d.route; });
     sortRadialByDistance();
