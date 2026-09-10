@@ -39,6 +39,19 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 .route-point-tag .num{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,#3b82f6 0%,#6366f1 100%);color:#fff;font-size:10px;font-weight:700;box-shadow:0 1px 4px rgba(59,130,246,.3);}
 .route-arrow{color:#93c5fd;font-size:12px;font-weight:700;}
 .route-empty{font-size:10px;color:#94a3b8;}
+.route-summary{display:flex;gap:8px;padding:8px 14px;border-top:1px solid rgba(0,0,0,.05);background:rgba(59,130,246,.04);}
+.route-summary-item{flex:1;text-align:center;}
+.route-summary-label{display:block;font-size:9px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.route-summary-value{display:block;font-size:13px;font-weight:800;color:#1e40af;margin-top:2px;}
+.route-manual-add{display:flex;gap:6px;padding:8px 14px;border-top:1px solid rgba(0,0,0,.05);background:rgba(255,255,255,.5);}
+.route-manual-add input{flex:1;padding:6px 10px;border:1.5px solid rgba(0,0,0,.08);border-radius:8px;font-size:11px;outline:none;background:rgba(255,255,255,.8);transition:.2s;}
+.route-manual-add input:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.1);}
+.manual-add-btn{padding:6px 12px;border:none;border-radius:8px;background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);color:#fff;font-size:11px;font-weight:600;cursor:pointer;transition:.2s;box-shadow:0 2px 6px rgba(59,130,246,.3);}
+.manual-add-btn:hover{background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);box-shadow:0 3px 10px rgba(59,130,246,.4);}
+.point-actions{display:inline-flex;gap:2px;margin-left:4px;}
+.point-action-btn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;background:rgba(0,0,0,.06);color:#64748b;font-size:9px;cursor:pointer;transition:.15s;border:none;padding:0;}
+.point-action-btn:hover{background:rgba(59,130,246,.2);color:#2563eb;}
+.point-action-btn.delete:hover{background:rgba(239,68,68,.15);color:#dc2626;}
 .search-box{padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.04);background:rgba(255,255,255,.4);}
 .search-box input{width:100%;padding:9px 12px;border:1.5px solid rgba(0,0,0,.08);border-radius:10px;font-size:12px;outline:none;background:rgba(255,255,255,.7);transition:.2s;font-weight:500;}
 .search-box input:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.12);background:#fff;}
@@ -263,13 +276,31 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         <span>已选路线（<span id="routeCount">0</span>个点）</span>
         <div class="route-bar-actions">
           <span class="route-collapse-btn" id="routeCollapseBtn" onclick="toggleRouteBar()">▼</span>
-          <span class="route-optimize" id="addAllCentersBtn" onclick="addAllCentersAsRoutePoints()" title="一键添加所有中心城市为路线点">⭐ 全部中心</span>
-          <span class="route-optimize" id="optimizeBtn" title="用Dijkstra算法自动优化访问顺序">🔄 优化顺序</span>
+          <span class="route-optimize" id="addAllCentersBtn" onclick="addAllCentersAsRoutePoints()" title="一键添加所有中心城市为路线点">⭐ 中心</span>
+          <span class="route-optimize" id="optimizeBtn" onclick="optimizeRouteOrder()" title="自动优化访问顺序">🔄 优化</span>
           <span class="route-bar-clear" id="clearRouteBtn">清空</span>
         </div>
       </div>
       <div class="route-points" id="routePointsBar">
         <span class="route-empty">尚未选择城市，点击下方列表或地图上的点开始</span>
+      </div>
+      <div class="route-summary" id="routeSummary" style="display:none;">
+        <div class="route-summary-item">
+          <span class="route-summary-label">总里程</span>
+          <span class="route-summary-value" id="totalDist">-</span>
+        </div>
+        <div class="route-summary-item">
+          <span class="route-summary-label">总时间</span>
+          <span class="route-summary-value" id="totalTime">-</span>
+        </div>
+        <div class="route-summary-item">
+          <span class="route-summary-label">路段</span>
+          <span class="route-summary-value" id="totalSegs">-</span>
+        </div>
+      </div>
+      <div class="route-manual-add" id="routeManualAdd">
+        <input type="text" id="manualCityInput" placeholder="输入城市名快速添加..." onkeypress="if(event.key==='Enter')addManualCity()" />
+        <button class="manual-add-btn" onclick="addManualCity()">+ 添加</button>
       </div>
     </div>
     <div class="filter-header" onclick="toggleFilter()">
@@ -882,9 +913,13 @@ function renderCityList(scrollToCity) {
 
 function renderRouteBar() {
   const bar = document.getElementById('routePointsBar');
+  const summary = document.getElementById('routeSummary');
+  const manualAdd = document.getElementById('routeManualAdd');
   
   if(currentMode === 'radial') {
     document.getElementById('routeCount').textContent = radialOrigin ? 1 + radialDestinations.length : 0;
+    if(summary) summary.style.display = 'none';
+    if(manualAdd) manualAdd.style.display = 'none';
     if(!radialOrigin) {
       bar.innerHTML = '<span class="route-empty">放射状模式：先点击选择出发地</span>';
       return;
@@ -914,10 +949,16 @@ function renderRouteBar() {
   }
   
   document.getElementById('routeCount').textContent = routePoints.length;
+  
+  // 显示/隐藏总览和手动添加
+  if(summary) summary.style.display = routePoints.length >= 2 ? 'flex' : 'none';
+  if(manualAdd) manualAdd.style.display = 'flex';
+  
   if(routePoints.length === 0) {
     bar.innerHTML = '<span class="route-empty">尚未选择城市，点击下方列表或地图上的点开始</span>';
     return;
   }
+  
   bar.innerHTML = '';
   routePoints.forEach(function(p, idx) {
     if(idx > 0) {
@@ -929,10 +970,98 @@ function renderRouteBar() {
     const tag = document.createElement('span');
     tag.className = 'route-point-tag';
     tag.title = '点击取消此点';
-    tag.innerHTML = '<span class="num">' + (idx+1) + '</span>' + p.city.name;
+    
+    // 编号 + 城市名
+    let html = '<span class="num">' + (idx+1) + '</span>' + p.city.name;
+    
+    // 上移/下移/删除按钮（多点路线模式下）
+    if(routePoints.length > 1) {
+      html += '<span class="point-actions">';
+      if(idx > 0) html += '<button class="point-action-btn" title="上移" onclick="event.stopPropagation();movePointUp(' + idx + ')">↑</button>';
+      if(idx < routePoints.length - 1) html += '<button class="point-action-btn" title="下移" onclick="event.stopPropagation();movePointDown(' + idx + ')">↓</button>';
+      html += '<button class="point-action-btn delete" title="删除" onclick="event.stopPropagation();removePointAt(' + idx + ')">×</button>';
+      html += '</span>';
+    }
+    
+    tag.innerHTML = html;
     tag.onclick = function() { removePointAt(idx); };
     bar.appendChild(tag);
   });
+  
+  // 更新路线总览
+  updateRouteSummary();
+}
+
+// 更新路线总览
+function updateRouteSummary() {
+  const totalDistEl = document.getElementById('totalDist');
+  const totalTimeEl = document.getElementById('totalTime');
+  const totalSegsEl = document.getElementById('totalSegs');
+  if(!totalDistEl) return;
+  
+  let totalDist = 0, totalTime = 0;
+  for(let i = 0; i < routeSegments.length; i++) {
+    if(routeSegments[i].route) {
+      totalDist += routeSegments[i].route.distance || 0;
+      totalTime += routeSegments[i].route.time || 0;
+    }
+  }
+  
+  totalDistEl.textContent = (totalDist / 1000).toFixed(1) + ' km';
+  totalTimeEl.textContent = formatTime(totalTime);
+  totalSegsEl.textContent = routeSegments.length + ' 段';
+}
+
+// 上移路线点
+function movePointUp(idx) {
+  if(idx <= 0 || idx >= routePoints.length) return;
+  const temp = routePoints[idx];
+  routePoints[idx] = routePoints[idx - 1];
+  routePoints[idx - 1] = temp;
+  // 重新编号标记
+  routePoints.forEach(function(p, i) {
+    if(p.marker) {
+      p.marker.setContent('<div style="background:rgba(22,163,74,0.7);color:#fff;border:2px solid rgba(255,255,255,0.8);border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;">' + (i+1) + '</div>');
+    }
+  });
+  renderRouteBar();
+  renderCityList();
+  if(routePoints.length >= 2) {
+    tipDom.innerHTML = '🔄 已调整顺序，正在重新规划路线...';
+    setTimeout(function() { planFullRoute(); }, 300);
+  }
+}
+
+// 下移路线点
+function movePointDown(idx) {
+  if(idx < 0 || idx >= routePoints.length - 1) return;
+  movePointUp(idx + 1);
+}
+
+// 手动添加城市
+function addManualCity() {
+  const input = document.getElementById('manualCityInput');
+  if(!input) return;
+  const name = input.value.trim();
+  if(!name) return;
+  
+  // 模糊匹配城市
+  const city = CITIES.find(function(c) {
+    return c.name === name || c.name.replace(/市$/, '') === name || c.name.indexOf(name) >= 0;
+  });
+  
+  if(city) {
+    if(routePoints.findIndex(function(p) { return p.city.name === city.name; }) >= 0) {
+      tipDom.innerHTML = '⚠️ 城市 "' + city.name + '" 已在路线中';
+    } else {
+      addPoint(city);
+      tipDom.innerHTML = '✅ 已添加 "' + city.name + '" 到路线';
+    }
+    input.value = '';
+  } else {
+    tipDom.innerHTML = '❌ 未找到城市 "' + name + '"，请检查拼写';
+  }
+  input.focus();
 }
 
 // 球面距离
@@ -1169,6 +1298,7 @@ function planNextSegment(version) {
     } else {
       tipDom.innerHTML = '✅ 路线规划完成（共' + routeSegments.length + '段，全部真实驾车路线）';
     }
+    updateRouteSummary();
     return;
   }
   
