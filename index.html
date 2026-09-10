@@ -2527,8 +2527,12 @@ function exportMapImage() {
   fullscreenBtn.style.display = 'none';
   if(sidebarExpandBtn) sidebarExpandBtn.style.display = 'none';
   
+  // 等待地图重新渲染（隐藏侧边栏后地图大小变化）
   setTimeout(function() {
     try {
+      // 触发地图更新
+      if(map.setStatus) map.setStatus({});
+      
       const mapEl = document.getElementById('map');
       const mapRect = mapEl.getBoundingClientRect();
       const canvases = mapEl.querySelectorAll('canvas');
@@ -2560,7 +2564,9 @@ function exportMapImage() {
         if(routePoints && routePoints.length > 0) {
           for(let i = 0; i < routePoints.length; i++) {
             const city = routePoints[i].city;
-            const pos = map.lngLatToContainer([city.lng, city.lat]);
+            // 使用AMap.LngLat对象进行坐标转换
+            const lnglat = new AMap.LngLat(city.lng, city.lat);
+            const pos = map.lngLatToContainer(lnglat);
             const x = pos.getX();
             const y = pos.getY();
             
@@ -2590,12 +2596,54 @@ function exportMapImage() {
             ctx.textBaseline = 'middle';
             ctx.fillText(label, x, y);
             
-            // 绘制城市名字（12px，标记正下方）
-            ctx.font = '12px sans-serif';
+            // 绘制城市名字（14px加粗，标记正下方，带白色背景确保可见）
+            ctx.font = 'bold 14px sans-serif';
+            const textWidth = ctx.measureText(city.name).width;
+            // 白色背景
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.fillRect(x - textWidth/2 - 4, y + 14, textWidth + 8, 20);
+            // 文字
             ctx.fillStyle = '#111';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
-            ctx.fillText(city.name, x, y + 14);
+            ctx.fillText(city.name, x, y + 17);
+          }
+        }
+        
+        // 放射状路线也绘制城市名称
+        if(currentMode === 'radial' && radialOrigin) {
+          // 出发地
+          const originCity = radialOrigin.city;
+          const originLnglat = new AMap.LngLat(originCity.lng, originCity.lat);
+          const originPos = map.lngLatToContainer(originLnglat);
+          const ox = originPos.getX();
+          const oy = originPos.getY();
+          
+          ctx.font = 'bold 14px sans-serif';
+          const originTextWidth = ctx.measureText(originCity.name).width;
+          ctx.fillStyle = 'rgba(220,38,38,0.9)';
+          ctx.fillRect(ox - originTextWidth/2 - 4, oy + 14, originTextWidth + 8, 20);
+          ctx.fillStyle = '#fff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillText(originCity.name, ox, oy + 17);
+          
+          // 目的地
+          for(let i = 0; i < radialDestinations.length; i++) {
+            const destCity = radialDestinations[i].city;
+            const destLnglat = new AMap.LngLat(destCity.lng, destCity.lat);
+            const destPos = map.lngLatToContainer(destLnglat);
+            const dx = destPos.getX();
+            const dy = destPos.getY();
+            
+            ctx.font = 'bold 13px sans-serif';
+            const destTextWidth = ctx.measureText(destCity.name).width;
+            ctx.fillStyle = 'rgba(37,99,235,0.9)';
+            ctx.fillRect(dx - destTextWidth/2 - 4, dy + 14, destTextWidth + 8, 18);
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(destCity.name, dx, dy + 16);
           }
         }
         
