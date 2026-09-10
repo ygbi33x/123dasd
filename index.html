@@ -43,6 +43,13 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 .route-summary-item{flex:1;text-align:center;}
 .route-summary-label{display:block;font-size:9px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
 .route-summary-value{display:block;font-size:13px;font-weight:800;color:#1e40af;margin-top:2px;}
+.traffic-stats{padding:8px 14px;border-top:1px solid rgba(0,0,0,.05);background:rgba(255,255,255,.5);}
+.traffic-stats-title{font-size:10px;color:#64748b;font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px;}
+.traffic-bar{height:8px;border-radius:4px;background:#f1f5f9;overflow:hidden;display:flex;}
+.traffic-bar-segment{height:100%;transition:width .5s ease;}
+.traffic-stats-detail{display:flex;justify-content:space-between;margin-top:5px;font-size:10px;color:#64748b;}
+.traffic-stats-detail b{color:#1f2937;font-weight:700;}
+.traffic-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;vertical-align:middle;}
 .route-manual-add{display:flex;gap:6px;padding:8px 14px;border-top:1px solid rgba(0,0,0,.05);background:rgba(255,255,255,.5);}
 .route-manual-add input{flex:1;padding:6px 10px;border:1.5px solid rgba(0,0,0,.08);border-radius:8px;font-size:11px;outline:none;background:rgba(255,255,255,.8);transition:.2s;}
 .route-manual-add input:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.1);}
@@ -334,6 +341,21 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <span class="route-summary-value" id="totalSegs">-</span>
         </div>
       </div>
+      <!-- 路线路况统计 -->
+      <div class="traffic-stats" id="trafficStats" style="display:none;">
+        <div class="traffic-stats-title">路线路况</div>
+        <div class="traffic-bar">
+          <div class="traffic-bar-segment" id="trafficSmooth" style="background:#22c55e;width:0%;"></div>
+          <div class="traffic-bar-segment" id="trafficSlow" style="background:#eab308;width:0%;"></div>
+          <div class="traffic-bar-segment" id="trafficJam" style="background:#ef4444;width:0%;"></div>
+          <div class="traffic-bar-segment" id="trafficSerious" style="background:#991b1b;width:0%;"></div>
+        </div>
+        <div class="traffic-stats-detail">
+          <span><span class="traffic-dot" style="background:#22c55e;"></span>畅通 <b id="smoothPct">0%</b></span>
+          <span><span class="traffic-dot" style="background:#eab308;"></span>缓行 <b id="slowPct">0%</b></span>
+          <span><span class="traffic-dot" style="background:#ef4444;"></span>拥堵 <b id="jamPct">0%</b></span>
+        </div>
+      </div>
     </div>
     <div class="filter-header" onclick="toggleFilter()">
       <span class="filter-header-title">🔍 筛选</span>
@@ -384,6 +406,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
             <div class="more-menu" id="moreMenu">
               <div class="more-item" onclick="toggleMode();toggleMoreMenu()">🔀 切换路线模式</div>
               <div class="more-item" onclick="toggleTraffic();toggleMoreMenu()">🚦 实时路况</div>
+              <div class="more-item" onclick="toggleAvoidTraffic();toggleMoreMenu()" id="avoidTrafficMenuItem">🚗 避开拥堵：关</div>
               <div class="more-item" onclick="resetAll();toggleMoreMenu()">🔄 全部重置</div>
               <div class="more-item" onclick="exportRouteCSV();toggleMoreMenu()">📊 导出路线数据</div>
               <div class="more-item" onclick="shareRouteLink();toggleMoreMenu()">🔗 复制分享链接</div>
@@ -485,6 +508,10 @@ let radialPlanVersion = 0;
 let radialPlanTimer = null;
 let trafficLayer = null;
 let trafficEnabled = false;
+let trafficRefreshTimer = null;
+let lastTrafficUpdate = null;
+let avoidTraffic = false; // 是否避开拥堵规划
+let routeTrafficStats = null; // 路线路况统计
 
 const tipDom = document.getElementById('tip');
 const panel = document.getElementById('panel');
@@ -1190,6 +1217,81 @@ function updateRouteSummary() {
   totalDistEl.textContent = (totalDist / 1000).toFixed(1) + ' km';
   totalTimeEl.textContent = formatTime(totalTime);
   totalSegsEl.textContent = routeSegments.length + ' 段';
+  
+  // 计算路线路况统计
+  updateTrafficStats();
+}
+
+// 计算并更新路线路况统计
+function updateTrafficStats() {
+  const statsPanel = document.getElementById('trafficStats');
+  if(!statsPanel) return;
+  
+  if(routeSegments.length === 0) {
+    statsPanel.style.display = 'none';
+    return;
+  }
+  
+  // 统计各路况的里程
+  let smoothDist = 0, slowDist = 0, jamDist = 0, seriousDist = 0, totalDist = 0;
+  
+  for(let i = 0; i < routeSegments.length; i++) {
+    const seg = routeSegments[i];
+    if(!seg.route || !seg.route.steps) continue;
+    
+    for(let j = 0; j < seg.route.steps.length; j++) {
+      const step = seg.route.steps[j];
+      const dist = step.distance || 0;
+      const status = step.traffic_status || 0;
+      totalDist += dist;
+      
+      if(status === 0 || status === 1) {
+        smoothDist += dist; // 畅通
+      } else if(status === 2) {
+        slowDist += dist; // 缓行
+      } else if(status === 3) {
+        jamDist += dist; // 拥堵
+      } else if(status === 4) {
+        seriousDist += dist; // 严重拥堵
+      } else {
+        smoothDist += dist; // 未知算畅通
+      }
+    }
+  }
+  
+  if(totalDist === 0) {
+    statsPanel.style.display = 'none';
+    return;
+  }
+  
+  // 计算百分比
+  const smoothPct = Math.round(smoothDist / totalDist * 100);
+  const slowPct = Math.round(slowDist / totalDist * 100);
+  const jamPct = Math.round((jamDist + seriousDist) / totalDist * 100);
+  
+  // 更新进度条
+  document.getElementById('trafficSmooth').style.width = smoothPct + '%';
+  document.getElementById('trafficSlow').style.width = slowPct + '%';
+  document.getElementById('trafficJam').style.width = jamPct + '%';
+  
+  // 更新文字
+  document.getElementById('smoothPct').textContent = smoothPct + '%';
+  document.getElementById('slowPct').textContent = slowPct + '%';
+  document.getElementById('jamPct').textContent = jamPct + '%';
+  
+  statsPanel.style.display = 'block';
+  
+  // 保存统计数据
+  routeTrafficStats = {
+    smooth: smoothDist,
+    slow: slowDist,
+    jam: jamDist,
+    serious: seriousDist,
+    total: totalDist,
+    smoothPct: smoothPct,
+    slowPct: slowPct,
+    jamPct: jamPct
+  };
 }
 
 // 上移路线点
@@ -1497,6 +1599,15 @@ function planNextSegment(version) {
   planSegmentWithRetry(version, start, end, 0);
 }
 
+// 获取当前路线规划策略
+function getCurrentPolicy() {
+  if(avoidTraffic) {
+    // 避开拥堵：使用考虑实时路况的策略
+    return AMap.DrivingPolicy.REAL_TRAFFIC || AMap.DrivingPolicy.LEAST_TIME;
+  }
+  return AMap.DrivingPolicy.LEAST_TIME;
+}
+
 function planSegmentWithRetry(version, start, end, retryCount) {
   if(version !== planVersion) return;
   
@@ -1504,7 +1615,7 @@ function planSegmentWithRetry(version, start, end, retryCount) {
     map: null,
     autoFitView: false,
     hideMarkers: true,
-    policy: AMap.DrivingPolicy.LEAST_TIME,
+    policy: getCurrentPolicy(),
     extensions: 'all' // 返回多条备选路线
   });
   
@@ -1765,6 +1876,43 @@ function showSegmentInfo(seg, position) {
   }
   
   let routeOptionsHtml = '';
+  let trafficDetailHtml = '';
+  
+  if(routeSeg && routeSeg.route && routeSeg.route.steps) {
+    // 统计该段路况详情
+    let segSmooth = 0, segSlow = 0, segJam = 0, segSerious = 0, segTotal = 0;
+    for(let i = 0; i < routeSeg.route.steps.length; i++) {
+      const step = routeSeg.route.steps[i];
+      const dist = step.distance || 0;
+      const status = step.traffic_status || 0;
+      segTotal += dist;
+      if(status === 0 || status === 1) segSmooth += dist;
+      else if(status === 2) segSlow += dist;
+      else if(status === 3) segJam += dist;
+      else if(status === 4) segSerious += dist;
+      else segSmooth += dist;
+    }
+    
+    if(segTotal > 0) {
+      const sPct = Math.round(segSmooth / segTotal * 100);
+      const slPct = Math.round(segSlow / segTotal * 100);
+      const jPct = Math.round((segJam + segSerious) / segTotal * 100);
+      
+      trafficDetailHtml = '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb;">' +
+        '<div style="font-size:11px;color:#6b7280;margin-bottom:5px;font-weight:600;">🚦 本段路况</div>' +
+        '<div style="height:6px;border-radius:3px;background:#f1f5f9;overflow:hidden;display:flex;margin-bottom:5px;">' +
+        '<div style="background:#22c55e;width:' + sPct + '%;height:100%;"></div>' +
+        '<div style="background:#eab308;width:' + slPct + '%;height:100%;"></div>' +
+        '<div style="background:#ef4444;width:' + jPct + '%;height:100%;"></div>' +
+        '</div>' +
+        '<div style="font-size:10px;color:#64748b;display:flex;justify-content:space-between;">' +
+        '<span><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#22c55e;margin-right:2px;"></span>畅通 ' + sPct + '%</span>' +
+        '<span><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#eab308;margin-right:2px;"></span>缓行 ' + slPct + '%</span>' +
+        '<span><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ef4444;margin-right:2px;"></span>拥堵 ' + jPct + '%</span>' +
+        '</div></div>';
+    }
+  }
+  
   if(routeSeg) {
     // 显示策略切换按钮
     const policies = [
@@ -1785,14 +1933,14 @@ function showSegmentInfo(seg, position) {
     routeOptionsHtml += '</div></div>';
   }
   
-  const content = '<div style="padding:10px 14px;min-width:200px;">' +
+  const content = '<div style="padding:10px 14px;min-width:220px;">' +
     '<div style="font-weight:700;font-size:15px;color:#1f2937;margin-bottom:6px;">路段详情</div>' +
     '<div style="font-size:13px;color:#374151;line-height:1.8;">' +
     '<div>🚩 出发地：<b>' + startName + '</b></div>' +
     '<div>🏁 目的地：<b>' + endName + '</b></div>' +
     '<div>📏 距离：<b>' + distanceKm + ' km</b></div>' +
     '<div>⏱️ 预计：<b>' + timeStr + '</b></div>' +
-    '</div>' + routeOptionsHtml + '</div>';
+    '</div>' + trafficDetailHtml + routeOptionsHtml + '</div>';
   
   segmentInfoWindow = new AMap.InfoWindow({
     content: content,
@@ -2188,7 +2336,7 @@ function planSingleRadialRoute(destObj, callback) {
     map: null,
     autoFitView: false,
     hideMarkers: true,
-    policy: AMap.DrivingPolicy.LEAST_TIME,
+    policy: getCurrentPolicy(),
     extensions: 'all' // 返回多条备选路线
   });
   
@@ -2282,7 +2430,7 @@ function planRadialNext(version) {
     map: null,
     autoFitView: false,
     hideMarkers: true,
-    policy: AMap.DrivingPolicy.LEAST_TIME,
+    policy: getCurrentPolicy(),
     extensions: 'all' // 返回多条备选路线
   });
   
@@ -2582,19 +2730,83 @@ function toggleTraffic() {
       trafficLayer = null;
     }
     trafficEnabled = false;
+    // 停止自动刷新
+    if(trafficRefreshTimer) {
+      clearInterval(trafficRefreshTimer);
+      trafficRefreshTimer = null;
+    }
     tipDom.innerHTML = '📌 实时路况已关闭';
   } else {
-    // 使用自定义TileLayer加载路况瓦片
-    trafficLayer = new AMap.TileLayer({
-      tileUrl: 'https://tm.amap.com/traffic/[z]/[x]/[y].png',
-      zIndex: 10,
-      opacity: 0.8
-    });
-    trafficLayer.setMap(map);
+    enableTrafficLayer();
     trafficEnabled = true;
-    tipDom.innerHTML = '✅ 实时路况已开启（绿=畅通 黄=缓行 红=拥堵）';
+    // 启动自动刷新（每3分钟）
+    startTrafficAutoRefresh();
+    tipDom.innerHTML = '✅ 实时路况已开启（每3分钟自动刷新，绿=畅通 黄=缓行 红=拥堵）';
   }
   updateTrafficIndicator();
+}
+
+// 启用路况图层
+function enableTrafficLayer() {
+  if(trafficLayer) {
+    trafficLayer.setMap(null);
+    trafficLayer = null;
+  }
+  trafficLayer = new AMap.TileLayer({
+    tileUrl: 'https://tm.amap.com/traffic/[z]/[x]/[y].png',
+    zIndex: 10,
+    opacity: 0.8
+  });
+  trafficLayer.setMap(map);
+  lastTrafficUpdate = new Date();
+}
+
+// 启动路况自动刷新
+function startTrafficAutoRefresh() {
+  if(trafficRefreshTimer) clearInterval(trafficRefreshTimer);
+  trafficRefreshTimer = setInterval(function() {
+    if(trafficEnabled) {
+      enableTrafficLayer();
+      console.log('路况已自动刷新:', new Date().toLocaleTimeString());
+    }
+  }, 3 * 60 * 1000); // 3分钟
+}
+
+// 手动刷新路况
+function refreshTraffic() {
+  if(!trafficEnabled) {
+    toggleTraffic();
+    return;
+  }
+  enableTrafficLayer();
+  const time = new Date().toLocaleTimeString();
+  tipDom.innerHTML = '🔄 路况已手动刷新（' + time + '）';
+}
+
+// 切换避开拥堵模式
+function toggleAvoidTraffic() {
+  avoidTraffic = !avoidTraffic;
+  const menuItem = document.getElementById('avoidTrafficMenuItem');
+  
+  if(avoidTraffic) {
+    menuItem.innerHTML = '🚗 避开拥堵：开';
+    menuItem.style.background = 'rgba(34,197,94,.1)';
+    menuItem.style.color = '#16a34a';
+    tipDom.innerHTML = '✅ 已开启避开拥堵模式，下次规划路线时优先避开拥堵路段';
+  } else {
+    menuItem.innerHTML = '🚗 避开拥堵：关';
+    menuItem.style.background = '';
+    menuItem.style.color = '';
+    tipDom.innerHTML = '📌 已关闭避开拥堵模式';
+  }
+  
+  // 如果已有路线，重新规划
+  if(routePoints.length >= 2) {
+    setTimeout(function() {
+      tipDom.innerHTML = '🔄 正在用' + (avoidTraffic ? '避开拥堵' : '最快') + '策略重新规划路线...';
+      planFullRoute();
+    }, 500);
+  }
 }
 
 // 更新路况指示器
