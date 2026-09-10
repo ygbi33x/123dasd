@@ -267,6 +267,7 @@ body.dark-mode #headerExpandBtn{background:#374151;color:#d1d5db;}
         <span>已选路线（<span id="routeCount">0</span>个点）</span>
         <div class="route-bar-actions">
           <span class="route-collapse-btn" id="routeCollapseBtn" onclick="toggleRouteBar()">▼</span>
+          <span class="route-optimize" id="addAllCentersBtn" onclick="addAllCentersAsRoutePoints()" title="一键添加所有中心城市为路线点">⭐ 全部中心</span>
           <span class="route-optimize" id="optimizeBtn" title="用Dijkstra算法自动优化访问顺序">🔄 优化顺序</span>
           <span class="route-bar-clear" id="clearRouteBtn">清空</span>
         </div>
@@ -315,7 +316,6 @@ body.dark-mode #headerExpandBtn{background:#374151;color:#d1d5db;}
           <button class="btn map-style" id="mapStyleBtn" onclick="toggleMapStyle()">🗺️ 地图样式</button>
           <button class="btn dark-mode" id="darkModeBtn" onclick="toggleDarkMode()">🌙 深色</button>
           <button class="btn export" id="exportBtn" onclick="exportMapImage()">📷 导出图片</button>
-          <button class="btn compare" id="compareBtn" onclick="toggleCompareMode()">⚖️ 路线对比</button>
           <button class="btn reset" id="clearBtn">全部重置</button>
         </div>
       </div>
@@ -328,8 +328,8 @@ body.dark-mode #headerExpandBtn{background:#374151;color:#d1d5db;}
         </div>
       </div>
       <div class="legend">
-        <div class="lg-item"><span class="lg-dot" style="background:#2563eb;width:12px;height:12px;"></span>中心城市（大）</div>
-        <div class="lg-item"><span class="lg-dot" style="background:#2563eb;"></span>普通地级市</div>
+        <div class="lg-item"><span class="lg-dot" style="background:#2563eb;width:12px;height:12px;"></span>中心城市</div>
+        <div class="lg-item"><span class="lg-dot" style="background:#93c5fd;width:6px;height:6px;opacity:0.5;"></span>普通地级市</div>
         <div class="lg-item"><span class="lg-dot" style="background:#dc2626;"></span>起点</div>
         <div class="lg-item"><span class="lg-dot" style="background:#f59e0b;"></span>途经点</div>
         <div class="lg-item"><span class="lg-dot" style="background:#16a34a;"></span>终点</div>
@@ -360,30 +360,6 @@ body.dark-mode #headerExpandBtn{background:#374151;color:#d1d5db;}
   <div class="dist-hint">共 31 个省会/直辖市/首府 · 按距离从近到远排序</div>
 </div>
 
-<div id="comparePanel">
-  <div id="compareHead">
-    <span id="compareTitle">⚖️ 路线对比</span>
-    <span id="compareClose" title="关闭" onclick="toggleCompareMode()">&#10005;</span>
-  </div>
-  <div id="compareBody">
-    <div id="compareTip" style="font-size:12px;color:#6b7280;margin-bottom:10px;">依次点击4个城市：A起点→A终点→B起点→B终点</div>
-    <div id="compareStep" style="font-size:13px;font-weight:600;color:#2563eb;margin-bottom:10px;">请选择路线A起点</div>
-    <div id="compareResult" style="display:none;">
-      <div style="display:flex;gap:10px;margin-bottom:10px;">
-        <div style="flex:1;padding:8px;background:#eff6ff;border-radius:6px;">
-          <div style="font-weight:700;color:#2563eb;margin-bottom:4px;">路线A</div>
-          <div id="routeAInfo" style="font-size:12px;color:#374151;line-height:1.6;"></div>
-        </div>
-        <div style="flex:1;padding:8px;background:#fdf2f8;border-radius:6px;">
-          <div style="font-weight:700;color:#db2777;margin-bottom:4px;">路线B</div>
-          <div id="routeBInfo" style="font-size:12px;color:#374151;line-height:1.6;"></div>
-        </div>
-      </div>
-      <div id="compareConclusion" style="font-size:12px;color:#059669;font-weight:600;padding:8px;background:#ecfdf5;border-radius:6px;text-align:center;"></div>
-    </div>
-  </div>
-</div>
-
 <div id="panel">
   <div id="panelHead">
     <span id="pTitle">路线汇总</span>
@@ -401,7 +377,7 @@ window._AMapSecurityConfig = {
   securityJsCode: "5709f1c855ca34155623c5fe0db7f05a"
 };
 </script>
-<script src="https://webapi.amap.com/maps?v=2.0&key=6ef93fcd8d5b297ae869c20eceaba5a6&plugin=AMap.Driving,AMap.TrafficLayer,AMap.Scale,AMap.ToolBar"></script>
+<script src="https://webapi.amap.com/maps?v=2.0&key=6ef93fcd8d5b297ae869c20eceaba5a6&plugin=AMap.Driving,AMap.TrafficLayer,AMap.Scale,AMap.ToolBar,AMap.TileLayer.Satellite,AMap.TileLayer.RoadNet"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <script>
@@ -588,18 +564,29 @@ function initMap() {
   CITIES.forEach(function(city) {
     const marker = new AMap.CircleMarker({
       center: [city.lng, city.lat],
-      radius: city.isCenter ? 8 : 4,
-      fillColor: "#2563eb",
-      fillOpacity: city.isCenter ? 0.5 : 0.3,
-      strokeColor: "#2563eb",
-      strokeOpacity: city.isCenter ? 0.7 : 0.5,
-      strokeWeight: city.isCenter ? 2 : 1.5,
+      radius: city.isCenter ? 7 : 2.5,
+      fillColor: city.isCenter ? "#2563eb" : "#93c5fd",
+      fillOpacity: city.isCenter ? 0.7 : 0.25,
+      strokeColor: city.isCenter ? "#1d4ed8" : "#bfdbfe",
+      strokeOpacity: city.isCenter ? 0.9 : 0.3,
+      strokeWeight: city.isCenter ? 2 : 1,
       cursor: "pointer",
       extData: city,
-      zIndex: city.isCenter ? 120 : 90
+      zIndex: city.isCenter ? 120 : 80
     });
     marker.on("click", function(e) {
       handleCityClick(e.target.getExtData());
+    });
+    // hover时普通城市变明显
+    marker.on("mouseover", function(e) {
+      if(!city.isCenter) {
+        marker.setOptions({radius: 5, fillOpacity: 0.6, strokeOpacity: 0.7});
+      }
+    });
+    marker.on("mouseout", function(e) {
+      if(!city.isCenter) {
+        marker.setOptions({radius: 2.5, fillOpacity: 0.25, strokeOpacity: 0.3});
+      }
     });
     marker.setMap(map);
     cityMarkers.push(marker);
@@ -1370,10 +1357,6 @@ function createCityLabel(city, position) {
 
 function handleCityClick(city) {
   document.getElementById("distPanel").classList.remove("open");
-  if(compareMode) {
-    handleCompareCityClick(city);
-    return;
-  }
   if(currentMode === 'radial') {
     handleRadialCityClick(city);
   } else {
@@ -1940,6 +1923,49 @@ function removePointAt(idx) {
   planFullRoute();
 }
 
+// 一键添加所有中心城市为路线点
+function addAllCentersAsRoutePoints() {
+  if(currentMode === 'radial') {
+    tipDom.innerHTML = '⚠️ 请先切换到多点路线模式';
+    return;
+  }
+  const centers = CITIES.filter(function(c) { return c.isCenter; });
+  let added = 0;
+  for(let i = 0; i < centers.length; i++) {
+    const city = centers[i];
+    if(routePoints.findIndex(function(p) { return p.city.name === city.name; }) >= 0) continue;
+    
+    const marker = new AMap.Marker({
+      position: [city.lng, city.lat],
+      content: '<div style="background:rgba(22,163,74,0.7);color:#fff;border:2px solid rgba(255,255,255,0.8);border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;">' + (routePoints.length+1) + '</div>',
+      offset: new AMap.Pixel(-14, -14),
+      zIndex: 300 + routePoints.length
+    });
+    marker.on("click", function() {
+      const idx = routePoints.findIndex(function(p) { return p.city.name === city.name; });
+      if(idx >= 0) removePointAt(idx);
+    });
+    marker.setMap(map);
+    const label = createCityLabel(city, [city.lng, city.lat]);
+    routePoints.push({city: city, marker: marker, label: label});
+    added++;
+  }
+  renumberMarkers();
+  renderRouteBar();
+  renderCityList();
+  if(routePoints.length >= 2) {
+    if(routePoints.length >= 3) {
+      const optimized = optimizeRouteOrder(routePoints);
+      routePoints = optimized;
+      renumberMarkers();
+    }
+    tipDom.innerHTML = '✅ 已添加 ' + added + ' 个中心城市（共' + routePoints.length + '个点），正在规划路线...';
+    planFullRoute();
+  } else {
+    tipDom.innerHTML = '✅ 已添加 ' + added + ' 个中心城市';
+  }
+}
+
 function optimizeRouteOrderBtn() {
   if(routePoints.length < 3) {
     tipDom.innerHTML = "⚠️ 至少需要3个点才能优化顺序";
@@ -2005,16 +2031,34 @@ function toggleTraffic() {
 
 // 地图样式切换
 let currentMapStyle = 'standard';
+let satelliteLayer = null;
+let roadNetLayer = null;
 const mapStyles = [
-  {name: 'standard', label: '🗺️ 标准地图', style: 'amap://styles/normal'},
-  {name: 'satellite', label: '🛰️ 卫星地图', style: 'amap://styles/satellite'},
-  {name: 'dark', label: '🌙 夜景地图', style: 'amap://styles/dark'}
+  {name: 'standard', label: '🗺️ 标准地图'},
+  {name: 'satellite', label: '🛰️ 卫星地图'},
+  {name: 'dark', label: '🌙 夜景地图'}
 ];
 function toggleMapStyle() {
   const idx = mapStyles.findIndex(s => s.name === currentMapStyle);
   const next = mapStyles[(idx + 1) % mapStyles.length];
   currentMapStyle = next.name;
-  map.setMapStyle(next.style);
+  
+  // 先移除卫星图层
+  if(satelliteLayer) { satelliteLayer.setMap(null); satelliteLayer = null; }
+  if(roadNetLayer) { roadNetLayer.setMap(null); roadNetLayer = null; }
+  
+  if(next.name === 'standard') {
+    map.setMapStyle('amap://styles/normal');
+  } else if(next.name === 'satellite') {
+    map.setMapStyle('amap://styles/normal');
+    satelliteLayer = new AMap.TileLayer.Satellite();
+    roadNetLayer = new AMap.TileLayer.RoadNet();
+    satelliteLayer.setMap(map);
+    roadNetLayer.setMap(map);
+  } else if(next.name === 'dark') {
+    map.setMapStyle('amap://styles/dark');
+  }
+  
   document.getElementById('mapStyleBtn').innerHTML = next.label;
   tipDom.innerHTML = '🗺️ 已切换为' + next.label.replace(/^[^\s]+\s/, '');
 }
@@ -2049,7 +2093,6 @@ function toggleDarkMode() {
 
 // 导出地图图片
 function exportMapImage() {
-  const mapEl = document.getElementById('map');
   const btn = document.getElementById('exportBtn');
   const originalText = btn.innerHTML;
   btn.innerHTML = '⏳ 生成中...';
@@ -2057,14 +2100,34 @@ function exportMapImage() {
   
   // 先关闭信息窗口和面板，避免遮挡
   if(segmentInfoWindow) segmentInfoWindow.close();
+  document.getElementById('panel').classList.remove('open');
+  document.getElementById('distPanel').classList.remove('open');
+  
+  // 隐藏侧边栏和顶部栏，只保留地图
+  const sidebar = document.querySelector('.sidebar');
+  const header = document.querySelector('.header');
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+  const originalSidebarDisplay = sidebar.style.display;
+  const originalHeaderDisplay = header.style.display;
+  const originalFullscreenDisplay = fullscreenBtn.style.display;
+  
+  sidebar.style.display = 'none';
+  header.style.display = 'none';
+  fullscreenBtn.style.display = 'none';
   
   setTimeout(function() {
-    html2canvas(mapEl, {
+    html2canvas(document.body, {
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#fff',
-      scale: 2
+      scale: 2,
+      logging: false
     }).then(function(canvas) {
+      // 恢复UI
+      sidebar.style.display = originalSidebarDisplay;
+      header.style.display = originalHeaderDisplay;
+      fullscreenBtn.style.display = originalFullscreenDisplay;
+      
       const link = document.createElement('a');
       link.download = '物流路由地图_' + new Date().toISOString().slice(0,10) + '.png';
       link.href = canvas.toDataURL('image/png');
@@ -2073,157 +2136,17 @@ function exportMapImage() {
       btn.disabled = false;
       tipDom.innerHTML = '📷 地图图片已导出';
     }).catch(function(err) {
+      // 恢复UI
+      sidebar.style.display = originalSidebarDisplay;
+      header.style.display = originalHeaderDisplay;
+      fullscreenBtn.style.display = originalFullscreenDisplay;
+      
       console.error('导出失败:', err);
       btn.innerHTML = originalText;
       btn.disabled = false;
-      tipDom.innerHTML = '❌ 导出失败，请重试';
+      tipDom.innerHTML = '❌ 导出失败，请使用浏览器截图功能（Ctrl+Shift+A）';
     });
-  }, 300);
-}
-
-// ===== 路线对比功能 =====
-let compareMode = false;
-let compareCities = []; // [A起点, A终点, B起点, B终点]
-let comparePolylines = [];
-
-function toggleCompareMode() {
-  compareMode = !compareMode;
-  const btn = document.getElementById('compareBtn');
-  const panel = document.getElementById('comparePanel');
-  if(compareMode) {
-    btn.classList.add('active');
-    btn.innerHTML = '⚖️ 对比中';
-    panel.classList.add('open');
-    compareCities = [];
-    clearComparePolylines();
-    document.getElementById('compareResult').style.display = 'none';
-    document.getElementById('compareStep').style.display = 'block';
-    document.getElementById('compareStep').textContent = '请选择路线A起点';
-    tipDom.innerHTML = '⚖️ 路线对比模式：依次点击4个城市（A起点→A终点→B起点→B终点）';
-  } else {
-    btn.classList.remove('active');
-    btn.innerHTML = '⚖️ 路线对比';
-    panel.classList.remove('open');
-    clearComparePolylines();
-    compareCities = [];
-    tipDom.innerHTML = '📌 已退出路线对比模式';
-  }
-}
-
-function clearComparePolylines() {
-  for(let i = 0; i < comparePolylines.length; i++) {
-    map.remove(comparePolylines[i]);
-  }
-  comparePolylines = [];
-}
-
-function handleCompareCityClick(city) {
-  if(compareCities.length >= 4) return;
-  
-  compareCities.push(city);
-  const stepEl = document.getElementById('compareStep');
-  
-  if(compareCities.length === 1) {
-    stepEl.textContent = '请选择路线A终点';
-  } else if(compareCities.length === 2) {
-    stepEl.textContent = '请选择路线B起点';
-  } else if(compareCities.length === 3) {
-    stepEl.textContent = '请选择路线B终点';
-  } else if(compareCities.length === 4) {
-    stepEl.style.display = 'none';
-    planCompareRoutes();
-  }
-}
-
-function planCompareRoutes() {
-  clearComparePolylines();
-  const [aStart, aEnd, bStart, bEnd] = compareCities;
-  
-  // 规划路线A（蓝色）
-  const drivingA = new AMap.Driving({
-    map: null, autoFitView: false, hideMarkers: true,
-    policy: AMap.DrivingPolicy.LEAST_TIME
-  });
-  drivingA.search([aStart.lng, aStart.lat], [aEnd.lng, aEnd.lat], function(status, result) {
-    if(status === "complete" && result.routes && result.routes.length > 0) {
-      const route = result.routes[0];
-      const allPath = [];
-      for(let j = 0; j < route.steps.length; j++) {
-        if(route.steps[j].path) {
-          for(let k = 0; k < route.steps[j].path.length; k++) {
-            allPath.push(route.steps[j].path[k]);
-          }
-        }
-      }
-      if(allPath.length > 0) {
-        const polyline = new AMap.Polyline({
-          path: allPath, strokeColor: '#2563eb', strokeWeight: 6,
-          strokeOpacity: 0.8, lineJoin: 'round', lineCap: 'round', zIndex: 95
-        });
-        polyline.setMap(map);
-        comparePolylines.push(polyline);
-      }
-      document.getElementById('routeAInfo').innerHTML =
-        aStart.name + ' → ' + aEnd.name + '<br>' +
-        '📏 ' + (route.distance/1000).toFixed(1) + ' km<br>' +
-        '⏱️ ' + formatTime(route.time);
-      checkCompareComplete();
-    }
-  });
-  
-  // 规划路线B（粉色）
-  const drivingB = new AMap.Driving({
-    map: null, autoFitView: false, hideMarkers: true,
-    policy: AMap.DrivingPolicy.LEAST_TIME
-  });
-  drivingB.search([bStart.lng, bStart.lat], [bEnd.lng, bEnd.lat], function(status, result) {
-    if(status === "complete" && result.routes && result.routes.length > 0) {
-      const route = result.routes[0];
-      const allPath = [];
-      for(let j = 0; j < route.steps.length; j++) {
-        if(route.steps[j].path) {
-          for(let k = 0; k < route.steps[j].path.length; k++) {
-            allPath.push(route.steps[j].path[k]);
-          }
-        }
-      }
-      if(allPath.length > 0) {
-        const polyline = new AMap.Polyline({
-          path: allPath, strokeColor: '#db2777', strokeWeight: 6,
-          strokeOpacity: 0.8, lineJoin: 'round', lineCap: 'round', zIndex: 96
-        });
-        polyline.setMap(map);
-        comparePolylines.push(polyline);
-      }
-      document.getElementById('routeBInfo').innerHTML =
-        bStart.name + ' → ' + bEnd.name + '<br>' +
-        '📏 ' + (route.distance/1000).toFixed(1) + ' km<br>' +
-        '⏱️ ' + formatTime(route.time);
-      checkCompareComplete();
-    }
-  });
-}
-
-function checkCompareComplete() {
-  const aInfo = document.getElementById('routeAInfo').innerHTML;
-  const bInfo = document.getElementById('routeBInfo').innerHTML;
-  if(aInfo && bInfo) {
-    document.getElementById('compareResult').style.display = 'block';
-    // 解析距离和时间进行对比
-    const aDist = parseFloat(aInfo.match(/([\d.]+) km/)[1]);
-    const bDist = parseFloat(bInfo.match(/([\d.]+) km/)[1]);
-    let conclusion = '';
-    if(aDist < bDist) {
-      conclusion = '🏆 路线A更短，近 ' + (bDist - aDist).toFixed(1) + ' km';
-    } else if(bDist < aDist) {
-      conclusion = '🏆 路线B更短，近 ' + (aDist - bDist).toFixed(1) + ' km';
-    } else {
-      conclusion = '两条路线距离相同';
-    }
-    document.getElementById('compareConclusion').textContent = conclusion;
-    if(comparePolylines.length > 0) map.setFitView(comparePolylines);
-    tipDom.innerHTML = '✅ 路线对比完成：' + conclusion;
-  }
+  }, 500);
 }
 
 function resetAll() {
