@@ -52,10 +52,13 @@ html,body{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"P
 .point-action-btn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;background:rgba(0,0,0,.06);color:#64748b;font-size:9px;cursor:pointer;transition:.15s;border:none;padding:0;}
 .point-action-btn:hover{background:rgba(59,130,246,.2);color:#2563eb;}
 .point-action-btn.delete:hover{background:rgba(239,68,68,.15);color:#dc2626;}
-.search-box{padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.04);background:rgba(255,255,255,.4);}
-.search-box input{width:100%;padding:9px 12px;border:1.5px solid rgba(0,0,0,.08);border-radius:10px;font-size:12px;outline:none;background:rgba(255,255,255,.7);transition:.2s;font-weight:500;}
+.search-box{padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.04);background:rgba(255,255,255,.4);display:flex;gap:6px;align-items:center;}
+.search-box input{flex:1;min-width:0;padding:9px 12px;border:1.5px solid rgba(0,0,0,.08);border-radius:10px;font-size:12px;outline:none;background:rgba(255,255,255,.7);transition:.2s;font-weight:500;}
 .search-box input:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.12);background:#fff;}
 .search-box input::placeholder{color:#94a3b8;}
+.search-add-btn{width:34px;height:34px;border:none;border-radius:8px;background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:.2s;box-shadow:0 2px 6px rgba(59,130,246,.3);flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.search-add-btn:hover{background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);box-shadow:0 3px 10px rgba(59,130,246,.4);transform:scale(1.05);}
+.search-add-btn:active{transform:scale(0.95);}
 .filter-section{padding:8px 14px;border-bottom:1px solid rgba(0,0,0,.04);background:rgba(255,255,255,.3);}
 .filter-label{font-size:10px;color:#64748b;font-weight:700;margin-bottom:5px;text-transform:uppercase;letter-spacing:.8px;}
 .filter-tabs{display:flex;flex-wrap:wrap;gap:4px;}
@@ -328,10 +331,6 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <span class="route-summary-value" id="totalSegs">-</span>
         </div>
       </div>
-      <div class="route-manual-add" id="routeManualAdd">
-        <input type="text" id="manualCityInput" placeholder="输入城市名快速添加..." onkeypress="if(event.key==='Enter')addManualCity()" />
-        <button class="manual-add-btn" onclick="addManualCity()">+ 添加</button>
-      </div>
     </div>
     <div class="filter-header" onclick="toggleFilter()">
       <span class="filter-header-title">🔍 筛选</span>
@@ -339,7 +338,8 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
     </div>
     <div id="filterArea">
       <div class="search-box">
-        <input type="text" id="searchInput" placeholder="搜索城市名称..." />
+        <input type="text" id="searchInput" placeholder="搜索城市名称..." onkeypress="if(event.key==='Enter'){if(event.shiftKey){addManualCity();}else{filterCities();}}" />
+        <button class="search-add-btn" onclick="addManualCity()" title="将搜索的城市添加到路线（Shift+回车）">+</button>
       </div>
       <div class="filter-section">
         <div class="filter-label">城市类型</div>
@@ -1068,12 +1068,15 @@ function movePointDown(idx) {
   movePointUp(idx + 1);
 }
 
-// 手动添加城市
+// 手动添加城市（从搜索框）
 function addManualCity() {
-  const input = document.getElementById('manualCityInput');
+  const input = document.getElementById('searchInput');
   if(!input) return;
   const name = input.value.trim();
-  if(!name) return;
+  if(!name) {
+    tipDom.innerHTML = '⚠️ 请先在搜索框输入城市名称';
+    return;
+  }
   
   // 模糊匹配城市
   const city = CITIES.find(function(c) {
@@ -1085,9 +1088,11 @@ function addManualCity() {
       tipDom.innerHTML = '⚠️ 城市 "' + city.name + '" 已在路线中';
     } else {
       addPoint(city);
-      tipDom.innerHTML = '✅ 已添加 "' + city.name + '" 到路线';
+      tipDom.innerHTML = '✅ 已添加 "' + city.name + '" 到路线（Shift+回车可快速添加）';
     }
     input.value = '';
+    searchKeyword = '';
+    renderCityList(); // 重置搜索过滤
   } else {
     tipDom.innerHTML = '❌ 未找到城市 "' + name + '"，请检查拼写';
   }
@@ -1349,7 +1354,8 @@ function planSegmentWithRetry(version, start, end, retryCount) {
     map: null,
     autoFitView: false,
     hideMarkers: true,
-    policy: AMap.DrivingPolicy.LEAST_TIME
+    policy: AMap.DrivingPolicy.LEAST_TIME,
+    extensions: 'all' // 返回多条备选路线
   });
   
   // 设置超时，10秒未响应则重试或兜底
@@ -1358,24 +1364,32 @@ function planSegmentWithRetry(version, start, end, retryCount) {
     handleSegmentResult(version, start, end, retryCount, false, null);
   }, 10000);
   
-  driving.search([start.lng, start.lat], [end.lng, end.lat], function(status, result) {
+  driving.search([start.lng, start.lat], [end.lng, end.lat], {extensions: 'all'}, function(status, result) {
     clearTimeout(timeoutId);
     if(version !== planVersion) return;
     
     const success = status === "complete" && result.routes && result.routes.length > 0;
-    handleSegmentResult(version, start, end, retryCount, success, success ? result.routes[0] : null);
+    if(success) {
+      // 保存所有可选路线，默认选中第一条
+      handleSegmentResult(version, start, end, retryCount, true, result.routes[0], result.routes);
+    } else {
+      handleSegmentResult(version, start, end, retryCount, false, null, null);
+    }
   });
 }
 
-function handleSegmentResult(version, start, end, retryCount, success, route) {
+function handleSegmentResult(version, start, end, retryCount, success, route, allRoutes) {
   if(version !== planVersion) return;
   
   if(success) {
-    // 规划成功
+    // 规划成功，保存所有可选路线
     routeSegments.push({
       startCity: start,
       endCity: end,
-      route: route
+      route: route,
+      allRoutes: allRoutes || [route],
+      selectedRouteIndex: 0,
+      currentPolicy: 'LEAST_TIME'
     });
     segmentPlanIndex++;
     // 段间延迟200ms，避免API限流
@@ -1587,6 +1601,38 @@ function showSegmentInfo(seg, position) {
   const startName = seg.startCity ? seg.startCity.name : '未知';
   const endName = seg.endCity ? seg.endCity.name : '未知';
   
+  // 查找对应的routeSegment以获取所有可选路线
+  let routeSeg = null;
+  let segIndex = -1;
+  for(let i = 0; i < routeSegments.length; i++) {
+    if(routeSegments[i].startCity === seg.startCity && routeSegments[i].endCity === seg.endCity) {
+      routeSeg = routeSegments[i];
+      segIndex = i;
+      break;
+    }
+  }
+  
+  let routeOptionsHtml = '';
+  if(routeSeg) {
+    // 显示策略切换按钮
+    const policies = [
+      {name: '时间优先', policy: 'LEAST_TIME', icon: '⏱️'},
+      {name: '费用优先', policy: 'LEAST_FEE', icon: '💰'},
+      {name: '距离优先', policy: 'LEAST_DISTANCE', icon: '📏'}
+    ];
+    routeOptionsHtml = '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb;">' +
+      '<div style="font-size:11px;color:#6b7280;margin-bottom:4px;font-weight:600;">🔀 路线策略（点击切换）</div>' +
+      '<div style="display:flex;gap:4px;flex-wrap:wrap;">';
+    for(let i = 0; i < policies.length; i++) {
+      const p = policies[i];
+      const isSelected = routeSeg.currentPolicy === p.policy;
+      const bgColor = isSelected ? '#3b82f6' : '#f3f4f6';
+      const textColor = isSelected ? '#fff' : '#374151';
+      routeOptionsHtml += '<div onclick="replanSegmentWithPolicy(' + segIndex + ',\'' + p.policy + '\')" style="cursor:pointer;padding:4px 8px;border-radius:6px;font-size:10px;background:' + bgColor + ';color:' + textColor + ';font-weight:' + (isSelected ? '700' : '500') + ';transition:.15s;">' + p.icon + ' ' + p.name + '</div>';
+    }
+    routeOptionsHtml += '</div></div>';
+  }
+  
   const content = '<div style="padding:10px 14px;min-width:200px;">' +
     '<div style="font-weight:700;font-size:15px;color:#1f2937;margin-bottom:6px;">路段详情</div>' +
     '<div style="font-size:13px;color:#374151;line-height:1.8;">' +
@@ -1594,7 +1640,7 @@ function showSegmentInfo(seg, position) {
     '<div>🏁 目的地：<b>' + endName + '</b></div>' +
     '<div>📏 距离：<b>' + distanceKm + ' km</b></div>' +
     '<div>⏱️ 预计：<b>' + timeStr + '</b></div>' +
-    '</div></div>';
+    '</div>' + routeOptionsHtml + '</div>';
   
   segmentInfoWindow = new AMap.InfoWindow({
     content: content,
@@ -1602,6 +1648,70 @@ function showSegmentInfo(seg, position) {
     closeWhenClickMap: true
   });
   segmentInfoWindow.open(map, position);
+}
+
+// 选择某段路线的备选路线
+function selectRoute(segmentIndex, routeIndex) {
+  if(segmentIndex < 0 || segmentIndex >= routeSegments.length) return;
+  const seg = routeSegments[segmentIndex];
+  if(!seg.allRoutes || routeIndex >= seg.allRoutes.length) return;
+  
+  // 更新选中的路线
+  seg.selectedRouteIndex = routeIndex;
+  seg.route = seg.allRoutes[routeIndex];
+  
+  // 关闭信息窗口
+  if(segmentInfoWindow) {
+    segmentInfoWindow.close();
+    segmentInfoWindow = null;
+  }
+  
+  // 重新绘制所有路线段
+  drawAllSegments();
+  updateRouteSummary();
+  
+  tipDom.innerHTML = '🔀 已切换为路线' + (routeIndex + 1) + '（' + (seg.route.distance / 1000).toFixed(1) + 'km，' + formatTime(seg.route.time) + '）';
+}
+
+// 用指定策略重新规划某段路线
+function replanSegmentWithPolicy(segmentIndex, policy) {
+  if(segmentIndex < 0 || segmentIndex >= routeSegments.length) return;
+  const seg = routeSegments[segmentIndex];
+  
+  // 关闭信息窗口
+  if(segmentInfoWindow) {
+    segmentInfoWindow.close();
+    segmentInfoWindow = null;
+  }
+  
+  tipDom.innerHTML = '⏳ 正在用' + (policy === 'LEAST_TIME' ? '时间优先' : policy === 'LEAST_FEE' ? '费用优先' : '距离优先') + '策略重新规划 ' + seg.startCity.name + ' → ' + seg.endCity.name + '...';
+  
+  const policyMap = {
+    'LEAST_TIME': AMap.DrivingPolicy.LEAST_TIME,
+    'LEAST_FEE': AMap.DrivingPolicy.LEAST_FEE,
+    'LEAST_DISTANCE': AMap.DrivingPolicy.LEAST_DISTANCE
+  };
+  
+  const driving = new AMap.Driving({
+    map: null,
+    autoFitView: false,
+    hideMarkers: true,
+    policy: policyMap[policy] || AMap.DrivingPolicy.LEAST_TIME
+  });
+  
+  driving.search([seg.startCity.lng, seg.startCity.lat], [seg.endCity.lng, seg.endCity.lat], function(status, result) {
+    if(status === "complete" && result.routes && result.routes.length > 0) {
+      seg.route = result.routes[0];
+      seg.allRoutes = result.routes;
+      seg.selectedRouteIndex = 0;
+      seg.currentPolicy = policy;
+      drawAllSegments();
+      updateRouteSummary();
+      tipDom.innerHTML = '✅ 已切换为' + (policy === 'LEAST_TIME' ? '时间优先' : policy === 'LEAST_FEE' ? '费用优先' : '距离优先') + '路线（' + (seg.route.distance / 1000).toFixed(1) + 'km，' + formatTime(seg.route.time) + '）';
+    } else {
+      tipDom.innerHTML = '❌ 重新规划失败，请重试';
+    }
+  });
 }
 
 function renumberMarkers() {
@@ -1926,7 +2036,8 @@ function planSingleRadialRoute(destObj, callback) {
     map: null,
     autoFitView: false,
     hideMarkers: true,
-    policy: AMap.DrivingPolicy.LEAST_TIME
+    policy: AMap.DrivingPolicy.LEAST_TIME,
+    extensions: 'all' // 返回多条备选路线
   });
   
   driving.search([radialOrigin.city.lng, radialOrigin.city.lat], [destObj.city.lng, destObj.city.lat], function(status, result) {
@@ -2019,7 +2130,8 @@ function planRadialNext(version) {
     map: null,
     autoFitView: false,
     hideMarkers: true,
-    policy: AMap.DrivingPolicy.LEAST_TIME
+    policy: AMap.DrivingPolicy.LEAST_TIME,
+    extensions: 'all' // 返回多条备选路线
   });
   
   driving.search([radialOrigin.city.lng, radialOrigin.city.lat], [dest.city.lng, dest.city.lat], function(status, result) {
