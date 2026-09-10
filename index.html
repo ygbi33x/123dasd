@@ -310,6 +310,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
       <div class="title-row">
         <div style="display:flex;align-items:center;gap:10px;">
           <div class="title">全国物流路由规划</div>
+          <span id="modeIndicator" style="padding:4px 12px;border-radius:20px;color:#fff;font-size:11px;font-weight:700;background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);box-shadow:0 2px 8px rgba(59,130,246,.3);">🔀 多点路线</span>
         </div>
         <div style="display:flex;gap:6px;align-items:center;">
           <div class="more-menu-wrap">
@@ -425,6 +426,7 @@ window.onload = function() {
   if(!window.AMap) { alert("高德地图加载失败，请检查网络"); return; }
   initMap();
   initFilters();
+  updateModeIndicator();
   CAPITALS = CITIES.filter(function(c) { return CAPITAL_NAMES.indexOf(c.name) >= 0; });
   renderCityList();
 };
@@ -1503,22 +1505,32 @@ function handleCityClick(city) {
 function toggleMode() {
   if(currentMode === 'multi') {
     currentMode = 'radial';
-    document.getElementById('modeBtn').textContent = '🌟 放射状路线';
-    document.getElementById('modeBtn').classList.add('radial');
     document.getElementById('radialQuick').style.display = 'flex';
     clearRoute();
     clearRadialRoutes();
-    tipDom.innerHTML = '🌟 放射状模式：先点出发地，再点多个目的地，每个目的地只与出发地连线';
+    tipDom.innerHTML = '🌟 放射状模式：先点出发地，再点多个目的地';
   } else {
     currentMode = 'multi';
-    document.getElementById('modeBtn').textContent = '🔀 多点路线';
-    document.getElementById('modeBtn').classList.remove('radial');
     document.getElementById('radialQuick').style.display = 'none';
     clearRadialRoutes();
-    tipDom.innerHTML = '📌 多点路线模式：点击城市添加到路线；再点已选城市只取消该点';
+    tipDom.innerHTML = '📌 多点路线模式：点击城市添加到路线；再点已选城市取消';
   }
+  updateModeIndicator();
   renderRouteBar();
   renderCityList();
+}
+
+// 更新模式指示器
+function updateModeIndicator() {
+  const indicator = document.getElementById('modeIndicator');
+  if(!indicator) return;
+  if(currentMode === 'radial') {
+    indicator.textContent = '🌟 放射状';
+    indicator.style.background = 'linear-gradient(135deg,#ec4899 0%,#db2777 100%)';
+  } else {
+    indicator.textContent = '🔀 多点路线';
+    indicator.style.background = 'linear-gradient(135deg,#3b82f6 0%,#2563eb 100%)';
+  }
 }
 
 function handleRadialCityClick(city) {
