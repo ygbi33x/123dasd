@@ -554,6 +554,9 @@ let radialDestinations = []; // 目的地列表 [{city, marker, label, route}]
 let radialPolylines = []; // 放射状路线的Polyline
 let radialPlanVersion = 0;
 let radialPlanTimer = null;
+let hoverNearbyRoutes = []; // 当前悬停位置附近的所有路线
+let hoverRouteIndex = 0; // 当前显示的路线索引
+let hoverPosition = null; // 当前悬停位置
 let trafficLayer = null;
 let trafficEnabled = false;
 let trafficRefreshTimer = null;
@@ -1460,6 +1463,27 @@ function findNearestRadialRoute(clickLng, clickLat) {
     }
   }
   return nearest;
+}
+
+// 找到鼠标附近的所有放射状路线，按距离出发点从近到远排序
+function findNearbyRadialRoutes(clickLng, clickLat, threshold) {
+  threshold = threshold || 0.5; // 距离阈值（度）
+  const nearby = [];
+  for(let i = 0; i < radialDestinations.length; i++) {
+    const dest = radialDestinations[i];
+    if(!dest.route || !dest.polyline) continue;
+    const path = dest.polyline.getPath();
+    if(!path || path.length === 0) continue;
+    const d = distToPolyline({lng: clickLng, lat: clickLat}, path);
+    if(d < threshold) {
+      nearby.push({dest: dest, dist: d, routeDistance: dest.route.distance});
+    }
+  }
+  // 按路线距离（离出发点远近）从近到远排序
+  nearby.sort(function(a, b) {
+    return a.routeDistance - b.routeDistance;
+  });
+  return nearby;
 }
 
 // ===== Dijkstra TSP 最优顺序 =====
@@ -2447,19 +2471,55 @@ function planSingleRadialRoute(destObj, callback) {
             cursor: 'pointer'
           });
           polyline.on('mouseover', function(e) {
-            // 先把所有路线恢复原样
-            for(let i = 0; i < radialPolylines.length; i++) {
-              radialPolylines[i].setOptions({strokeWeight: 5, strokeOpacity: 0.7});
-            }
-            // 高亮当前悬停的路线
-            polyline.setOptions({strokeWeight: 8, strokeOpacity: 1});
             const lng = e.lnglat.getLng();
             const lat = e.lnglat.getLat();
-            // 直接使用当前polyline对应的destObj，鼠标在哪条路线就显示哪条
-            showRadialSegmentInfo(destObj, [lng, lat]);
+            hoverPosition = [lng, lat];
+            
+            // 找到附近所有路线，按距离出发点从近到远排序
+            hoverNearbyRoutes = findNearbyRadialRoutes(lng, lat, 0.8);
+            hoverRouteIndex = 0; // 默认显示最近的
+            
+            if(hoverNearbyRoutes.length > 0) {
+              // 先把所有路线恢复原样
+              for(let i = 0; i < radialPolylines.length; i++) {
+                radialPolylines[i].setOptions({strokeWeight: 5, strokeOpacity: 0.7});
+              }
+              // 高亮当前显示的路线
+              const currentDest = hoverNearbyRoutes[hoverRouteIndex].dest;
+              if(currentDest.polyline) {
+                currentDest.polyline.setOptions({strokeWeight: 8, strokeOpacity: 1});
+              }
+              // 显示信息，如果有多个路线，提示点击切换
+              showRadialSegmentInfo(currentDest, [lng, lat], hoverNearbyRoutes.length, hoverRouteIndex);
+            }
           });
+          
+          polyline.on('click', function(e) {
+            // 点击切换显示下一个目的地
+            if(hoverNearbyRoutes.length > 1) {
+              hoverRouteIndex = (hoverRouteIndex + 1) % hoverNearbyRoutes.length;
+              const lng = hoverPosition ? hoverPosition[0] : e.lnglat.getLng();
+              const lat = hoverPosition ? hoverPosition[1] : e.lnglat.getLat();
+              
+              // 先把所有路线恢复原样
+              for(let i = 0; i < radialPolylines.length; i++) {
+                radialPolylines[i].setOptions({strokeWeight: 5, strokeOpacity: 0.7});
+              }
+              // 高亮当前显示的路线
+              const currentDest = hoverNearbyRoutes[hoverRouteIndex].dest;
+              if(currentDest.polyline) {
+                currentDest.polyline.setOptions({strokeWeight: 8, strokeOpacity: 1});
+              }
+              // 显示信息
+              showRadialSegmentInfo(currentDest, [lng, lat], hoverNearbyRoutes.length, hoverRouteIndex);
+            }
+          });
+          
           polyline.on('mouseout', function() {
             polyline.setOptions({strokeWeight: 5, strokeOpacity: 0.7});
+            hoverNearbyRoutes = [];
+            hoverRouteIndex = 0;
+            hoverPosition = null;
             if(segmentInfoWindow) {
               segmentInfoWindow.close();
               segmentInfoWindow = null;
@@ -2553,19 +2613,55 @@ function planRadialNext(version) {
             cursor: 'pointer'
           });
           polyline.on('mouseover', function(e) {
-            // 先把所有路线恢复原样
-            for(let i = 0; i < radialPolylines.length; i++) {
-              radialPolylines[i].setOptions({strokeWeight: 5, strokeOpacity: 0.7});
-            }
-            // 高亮当前悬停的路线
-            polyline.setOptions({strokeWeight: 8, strokeOpacity: 1});
             const lng = e.lnglat.getLng();
             const lat = e.lnglat.getLat();
-            // 直接使用当前polyline对应的destObj，鼠标在哪条路线就显示哪条
-            showRadialSegmentInfo(destObj, [lng, lat]);
+            hoverPosition = [lng, lat];
+            
+            // 找到附近所有路线，按距离出发点从近到远排序
+            hoverNearbyRoutes = findNearbyRadialRoutes(lng, lat, 0.8);
+            hoverRouteIndex = 0; // 默认显示最近的
+            
+            if(hoverNearbyRoutes.length > 0) {
+              // 先把所有路线恢复原样
+              for(let i = 0; i < radialPolylines.length; i++) {
+                radialPolylines[i].setOptions({strokeWeight: 5, strokeOpacity: 0.7});
+              }
+              // 高亮当前显示的路线
+              const currentDest = hoverNearbyRoutes[hoverRouteIndex].dest;
+              if(currentDest.polyline) {
+                currentDest.polyline.setOptions({strokeWeight: 8, strokeOpacity: 1});
+              }
+              // 显示信息，如果有多个路线，提示点击切换
+              showRadialSegmentInfo(currentDest, [lng, lat], hoverNearbyRoutes.length, hoverRouteIndex);
+            }
           });
+          
+          polyline.on('click', function(e) {
+            // 点击切换显示下一个目的地
+            if(hoverNearbyRoutes.length > 1) {
+              hoverRouteIndex = (hoverRouteIndex + 1) % hoverNearbyRoutes.length;
+              const lng = hoverPosition ? hoverPosition[0] : e.lnglat.getLng();
+              const lat = hoverPosition ? hoverPosition[1] : e.lnglat.getLat();
+              
+              // 先把所有路线恢复原样
+              for(let i = 0; i < radialPolylines.length; i++) {
+                radialPolylines[i].setOptions({strokeWeight: 5, strokeOpacity: 0.7});
+              }
+              // 高亮当前显示的路线
+              const currentDest = hoverNearbyRoutes[hoverRouteIndex].dest;
+              if(currentDest.polyline) {
+                currentDest.polyline.setOptions({strokeWeight: 8, strokeOpacity: 1});
+              }
+              // 显示信息
+              showRadialSegmentInfo(currentDest, [lng, lat], hoverNearbyRoutes.length, hoverRouteIndex);
+            }
+          });
+          
           polyline.on('mouseout', function() {
             polyline.setOptions({strokeWeight: 5, strokeOpacity: 0.7});
+            hoverNearbyRoutes = [];
+            hoverRouteIndex = 0;
+            hoverPosition = null;
             if(segmentInfoWindow) {
               segmentInfoWindow.close();
               segmentInfoWindow = null;
@@ -2587,7 +2683,7 @@ function planRadialNext(version) {
   });
 }
 
-function showRadialSegmentInfo(dest, position) {
+function showRadialSegmentInfo(dest, position, totalCount, currentIndex) {
   if(segmentInfoWindow) {
     segmentInfoWindow.close();
     segmentInfoWindow = null;
@@ -2601,6 +2697,14 @@ function showRadialSegmentInfo(dest, position) {
   const km = (dest.route.distance / 1000).toFixed(1);
   const timeStr = formatTime(dest.route.time);
   
+  // 如果有多个路线，显示当前是第几个和提示点击切换
+  let countHtml = '';
+  if(totalCount && totalCount > 1) {
+    countHtml = '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #e5e7eb;font-size:10px;color:#64748b;text-align:center;">' +
+      '第 <b style="color:#3b82f6;">' + (currentIndex + 1) + '</b> / ' + totalCount + ' 条 · 点击切换下一个' +
+      '</div>';
+  }
+  
   const content = '<div style="padding:10px 14px;min-width:180px;">' +
     '<div style="font-weight:700;font-size:15px;color:#1f2937;margin-bottom:6px;">路线详情</div>' +
     '<div style="font-size:13px;color:#374151;line-height:1.8;">' +
@@ -2608,7 +2712,7 @@ function showRadialSegmentInfo(dest, position) {
     '<div>🏁 目的地：<b>' + dest.city.name + '</b></div>' +
     '<div>📏 距离：<b>' + km + ' km</b></div>' +
     '<div>⏱️ 预计：<b>' + timeStr + '</b></div>' +
-    '</div></div>';
+    '</div>' + countHtml + '</div>';
   
   segmentInfoWindow = new AMap.InfoWindow({
     content: content,
