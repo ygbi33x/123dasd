@@ -2059,7 +2059,7 @@ function updateRouteSelector() {
       option.onclick = function() { selectRoute(i); };
       
       let badge = '';
-      if(i === 0) badge = '<span class="route-option-badge" style="background:#3b82f6;">推荐</span>';
+      if(i === 0) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
       else if(route.distance <= routes[0].distance) badge = '<span class="route-option-badge" style="background:#22c55e;">最短</span>';
       else if(route.time <= routes[0].time) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
       
@@ -2109,7 +2109,7 @@ function updateRouteSelector() {
         option.onclick = function() { selectSegmentRoute(i, r); };
         
         let badge = '';
-        if(r === 0) badge = '<span class="route-option-badge" style="background:#3b82f6;">推荐</span>';
+        if(r === 0) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
         else if(route.distance <= routes[0].distance) badge = '<span class="route-option-badge" style="background:#22c55e;">最短</span>';
         else if(route.time <= routes[0].time) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
         
@@ -2229,8 +2229,8 @@ function planMultiRoutes(version, start, end, retryCount) {
     if(completed >= policies.length) {
       if(version !== planVersion) return;
       if(hasSuccess) {
-        // 按距离排序
-        allRoutes.sort(function(a, b) { return a.distance - b.distance; });
+        // 按时间排序，默认显示最快（时间最短）的路线
+        allRoutes.sort(function(a, b) { return a.time - b.time; });
         handleSegmentResult(version, start, end, retryCount, true, allRoutes[0], allRoutes);
       } else if(retryCount < 2) {
         tipDom.innerHTML = '⏳ 多条路线规划失败，正在重试（第' + (retryCount + 1) + '次）...';
