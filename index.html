@@ -1804,17 +1804,18 @@ function drawAllSegments() {
         cursor: 'pointer'
       });
       
-      polyline.on('click', function(e) {
+      polyline.on('mouseover', function(e) {
+        polyline.setOptions({strokeWeight: 9, strokeOpacity: 1});
         const midIdx = Math.floor(mseg.path.length / 2);
         const midPos = mseg.path[midIdx];
         showSegmentInfo(mseg, midPos);
       });
-      
-      polyline.on('mouseover', function() {
-        polyline.setOptions({strokeWeight: 9, strokeOpacity: 1});
-      });
       polyline.on('mouseout', function() {
         polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.85});
+        if(segmentInfoWindow) {
+          segmentInfoWindow.close();
+          segmentInfoWindow = null;
+        }
       });
       
       polyline.setMap(map);
@@ -2426,12 +2427,20 @@ function planSingleRadialRoute(destObj, callback) {
             zIndex: 90,
             cursor: 'pointer'
           });
-          polyline.on('click', function(e) {
+          polyline.on('mouseover', function(e) {
+            polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.95});
             const lng = e.lnglat.getLng();
             const lat = e.lnglat.getLat();
             const nearest = findNearestRadialRoute(lng, lat);
             if(nearest) {
               showRadialSegmentInfo(nearest, [lng, lat]);
+            }
+          });
+          polyline.on('mouseout', function() {
+            polyline.setOptions({strokeWeight: 5, strokeOpacity: 0.7});
+            if(segmentInfoWindow) {
+              segmentInfoWindow.close();
+              segmentInfoWindow = null;
             }
           });
           polyline.setMap(map);
@@ -2521,12 +2530,20 @@ function planRadialNext(version) {
             zIndex: 90,
             cursor: 'pointer'
           });
-          polyline.on('click', function(e) {
+          polyline.on('mouseover', function(e) {
+            polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.95});
             const lng = e.lnglat.getLng();
             const lat = e.lnglat.getLat();
             const nearest = findNearestRadialRoute(lng, lat);
             if(nearest) {
               showRadialSegmentInfo(nearest, [lng, lat]);
+            }
+          });
+          polyline.on('mouseout', function() {
+            polyline.setOptions({strokeWeight: 5, strokeOpacity: 0.7});
+            if(segmentInfoWindow) {
+              segmentInfoWindow.close();
+              segmentInfoWindow = null;
             }
           });
           polyline.setMap(map);
