@@ -48,6 +48,21 @@ button{font-family:inherit;}
 .route-arrow{color:#93c5fd;font-size:12px;font-weight:700;}
 .route-empty{font-size:10px;color:#94a3b8;}
 .route-summary{display:flex;gap:8px;padding:8px 14px;border-top:1px solid rgba(0,0,0,.05);background:rgba(59,130,246,.04);}
+.route-selector{padding:10px 14px;border-top:1px solid rgba(0,0,0,.05);background:rgba(255,255,255,.7);}
+.route-selector-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.route-selector-title{font-size:12px;font-weight:700;color:#1e40af;}
+.route-selector-toggle{font-size:11px;color:#3b82f6;cursor:pointer;font-weight:600;padding:3px 8px;border:1px solid rgba(59,130,246,.3);border-radius:6px;background:rgba(59,130,246,.05);transition:.15s;}
+.route-selector-toggle:hover{background:rgba(59,130,246,.12);}
+.route-selector-toggle.active{background:#3b82f6;color:#fff;border-color:#3b82f6;}
+.route-selector-list{display:flex;flex-direction:column;gap:6px;}
+.route-option{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid rgba(0,0,0,.08);border-radius:8px;cursor:pointer;transition:.15s;background:rgba(255,255,255,.6);}
+.route-option:hover{border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.05);}
+.route-option.selected{border-color:#3b82f6;background:rgba(59,130,246,.1);box-shadow:0 1px 4px rgba(59,130,246,.15);}
+.route-option-color{width:14px;height:14px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,.8);box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.route-option-info{flex:1;min-width:0;}
+.route-option-name{font-size:12px;font-weight:700;color:#1e293b;}
+.route-option-detail{font-size:10px;color:#64748b;margin-top:1px;}
+.route-option-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:#22c55e;color:#fff;flex-shrink:0;}
 .route-summary-item{flex:1;text-align:center;}
 .route-summary-label{display:block;font-size:9px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
 .route-summary-value{display:block;font-size:13px;font-weight:800;color:#1e40af;margin-top:2px;}
@@ -359,6 +374,14 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <span class="route-summary-value" id="totalSegs">-</span>
         </div>
       </div>
+      <!-- 路线选择器（两点之间时显示） -->
+      <div class="route-selector" id="routeSelector" style="display:none;">
+        <div class="route-selector-header">
+          <span class="route-selector-title">🛣️ 备选路线</span>
+          <span class="route-selector-toggle" id="toggleAllRoutesBtn" onclick="toggleShowAllRoutes()">📊 对比：关</span>
+        </div>
+        <div class="route-selector-list" id="routeSelectorList"></div>
+      </div>
       <!-- 路线路况统计 -->
       <div class="traffic-stats" id="trafficStats" style="display:none;">
         <div class="traffic-stats-title">路线路况</div>
@@ -568,6 +591,9 @@ let lastTrafficUpdate = null;
 let avoidTraffic = false; // 是否避开拥堵规划
 let routeTrafficStats = null; // 路线路况统计
 let centerViaCapital = false; // 中心之间是否通过最近省会中转
+let showAllRoutes = false; // 是否显示所有备选路线做对比
+let excludedTransferCapitals = []; // 用户手动删除的中转城市，不再自动插入
+const ROUTE_OPTION_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 const tipDom = document.getElementById('tip');
 const panel = document.getElementById('panel');
@@ -1264,6 +1290,7 @@ function renderRouteBar() {
   
   // 更新路线总览
   updateRouteSummary();
+  updateRouteSelector();
 }
 
 // 更新路线总览
@@ -1671,7 +1698,7 @@ function planFullRoute() {
     }
   }
   
-  // 中心中转省会模式：在非省会中心之间插入最近省会作为中转
+  // 中心中转省会模式：在非省会中心之间插入最优省会作为中转
   if(centerViaCapital) {
     const newPoints = [];
     for(let i = 0; i < routePoints.length; i++) {
@@ -1679,23 +1706,46 @@ function planFullRoute() {
       if(i < routePoints.length - 1) {
         const cur = routePoints[i].city;
         const next = routePoints[i + 1].city;
-        // 如果两个点都是中心且都不是省会，则插入最近省会
+        // 如果两个点都是中心且都不是省会，则插入最优中转省会
         if(cur.isCenter && next.isCenter && !isCapital(cur) && !isCapital(next)) {
-          const nearestCap = findNearestCapital(cur);
-          if(nearestCap && nearestCap.name !== cur.name && nearestCap.name !== next.name) {
-            // 创建中转点标记（灰色小圆点）
-            const viaMarker = new AMap.CircleMarker({
-              center: [nearestCap.lng, nearestCap.lat],
-              radius: 5,
-              fillColor: "#94a3b8",
-              fillOpacity: 0.8,
-              strokeColor: "#64748b",
-              strokeOpacity: 0.9,
-              strokeWeight: 1.5,
-              zIndex: 100
-            });
-            map.add(viaMarker);
-            newPoints.push({city: nearestCap, marker: viaMarker, label: null, isVia: true});
+          // 找到使A→C→B总路线最短的省会
+          let transferCap = findBestTransferCapital(cur, next);
+          // 跳过用户已排除的中转城市，找下一个最优的
+          if(transferCap && excludedTransferCapitals.indexOf(transferCap.name) >= 0) {
+            let best = null;
+            let minTotalDist = Infinity;
+            for(let c = 0; c < CAPITALS.length; c++) {
+              const cap = CAPITALS[c];
+              if(cap.name === cur.name || cap.name === next.name) continue;
+              if(excludedTransferCapitals.indexOf(cap.name) >= 0) continue;
+              const d1 = Math.sqrt((cap.lng - cur.lng)**2 + (cap.lat - cur.lat)**2);
+              const d2 = Math.sqrt((next.lng - cap.lng)**2 + (next.lat - cap.lat)**2);
+              const total = d1 + d2;
+              if(total < minTotalDist) {
+                minTotalDist = total;
+                best = cap;
+              }
+            }
+            transferCap = best;
+          }
+          if(transferCap && transferCap.name !== cur.name && transferCap.name !== next.name) {
+            // 检查中转点是否已经在路线中（避免重复）
+            const alreadyInRoute = newPoints.findIndex(function(p) { return p.city.name === transferCap.name; }) >= 0;
+            if(!alreadyInRoute) {
+              // 创建中转点标记（灰色小圆点）
+              const viaMarker = new AMap.CircleMarker({
+                center: [transferCap.lng, transferCap.lat],
+                radius: 5,
+                fillColor: "#94a3b8",
+                fillOpacity: 0.8,
+                strokeColor: "#64748b",
+                strokeOpacity: 0.9,
+                strokeWeight: 1.5,
+                zIndex: 100
+              });
+              map.add(viaMarker);
+              newPoints.push({city: transferCap, marker: viaMarker, label: null, isVia: true});
+            }
           }
         }
       }
@@ -1742,6 +1792,7 @@ function planNextSegment(version) {
       tipDom.innerHTML = '✅ 路线规划完成（共' + routeSegments.length + '段，全部真实驾车路线）';
     }
     updateRouteSummary();
+    updateRouteSelector();
     return;
   }
   
@@ -1787,6 +1838,26 @@ function findNearestCapital(city) {
   return nearest;
 }
 
+// 找到使A→C→B总路线最短的省会中转点
+function findBestTransferCapital(cityA, cityB) {
+  let best = null;
+  let minTotalDist = Infinity;
+  for(let i = 0; i < CAPITALS.length; i++) {
+    const cap = CAPITALS[i];
+    // 跳过起点和终点本身
+    if(cap.name === cityA.name || cap.name === cityB.name) continue;
+    // 计算A→C + C→B的总距离（直线距离近似）
+    const d1 = Math.sqrt((cap.lng - cityA.lng)**2 + (cap.lat - cityA.lat)**2);
+    const d2 = Math.sqrt((cityB.lng - cap.lng)**2 + (cityB.lat - cap.lat)**2);
+    const total = d1 + d2;
+    if(total < minTotalDist) {
+      minTotalDist = total;
+      best = cap;
+    }
+  }
+  return best;
+}
+
 // 切换中心中转省会模式
 function toggleCenterViaCapital() {
   centerViaCapital = !centerViaCapital;
@@ -1801,35 +1872,202 @@ function toggleCenterViaCapital() {
   }
 }
 
+// 切换是否显示所有备选路线做对比
+function toggleShowAllRoutes() {
+  showAllRoutes = !showAllRoutes;
+  const btn = document.getElementById('toggleAllRoutesBtn');
+  if(btn) {
+    btn.textContent = '📊 对比：' + (showAllRoutes ? '开' : '关');
+    btn.classList.toggle('active', showAllRoutes);
+  }
+  if(routeSegments.length > 0) {
+    drawAllSegments();
+  }
+}
+
+// 选择某条备选路线
+function selectRoute(routeIndex) {
+  if(routeSegments.length === 0) return;
+  const seg = routeSegments[0]; // 两点之间只有一段
+  if(!seg.allRoutes || routeIndex >= seg.allRoutes.length) return;
+  seg.selectedRouteIndex = routeIndex;
+  seg.route = seg.allRoutes[routeIndex];
+  // 清除路况统计缓存
+  seg._trafficStats = null;
+  drawAllSegments();
+  updateRouteSelector();
+  updateRouteSummary();
+  updateTrafficStats();
+}
+
+// 更新路线选择器
+function updateRouteSelector() {
+  const selector = document.getElementById('routeSelector');
+  const list = document.getElementById('routeSelectorList');
+  if(!selector || !list) return;
+  
+  // 只有两点之间（一段路线）且有多条备选路线时才显示
+  const normalPoints = routePoints.filter(p => !p.isVia);
+  if(normalPoints.length !== 2 || routeSegments.length === 0) {
+    selector.style.display = 'none';
+    return;
+  }
+  
+  const seg = routeSegments[0];
+  if(!seg.allRoutes || seg.allRoutes.length <= 1) {
+    selector.style.display = 'none';
+    return;
+  }
+  
+  selector.style.display = 'block';
+  list.innerHTML = '';
+  
+  for(let i = 0; i < seg.allRoutes.length; i++) {
+    const route = seg.allRoutes[i];
+    const isSelected = i === seg.selectedRouteIndex;
+    const color = ROUTE_OPTION_COLORS[i % ROUTE_OPTION_COLORS.length];
+    
+    const option = document.createElement('div');
+    option.className = 'route-option' + (isSelected ? ' selected' : '');
+    option.onclick = function() { selectRoute(i); };
+    
+    let badge = '';
+    if(i === 0) badge = '<span class="route-option-badge" style="background:#3b82f6;">推荐</span>';
+    else if(route.distance <= seg.allRoutes[0].distance) badge = '<span class="route-option-badge" style="background:#22c55e;">最短</span>';
+    else if(route.time <= seg.allRoutes[0].time) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
+    
+    option.innerHTML = 
+      '<div class="route-option-color" style="background:' + color + ';"></div>' +
+      '<div class="route-option-info">' +
+        '<div class="route-option-name">路线 ' + (i+1) + '</div>' +
+        '<div class="route-option-detail">' + (route.distance/1000).toFixed(1) + 'km · ' + formatTime(route.time) + '</div>' +
+      '</div>' + badge;
+    
+    list.appendChild(option);
+  }
+}
+
 function planSegmentWithRetry(version, start, end, retryCount) {
+  if(version !== planVersion) return;
+  
+  // 判断是否是两点之间（需要多条备选路线）
+  const normalPoints = routePoints.filter(p => !p.isVia);
+  const needMultiRoutes = normalPoints.length === 2;
+  
+  if(needMultiRoutes) {
+    // 两点之间：用3种策略分别规划，获取多条备选路线
+    planMultiRoutes(version, start, end, retryCount);
+  } else {
+    // 多点路线：只用当前策略规划1条
+    planSingleRoute(version, start, end, retryCount, getCurrentPolicy());
+  }
+}
+
+// 单条路线规划
+function planSingleRoute(version, start, end, retryCount, policy) {
   if(version !== planVersion) return;
   
   const driving = new AMap.Driving({
     map: null,
     autoFitView: false,
     hideMarkers: true,
-    policy: getCurrentPolicy(),
-    extensions: 'all' // 返回多条备选路线
+    policy: policy
   });
   
-  // 设置超时，10秒未响应则重试或兜底
   let timeoutId = setTimeout(function() {
     if(version !== planVersion) return;
     handleSegmentResult(version, start, end, retryCount, false, null);
   }, 10000);
   
-  driving.search([start.lng, start.lat], [end.lng, end.lat], {extensions: 'all'}, function(status, result) {
+  driving.search([start.lng, start.lat], [end.lng, end.lat], function(status, result) {
     clearTimeout(timeoutId);
     if(version !== planVersion) return;
     
     const success = status === "complete" && result.routes && result.routes.length > 0;
     if(success) {
-      // 保存所有可选路线，默认选中第一条
-      handleSegmentResult(version, start, end, retryCount, true, result.routes[0], result.routes);
+      handleSegmentResult(version, start, end, retryCount, true, result.routes[0], [result.routes[0]]);
     } else {
       handleSegmentResult(version, start, end, retryCount, false, null, null);
     }
   });
+}
+
+// 多条路线规划（两点之间）
+function planMultiRoutes(version, start, end, retryCount) {
+  if(version !== planVersion) return;
+  
+  const policies = [
+    AMap.DrivingPolicy.LEAST_TIME,
+    AMap.DrivingPolicy.LEAST_FEE,
+    AMap.DrivingPolicy.SHORTEST_DISTANCE
+  ];
+  const policyNames = ['时间最短', '费用最少', '距离最短'];
+  
+  let completed = 0;
+  const allRoutes = [];
+  let hasSuccess = false;
+  
+  tipDom.innerHTML = '⏳ 正在规划多条备选路线...';
+  
+  for(let i = 0; i < policies.length; i++) {
+    const policy = policies[i];
+    const driving = new AMap.Driving({
+      map: null,
+      autoFitView: false,
+      hideMarkers: true,
+      policy: policy
+    });
+    
+    let timeoutId = setTimeout(function() {
+      completed++;
+      checkAllDone();
+    }, 10000);
+    
+    driving.search([start.lng, start.lat], [end.lng, end.lat], function(status, result) {
+      clearTimeout(timeoutId);
+      if(version !== planVersion) return;
+      
+      if(status === "complete" && result.routes && result.routes.length > 0) {
+        const route = result.routes[0];
+        route.policyName = policyNames[i];
+        // 去重：如果与已有路线距离和时间都很接近，视为同一条
+        let isDuplicate = false;
+        for(let j = 0; j < allRoutes.length; j++) {
+          const existing = allRoutes[j];
+          const distDiff = Math.abs(existing.distance - route.distance) / Math.max(existing.distance, 1);
+          const timeDiff = Math.abs(existing.time - route.time) / Math.max(existing.time, 1);
+          if(distDiff < 0.02 && timeDiff < 0.02) {
+            isDuplicate = true;
+            break;
+          }
+        }
+        if(!isDuplicate) {
+          allRoutes.push(route);
+          hasSuccess = true;
+        }
+      }
+      completed++;
+      checkAllDone();
+    });
+  }
+  
+  function checkAllDone() {
+    if(completed >= policies.length) {
+      if(version !== planVersion) return;
+      if(hasSuccess) {
+        // 按距离排序
+        allRoutes.sort(function(a, b) { return a.distance - b.distance; });
+        handleSegmentResult(version, start, end, retryCount, true, allRoutes[0], allRoutes);
+      } else if(retryCount < 2) {
+        tipDom.innerHTML = '⏳ 多条路线规划失败，正在重试（第' + (retryCount + 1) + '次）...';
+        setTimeout(function() { planMultiRoutes(version, start, end, retryCount + 1); }, 500);
+      } else {
+        // 兜底：直线
+        const fallback = createFallbackRoute(start, end);
+        handleSegmentResult(version, start, end, retryCount, true, fallback, [fallback]);
+      }
+    }
+  }
 }
 
 function handleSegmentResult(version, start, end, retryCount, success, route, allRoutes) {
@@ -1886,6 +2124,70 @@ function createFallbackRoute(start, end) {
 function drawAllSegments() {
   clearRoutePolylines();
   const allPaths = [];
+  
+  // 多条路线对比模式：两点之间显示所有备选路线
+  if(showAllRoutes && routeSegments.length === 1 && routeSegments[0].allRoutes && routeSegments[0].allRoutes.length > 1) {
+    const seg = routeSegments[0];
+    for(let r = 0; r < seg.allRoutes.length; r++) {
+      const route = seg.allRoutes[r];
+      const color = ROUTE_OPTION_COLORS[r % ROUTE_OPTION_COLORS.length];
+      const isSelected = r === seg.selectedRouteIndex;
+      
+      if(!route.steps) continue;
+      
+      // 合并所有step的path（兼容LngLat对象和数组两种格式）
+      const fullPath = [];
+      for(let i = 0; i < route.steps.length; i++) {
+        const step = route.steps[i];
+        if(!step.path) continue;
+        for(let j = 0; j < step.path.length; j++) {
+          const p = step.path[j];
+          // 兼容LngLat对象和数组
+          const lng = typeof p.getLng === 'function' ? p.getLng() : p[0];
+          const lat = typeof p.getLat === 'function' ? p.getLat() : p[1];
+          if(fullPath.length === 0 || 
+             fullPath[fullPath.length-1][0] !== lng || 
+             fullPath[fullPath.length-1][1] !== lat) {
+            fullPath.push([lng, lat]);
+          }
+        }
+      }
+      
+      if(fullPath.length < 2) continue;
+      
+      const polyline = new AMap.Polyline({
+        path: fullPath,
+        strokeColor: color,
+        strokeWeight: isSelected ? 8 : 5,
+        strokeOpacity: isSelected ? 0.9 : 0.5,
+        lineJoin: 'round',
+        lineCap: 'round',
+        showDir: isSelected,
+        zIndex: isSelected ? 120 : 100,
+        cursor: 'pointer'
+      });
+      
+      polyline.setExtData({startCity: seg.startCity, endCity: seg.endCity, routeIndex: r});
+      
+      // 点击切换选中路线
+      polyline.on('click', function() {
+        selectRoute(r);
+      });
+      
+      polyline.setMap(map);
+      routePolylines.push(polyline);
+      
+      for(let j = 0; j < fullPath.length; j++) {
+        allPaths.push(fullPath[j]);
+      }
+    }
+    
+    // 自适应视野
+    if(allPaths.length > 0) {
+      map.setFitView([new AMap.Polyline({path: allPaths})]);
+    }
+    return;
+  }
   
   for(let s = 0; s < routeSegments.length; s++) {
     const seg = routeSegments[s];
@@ -2241,6 +2543,8 @@ function replanSegmentWithPolicy(segmentIndex, policy) {
 
 function renumberMarkers() {
   routePoints.forEach(function(p, i) {
+    // 中转点使用CircleMarker，跳过编号
+    if(p.isVia || !p.marker || typeof p.marker.setContent !== 'function') return;
     let color = '#f59e0b'; // 途经点：橙色
     let label = (i+1).toString();
     if(i === 0) {
@@ -2940,6 +3244,10 @@ function removePointAt(idx) {
   removed.forEach(function(p) {
     if(p.marker) map.remove(p.marker);
     if(p.label) map.remove(p.label);
+    // 如果删除的是中转点，加入排除列表，避免重新规划时再次插入
+    if(p.isVia && excludedTransferCapitals.indexOf(p.city.name) < 0) {
+      excludedTransferCapitals.push(p.city.name);
+    }
   });
   renumberMarkers();
   tipDom.innerHTML = routePoints.length > 0 ?
@@ -3045,6 +3353,7 @@ function clearRoute() {
     if(p.label) map.remove(p.label);
   });
   routePoints = [];
+  excludedTransferCapitals = []; // 清空中转排除列表
   if(currentDriving) { currentDriving.clear(); currentDriving = null; }
   clearRoutePolylines();
   panel.classList.remove("open");
