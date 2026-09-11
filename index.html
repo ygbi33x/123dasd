@@ -1805,17 +1805,34 @@ function drawAllSegments() {
       });
       
       polyline.on('mouseover', function(e) {
-        polyline.setOptions({strokeWeight: 9, strokeOpacity: 1});
+        // 先把所有路线恢复原样
+        for(let i = 0; i < routePolylines.length; i++) {
+          routePolylines[i].setOptions({strokeWeight: 7, strokeOpacity: 0.85});
+        }
+        // 高亮整个城市间路线段（所有同一起点终点的小段）
+        for(let i = 0; i < routePolylines.length; i++) {
+          const p = routePolylines[i];
+          const extData = p.getExtData();
+          if(extData && extData.startCity === seg.startCity && extData.endCity === seg.endCity) {
+            p.setOptions({strokeWeight: 9, strokeOpacity: 1});
+          }
+        }
         // 使用完整的routeSegment显示信息，而不是小段mseg
         showSegmentInfo(seg, [e.lnglat.getLng(), e.lnglat.getLat()]);
       });
       polyline.on('mouseout', function() {
-        polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.85});
+        // 恢复所有路线原样
+        for(let i = 0; i < routePolylines.length; i++) {
+          routePolylines[i].setOptions({strokeWeight: 7, strokeOpacity: 0.85});
+        }
         if(segmentInfoWindow) {
           segmentInfoWindow.close();
           segmentInfoWindow = null;
         }
       });
+      
+      // 保存对应的城市信息，用于高亮整个路段
+      polyline.setExtData({startCity: seg.startCity, endCity: seg.endCity});
       
       polyline.setMap(map);
       routePolylines.push(polyline);
@@ -2430,14 +2447,16 @@ function planSingleRadialRoute(destObj, callback) {
             cursor: 'pointer'
           });
           polyline.on('mouseover', function(e) {
-            polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.95});
+            // 先把所有路线恢复原样
+            for(let i = 0; i < radialPolylines.length; i++) {
+              radialPolylines[i].setOptions({strokeWeight: 5, strokeOpacity: 0.7});
+            }
+            // 高亮当前悬停的路线
+            polyline.setOptions({strokeWeight: 8, strokeOpacity: 1});
             const lng = e.lnglat.getLng();
             const lat = e.lnglat.getLat();
-            // 多条路线重叠时，显示距离鼠标位置最近的那条
-            const nearest = findNearestRadialRoute(lng, lat);
-            if(nearest) {
-              showRadialSegmentInfo(nearest, [lng, lat]);
-            }
+            // 直接使用当前polyline对应的destObj，鼠标在哪条路线就显示哪条
+            showRadialSegmentInfo(destObj, [lng, lat]);
           });
           polyline.on('mouseout', function() {
             polyline.setOptions({strokeWeight: 5, strokeOpacity: 0.7});
@@ -2534,14 +2553,16 @@ function planRadialNext(version) {
             cursor: 'pointer'
           });
           polyline.on('mouseover', function(e) {
-            polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.95});
+            // 先把所有路线恢复原样
+            for(let i = 0; i < radialPolylines.length; i++) {
+              radialPolylines[i].setOptions({strokeWeight: 5, strokeOpacity: 0.7});
+            }
+            // 高亮当前悬停的路线
+            polyline.setOptions({strokeWeight: 8, strokeOpacity: 1});
             const lng = e.lnglat.getLng();
             const lat = e.lnglat.getLat();
-            // 多条路线重叠时，显示距离鼠标位置最近的那条
-            const nearest = findNearestRadialRoute(lng, lat);
-            if(nearest) {
-              showRadialSegmentInfo(nearest, [lng, lat]);
-            }
+            // 直接使用当前polyline对应的destObj，鼠标在哪条路线就显示哪条
+            showRadialSegmentInfo(destObj, [lng, lat]);
           });
           polyline.on('mouseout', function() {
             polyline.setOptions({strokeWeight: 5, strokeOpacity: 0.7});
