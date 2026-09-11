@@ -197,6 +197,34 @@ button{font-family:inherit;}
 .seg-dist{color:#2563eb;font-weight:700;float:right;}
 .footnote{font-size:10px;color:#64748b;padding:10px 18px;border-top:1px solid rgba(0,0,0,.06);background:linear-gradient(135deg,rgba(59,130,246,.04) 0%,rgba(99,102,241,.04) 100%);font-weight:600;letter-spacing:.3px;}
 
+/* ===== 路线选择器浮动弹窗 ===== */
+#routeSelectorModal{position:absolute;right:16px;top:110px;width:300px;max-width:88vw;max-height:55vh;background:rgba(255,255,255,.95);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid rgba(0,0,0,.08);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.15);z-index:220;display:none;overflow:hidden;flex-direction:column;animation:panelFadeIn .25s cubic-bezier(.4,0,.2,1);}
+#routeSelectorModal.open{display:flex;}
+#routeSelectorHead{padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,rgba(14,165,233,.08) 0%,rgba(59,130,246,.08) 100%);}
+#routeSelectorTitle{font-size:14px;font-weight:800;background:linear-gradient(135deg,#0ea5e9 0%,#3b82f6 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;flex:1;letter-spacing:.5px;}
+#routeSelectorClose{cursor:pointer;color:#64748b;font-size:18px;padding:3px 8px;border-radius:6px;transition:.15s;font-weight:700;}
+#routeSelectorClose:hover{color:#1e293b;background:rgba(0,0,0,.06);}
+#routeSelectorBody{overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px;}
+#routeSelectorBody::-webkit-scrollbar{width:5px;}
+#routeSelectorBody::-webkit-scrollbar-track{background:transparent;}
+#routeSelectorBody::-webkit-scrollbar-thumb{background:rgba(59,130,246,.3);border-radius:3px;}
+#routeSelectorActions{display:flex;justify-content:flex-end;margin-bottom:4px;}
+.route-compare-btn{font-size:11px;color:#3b82f6;cursor:pointer;font-weight:700;padding:5px 12px;border:1px solid rgba(59,130,246,.3);border-radius:8px;background:rgba(59,130,246,.05);transition:.15s;user-select:none;}
+.route-compare-btn:hover{background:rgba(59,130,246,.12);}
+.route-compare-btn.active{background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);color:#fff;border-color:transparent;box-shadow:0 2px 8px rgba(59,130,246,.3);}
+#routeSelectorList{display:flex;flex-direction:column;gap:8px;}
+.route-option-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid rgba(0,0,0,.08);border-radius:10px;cursor:pointer;transition:.15s;background:rgba(255,255,255,.6);}
+.route-option-item:hover{border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.04);transform:translateX(2px);}
+.route-option-item.selected{border-color:#3b82f6;background:linear-gradient(135deg,rgba(59,130,246,.08) 0%,rgba(14,165,233,.08) 100%);box-shadow:0 2px 10px rgba(59,130,246,.15);}
+.route-option-color{width:14px;height:14px;border-radius:50%;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.2);}
+.route-option-info{flex:1;min-width:0;}
+.route-option-name{font-size:13px;font-weight:700;color:#1e293b;margin-bottom:2px;display:flex;align-items:center;gap:6px;}
+.route-option-policy{font-size:10px;font-weight:600;color:#64748b;background:rgba(0,0,0,.05);padding:1px 6px;border-radius:4px;}
+.route-option-detail{font-size:11px;color:#475569;font-weight:500;}
+.route-option-detail b{color:#2563eb;font-weight:700;}
+.route-option-badge{font-size:10px;font-weight:700;color:#fff;padding:2px 7px;border-radius:5px;flex-shrink:0;}
+
+
 /* ===== 省会距离面板 ===== */
 #distPanel{position:absolute;right:14px;top:100px;width:280px;max-width:86vw;max-height:60vh;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.14);z-index:250;display:none;overflow:hidden;flex-direction:column;}
 #distPanel.open{display:flex;}
@@ -254,6 +282,7 @@ button{font-family:inherit;}
   
   #panel{right:8px;left:8px;bottom:8px;top:auto;width:auto;max-width:none;max-height:50vh;border-radius:12px;}
   #distPanel{right:8px;left:8px;bottom:8px;top:auto;width:auto;max-width:none;max-height:55vh;border-radius:12px;}
+  #routeSelectorModal{right:8px;left:8px;bottom:8px;top:auto;width:auto;max-width:none;max-height:55vh;border-radius:12px;}
   
   .city-item{padding:6px 10px;font-size:11px;}
   .city-province{font-size:9px;}
@@ -373,14 +402,6 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <span class="route-summary-label">路段</span>
           <span class="route-summary-value" id="totalSegs">-</span>
         </div>
-      </div>
-      <!-- 路线选择器（两点之间时显示） -->
-      <div class="route-selector" id="routeSelector" style="display:none;">
-        <div class="route-selector-header">
-          <span class="route-selector-title">🛣️ 备选路线</span>
-          <span class="route-selector-toggle" id="toggleAllRoutesBtn" onclick="toggleShowAllRoutes()">📊 对比：关</span>
-        </div>
-        <div class="route-selector-list" id="routeSelectorList"></div>
       </div>
       <!-- 路线路况统计 -->
       <div class="traffic-stats" id="trafficStats" style="display:none;">
@@ -517,6 +538,20 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
     <ul id="segList"></ul>
   </div>
   <div class="footnote">数据来源：高德地图驾车路线规划</div>
+</div>
+
+<!-- 路线选择器浮动弹窗（两点之间多条备选路线时显示） -->
+<div id="routeSelectorModal" style="display:none;">
+  <div id="routeSelectorHead">
+    <span id="routeSelectorTitle">🛣️ 备选路线</span>
+    <span id="routeSelectorClose" title="关闭" onclick="closeRouteSelector()">&#10005;</span>
+  </div>
+  <div id="routeSelectorBody">
+    <div id="routeSelectorActions">
+      <span class="route-compare-btn" id="compareBtn" onclick="toggleShowAllRoutes()">📊 对比：关</span>
+    </div>
+    <div id="routeSelectorList"></div>
+  </div>
 </div>
 
 <script>
@@ -1799,6 +1834,12 @@ function planNextSegment(version) {
     }
     updateRouteSummary();
     updateRouteSelector();
+    // 两点之间有多条备选路线时，自动弹出路线选择器
+    const normalPoints = routePoints.filter(p => !p.isVia);
+    if(normalPoints.length === 2 && routeSegments.length > 0 && routeSegments[0].allRoutes && routeSegments[0].allRoutes.length > 1) {
+      const modal = document.getElementById('routeSelectorModal');
+      if(modal) modal.classList.add('open');
+    }
     // 如果规划过程中有新的点添加，需要重新规划
     if(needsReplan && routePoints.length >= 2) {
       needsReplan = false;
@@ -1886,7 +1927,7 @@ function toggleCenterViaCapital() {
 // 切换是否显示所有备选路线做对比
 function toggleShowAllRoutes() {
   showAllRoutes = !showAllRoutes;
-  const btn = document.getElementById('toggleAllRoutesBtn');
+  const btn = document.getElementById('compareBtn');
   if(btn) {
     btn.textContent = '📊 对比：' + (showAllRoutes ? '开' : '关');
     btn.classList.toggle('active', showAllRoutes);
@@ -1896,11 +1937,19 @@ function toggleShowAllRoutes() {
   }
 }
 
+// 关闭路线选择器
+function closeRouteSelector() {
+  const modal = document.getElementById('routeSelectorModal');
+  if(modal) modal.classList.remove('open');
+}
+
 // 选择某条备选路线
 function selectRoute(routeIndex) {
   if(routeSegments.length === 0) return;
   const seg = routeSegments[0]; // 两点之间只有一段
   if(!seg.allRoutes || routeIndex >= seg.allRoutes.length) return;
+  if(seg.selectedRouteIndex === routeIndex) return; // 已经是选中的，不重复操作
+  
   seg.selectedRouteIndex = routeIndex;
   seg.route = seg.allRoutes[routeIndex];
   // 清除路况统计缓存
@@ -1909,37 +1958,45 @@ function selectRoute(routeIndex) {
   updateRouteSelector();
   updateRouteSummary();
   updateTrafficStats();
+  tipDom.innerHTML = '✅ 已切换到路线 ' + (routeIndex + 1) + '（' + (seg.allRoutes[routeIndex].policyName || '默认') + '）';
 }
 
 // 更新路线选择器
 function updateRouteSelector() {
-  const selector = document.getElementById('routeSelector');
+  const modal = document.getElementById('routeSelectorModal');
   const list = document.getElementById('routeSelectorList');
-  if(!selector || !list) return;
+  const compareBtn = document.getElementById('compareBtn');
+  if(!modal || !list) return;
   
   // 只有两点之间（一段路线）且有多条备选路线时才显示
   const normalPoints = routePoints.filter(p => !p.isVia);
   if(normalPoints.length !== 2 || routeSegments.length === 0) {
-    selector.style.display = 'none';
+    modal.classList.remove('open');
     return;
   }
   
   const seg = routeSegments[0];
   if(!seg.allRoutes || seg.allRoutes.length <= 1) {
-    selector.style.display = 'none';
+    modal.classList.remove('open');
     return;
   }
   
-  selector.style.display = 'block';
+  // 更新对比按钮状态
+  if(compareBtn) {
+    compareBtn.textContent = '📊 对比：' + (showAllRoutes ? '开' : '关');
+    compareBtn.classList.toggle('active', showAllRoutes);
+  }
+  
   list.innerHTML = '';
   
   for(let i = 0; i < seg.allRoutes.length; i++) {
     const route = seg.allRoutes[i];
     const isSelected = i === seg.selectedRouteIndex;
     const color = ROUTE_OPTION_COLORS[i % ROUTE_OPTION_COLORS.length];
+    const policyName = route.policyName || '默认策略';
     
     const option = document.createElement('div');
-    option.className = 'route-option' + (isSelected ? ' selected' : '');
+    option.className = 'route-option-item' + (isSelected ? ' selected' : '');
     option.onclick = function() { selectRoute(i); };
     
     let badge = '';
@@ -1950,8 +2007,10 @@ function updateRouteSelector() {
     option.innerHTML = 
       '<div class="route-option-color" style="background:' + color + ';"></div>' +
       '<div class="route-option-info">' +
-        '<div class="route-option-name">路线 ' + (i+1) + '</div>' +
-        '<div class="route-option-detail">' + (route.distance/1000).toFixed(1) + 'km · ' + formatTime(route.time) + '</div>' +
+        '<div class="route-option-name">路线 ' + (i+1) + 
+          '<span class="route-option-policy">' + policyName + '</span>' +
+        '</div>' +
+        '<div class="route-option-detail"><b>' + (route.distance/1000).toFixed(1) + 'km</b> · ' + formatTime(route.time) + '</div>' +
       '</div>' + badge;
     
     list.appendChild(option);
@@ -2492,8 +2551,8 @@ function showSegmentInfo(seg, position) {
   }
 }
 
-// 选择某段路线的备选路线
-function selectRoute(segmentIndex, routeIndex) {
+// 选择某段路线的备选路线（多段路线时使用）
+function selectSegmentRoute(segmentIndex, routeIndex) {
   if(segmentIndex < 0 || segmentIndex >= routeSegments.length) return;
   const seg = routeSegments[segmentIndex];
   if(!seg.allRoutes || routeIndex >= seg.allRoutes.length) return;
@@ -3394,6 +3453,9 @@ function clearRoute() {
   if(currentDriving) { currentDriving.clear(); currentDriving = null; }
   clearRoutePolylines();
   panel.classList.remove("open");
+  // 关闭路线选择器弹窗
+  const routeModal = document.getElementById('routeSelectorModal');
+  if(routeModal) routeModal.classList.remove('open');
   tipDom.textContent = "📌 路线已清空，点击城市重新开始";
   renderRouteBar();
   renderCityList();
