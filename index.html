@@ -2077,7 +2077,11 @@ function updateRouteSelector() {
   } else {
     // 多个途径点：显示每一段的所有备选路线，可点击切换
     if(title) title.textContent = '🛣️ 分段备选路线';
-    if(compareBtn) compareBtn.style.display = 'none';
+    if(compareBtn) {
+      compareBtn.style.display = 'flex';
+      compareBtn.textContent = '📊 对比：' + (showAllRoutes ? '开' : '关');
+      compareBtn.classList.toggle('active', showAllRoutes);
+    }
     
     list.innerHTML = '';
     
@@ -2299,8 +2303,8 @@ function drawAllSegments() {
     const seg = routeSegments[s];
     if(!seg.route || !seg.route.steps) continue;
     
-    // 如果该段有多条备选路线，先绘制未选中的（浅色、细线、半透明）
-    if(seg.allRoutes && seg.allRoutes.length > 1) {
+    // 如果该段有多条备选路线且对比开关打开，先绘制未选中的（浅色、细线、半透明）
+    if(showAllRoutes && seg.allRoutes && seg.allRoutes.length > 1) {
       for(let r = 0; r < seg.allRoutes.length; r++) {
         if(r === seg.selectedRouteIndex) continue; // 跳过选中的，后面单独绘制
         const route = seg.allRoutes[r];
