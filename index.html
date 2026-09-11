@@ -593,6 +593,9 @@ let routeTrafficStats = null; // 路线路况统计
 let centerViaCapital = false; // 中心之间是否通过最近省会中转
 let showAllRoutes = false; // 是否显示所有备选路线做对比
 let excludedTransferCapitals = []; // 用户手动删除的中转城市，不再自动插入
+let planDebounceTimer = null; // 规划防抖定时器
+let isPlanningRoute = false; // 是否正在规划路线
+let needsReplan = false; // 规划完成后是否需要重新规划
 const ROUTE_OPTION_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 const tipDom = document.getElementById('tip');
@@ -937,12 +940,12 @@ function initMap() {
   CITIES.forEach(function(city) {
     const marker = new AMap.CircleMarker({
       center: [city.lng, city.lat],
-      radius: city.isCenter ? 7 : 2.5,
-      fillColor: city.isCenter ? "#2563eb" : "#93c5fd",
-      fillOpacity: city.isCenter ? 0.7 : 0.25,
-      strokeColor: city.isCenter ? "#1d4ed8" : "#bfdbfe",
-      strokeOpacity: city.isCenter ? 0.9 : 0.3,
-      strokeWeight: city.isCenter ? 2 : 1,
+      radius: city.isCenter ? 7 : 4,
+      fillColor: city.isCenter ? "#2563eb" : "#60a5fa",
+      fillOpacity: city.isCenter ? 0.7 : 0.5,
+      strokeColor: city.isCenter ? "#1d4ed8" : "#3b82f6",
+      strokeOpacity: city.isCenter ? 0.9 : 0.6,
+      strokeWeight: city.isCenter ? 2 : 1.5,
       cursor: "pointer",
       extData: city,
       zIndex: city.isCenter ? 120 : 80
@@ -953,12 +956,12 @@ function initMap() {
     // hover时普通城市变明显
     marker.on("mouseover", function(e) {
       if(!city.isCenter) {
-        marker.setOptions({radius: 5, fillOpacity: 0.6, strokeOpacity: 0.7});
+        marker.setOptions({radius: 6, fillOpacity: 0.8, strokeOpacity: 0.9});
       }
     });
     marker.on("mouseout", function(e) {
       if(!city.isCenter) {
-        marker.setOptions({radius: 2.5, fillOpacity: 0.25, strokeOpacity: 0.3});
+        marker.setOptions({radius: 4, fillOpacity: 0.5, strokeOpacity: 0.6});
       }
     });
     marker.setMap(map);
@@ -1757,6 +1760,8 @@ function planFullRoute() {
   planVersion++;
 
   isPlanning = true;
+  isPlanningRoute = true;
+  needsReplan = false;
   segmentPlanIndex = 0;
   
   // 显示加载指示器
@@ -1774,6 +1779,7 @@ function planNextSegment(version) {
   if(segmentPlanIndex >= routePoints.length - 1) {
     // 所有段规划完成，统一绘制
     isPlanning = false;
+    isPlanningRoute = false;
     hideLoading();
     drawAllSegments();
     updateFullRouteSummary();
@@ -1793,6 +1799,11 @@ function planNextSegment(version) {
     }
     updateRouteSummary();
     updateRouteSelector();
+    // 如果规划过程中有新的点添加，需要重新规划
+    if(needsReplan && routePoints.length >= 2) {
+      needsReplan = false;
+      setTimeout(function() { planFullRoute(); }, 200);
+    }
     return;
   }
   
@@ -1981,7 +1992,7 @@ function planSingleRoute(version, start, end, retryCount, policy) {
   
   driving.search([start.lng, start.lat], [end.lng, end.lat], function(status, result) {
     clearTimeout(timeoutId);
-    if(version !== planVersion) return;
+    if(version !== planVersion) { if(driving) driving.clear(); return; }
     
     const success = status === "complete" && result.routes && result.routes.length > 0;
     if(success) {
@@ -1989,6 +2000,8 @@ function planSingleRoute(version, start, end, retryCount, policy) {
     } else {
       handleSegmentResult(version, start, end, retryCount, false, null, null);
     }
+    // 销毁Driving对象，避免内存泄漏
+    if(driving) driving.clear();
   });
 }
 
@@ -2025,7 +2038,7 @@ function planMultiRoutes(version, start, end, retryCount) {
     
     driving.search([start.lng, start.lat], [end.lng, end.lat], function(status, result) {
       clearTimeout(timeoutId);
-      if(version !== planVersion) return;
+      if(version !== planVersion) { if(driving) driving.clear(); return; }
       
       if(status === "complete" && result.routes && result.routes.length > 0) {
         const route = result.routes[0];
@@ -2046,6 +2059,8 @@ function planMultiRoutes(version, start, end, retryCount) {
           hasSuccess = true;
         }
       }
+      // 销毁Driving对象，避免内存泄漏
+      if(driving) driving.clear();
       completed++;
       checkAllDone();
     });
@@ -3230,7 +3245,16 @@ function addPoint(city) {
   renumberMarkers();
   if(routePoints.length >= 2) {
     tipDom.innerHTML = "🚗 正在规划路线（" + routePoints.length + "个点）...";
-    planFullRoute();
+    // 防抖：300ms内多次添加点只规划一次
+    if(planDebounceTimer) clearTimeout(planDebounceTimer);
+    planDebounceTimer = setTimeout(function() {
+      if(isPlanningRoute) {
+        // 正在规划中，标记需要重新规划
+        needsReplan = true;
+      } else {
+        planFullRoute();
+      }
+    }, 300);
   } else {
     map.setZoomAndCenter(6, [city.lng, city.lat], false, 300);
     tipDom.innerHTML = "✅ 起点：<b>" + city.name + "</b>（" + city.province + "），请继续点击添加下一个点";
@@ -3255,7 +3279,15 @@ function removePointAt(idx) {
     "📌 路线已清空，点击城市重新开始";
   renderRouteBar();
   renderCityList();
-  planFullRoute();
+  // 防抖：避免快速连续删除导致多次规划
+  if(planDebounceTimer) clearTimeout(planDebounceTimer);
+  planDebounceTimer = setTimeout(function() {
+    if(isPlanningRoute) {
+      needsReplan = true;
+    } else {
+      planFullRoute();
+    }
+  }, 300);
 }
 
 // 一键添加所有中心城市为路线点
@@ -3348,6 +3380,11 @@ function optimizeRouteOrderBtn() {
 }
 
 function clearRoute() {
+  // 取消正在进行的规划
+  planVersion++;
+  isPlanningRoute = false;
+  needsReplan = false;
+  if(planDebounceTimer) { clearTimeout(planDebounceTimer); planDebounceTimer = null; }
   routePoints.forEach(function(p) {
     if(p.marker) map.remove(p.marker);
     if(p.label) map.remove(p.label);
