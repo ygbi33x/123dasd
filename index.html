@@ -2433,8 +2433,11 @@ function planSingleRadialRoute(destObj, callback) {
             polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.95});
             const lng = e.lnglat.getLng();
             const lat = e.lnglat.getLat();
-            // 直接使用当前polyline对应的destObj，不用findNearestRadialRoute查找
-            showRadialSegmentInfo(destObj, [lng, lat]);
+            // 多条路线重叠时，显示距离鼠标位置最近的那条
+            const nearest = findNearestRadialRoute(lng, lat);
+            if(nearest) {
+              showRadialSegmentInfo(nearest, [lng, lat]);
+            }
           });
           polyline.on('mouseout', function() {
             polyline.setOptions({strokeWeight: 5, strokeOpacity: 0.7});
@@ -2534,8 +2537,11 @@ function planRadialNext(version) {
             polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.95});
             const lng = e.lnglat.getLng();
             const lat = e.lnglat.getLat();
-            // 直接使用当前polyline对应的destObj，不用findNearestRadialRoute查找
-            showRadialSegmentInfo(destObj, [lng, lat]);
+            // 多条路线重叠时，显示距离鼠标位置最近的那条
+            const nearest = findNearestRadialRoute(lng, lat);
+            if(nearest) {
+              showRadialSegmentInfo(nearest, [lng, lat]);
+            }
           });
           polyline.on('mouseout', function() {
             polyline.setOptions({strokeWeight: 5, strokeOpacity: 0.7});
