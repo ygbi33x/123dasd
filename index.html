@@ -845,7 +845,7 @@ let sidebarHoverTimer = null;
 function toggleBrowserFullscreen() {
   if(!document.fullscreenElement) {
     document.documentElement.requestFullscreen().catch(function(err) {
-      console.log('全屏失败:', err);
+      // 全屏失败时静默处理
     });
     enterFullscreenMode();
   } else {
@@ -3576,6 +3576,7 @@ function clearRoute() {
     if(p.label) map.remove(p.label);
   });
   routePoints = [];
+  routeSegments = []; // 清空路线段数据
   excludedTransferCapitals = []; // 清空中转排除列表
   if(currentDriving) { currentDriving.clear(); currentDriving = null; }
   clearRoutePolylines();
@@ -3588,6 +3589,7 @@ function clearRoute() {
   tipDom.textContent = "📌 路线已清空，点击城市重新开始";
   renderRouteBar();
   renderCityList();
+  updateRouteSummary();
 }
 
 // 切换实时路况图层
@@ -3635,7 +3637,6 @@ function startTrafficAutoRefresh() {
   trafficRefreshTimer = setInterval(function() {
     if(trafficEnabled) {
       enableTrafficLayer();
-      console.log('路况已自动刷新:', new Date().toLocaleTimeString());
     }
   }, 3 * 60 * 1000); // 3分钟
 }
