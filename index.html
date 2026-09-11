@@ -404,8 +404,12 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <span class="route-summary-value" id="totalDist">-</span>
         </div>
         <div class="route-summary-item">
-          <span class="route-summary-label">总时间</span>
+          <span class="route-summary-label">驾车时间</span>
           <span class="route-summary-value" id="totalTime">-</span>
+        </div>
+        <div class="route-summary-item">
+          <span class="route-summary-label">理论时效</span>
+          <span class="route-summary-value" id="totalDesignTime" style="color:#059669;">-</span>
         </div>
         <div class="route-summary-item">
           <span class="route-summary-label">路段</span>
@@ -478,6 +482,15 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <div class="more-menu-wrap">
             <button class="btn more-btn" onclick="toggleMoreMenu()">☰ 菜单</button>
             <div class="more-menu" id="moreMenu">
+              <div class="more-item" style="cursor:default;padding:10px 18px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                  <span style="font-size:12px;font-weight:700;color:#334155;">🚚 设计时速</span>
+                  <div style="display:flex;align-items:center;gap:4px;">
+                    <input type="number" id="designSpeedInput" value="60" min="20" max="200" style="width:50px;padding:3px 6px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;text-align:center;" onchange="setDesignSpeed(this.value)">
+                    <span style="font-size:11px;color:#64748b;">km/h</span>
+                  </div>
+                </div>
+              </div>
               <div class="more-item" onclick="toggleAvoidTraffic();toggleMoreMenu()" id="avoidTrafficMenuItem">🚗 避开拥堵：关</div>
               <div class="more-item" onclick="toggleCenterViaCapital();toggleMoreMenu()" id="centerViaCapitalMenuItem">🔄 中心中转省会：关</div>
               <div class="more-item" onclick="exportRouteCSV();toggleMoreMenu()">📊 导出路线数据</div>
@@ -638,6 +651,7 @@ let routeTrafficStats = null; // 路线路况统计
 let centerViaCapital = false; // 中心之间是否通过最近省会中转
 let showAllRoutes = false; // 是否显示所有备选路线做对比
 let excludedTransferCapitals = []; // 用户手动删除的中转城市，不再自动插入
+let designSpeed = 60; // 设计时速（km/h），用于计算物流时效
 let planDebounceTimer = null; // 规划防抖定时器
 let isPlanningRoute = false; // 是否正在规划路线
 let needsReplan = false; // 规划完成后是否需要重新规划
@@ -1342,9 +1356,28 @@ function renderRouteBar() {
 }
 
 // 更新路线总览
+// 设置设计时速
+function setDesignSpeed(value) {
+  const speed = parseFloat(value);
+  if(!isNaN(speed) && speed >= 20 && speed <= 200) {
+    designSpeed = speed;
+    updateRouteSummary();
+    // 更新放射状路线面板（如果有）
+    if(typeof updateRadialPanel === 'function') updateRadialPanel();
+    tipDom.innerHTML = '✅ 设计时速已设置为 ' + speed + ' km/h';
+  }
+}
+
+// 根据设计时速计算理论时效（秒）
+function calcDesignTime(distanceMeters) {
+  if(designSpeed <= 0) return 0;
+  return (distanceMeters / 1000) / designSpeed * 3600; // 距离km / 时速km/h = 小时，转秒
+}
+
 function updateRouteSummary() {
   const totalDistEl = document.getElementById('totalDist');
   const totalTimeEl = document.getElementById('totalTime');
+  const totalDesignTimeEl = document.getElementById('totalDesignTime');
   const totalSegsEl = document.getElementById('totalSegs');
   if(!totalDistEl) return;
   
@@ -1358,6 +1391,11 @@ function updateRouteSummary() {
   
   totalDistEl.textContent = (totalDist / 1000).toFixed(1) + ' km';
   totalTimeEl.textContent = formatTime(totalTime);
+  if(totalDesignTimeEl) {
+    const designTime = calcDesignTime(totalDist);
+    totalDesignTimeEl.textContent = formatTime(designTime);
+    totalDesignTimeEl.title = '按设计时速 ' + designSpeed + ' km/h 计算';
+  }
   totalSegsEl.textContent = routeSegments.length + ' 段';
   
   // 计算路线路况统计
@@ -2591,13 +2629,17 @@ function showSegmentInfo(seg, position) {
       '</div></div>';
   }
   
+  const designTime = calcDesignTime(seg.route.distance || 0);
+  const designTimeStr = formatTime(designTime);
+  
   const content = '<div style="padding:10px 14px;min-width:220px;">' +
     '<div style="font-weight:700;font-size:15px;color:#1f2937;margin-bottom:6px;">路段详情</div>' +
     '<div style="font-size:13px;color:#374151;line-height:1.8;">' +
     '<div>🚩 出发地：<b>' + startName + '</b></div>' +
     '<div>🏁 目的地：<b>' + endName + '</b></div>' +
     '<div>📏 距离：<b>' + distanceKm + ' km</b></div>' +
-    '<div>⏱️ 预计：<b>' + timeStr + '</b></div>' +
+    '<div>⏱️ 驾车时间：<b>' + timeStr + '</b></div>' +
+    '<div>🚚 理论时效：<b style="color:#059669;">' + designTimeStr + '</b> <span style="font-size:10px;color:#94a3b8;">(' + designSpeed + 'km/h)</span></div>' +
     '</div>' + trafficDetailHtml + '</div>';
   
   // 复用InfoWindow，不每次创建
@@ -3319,10 +3361,12 @@ function updateRadialSummary() {
     }
   }
   
+  const totalDesignTime = calcDesignTime(totalKm);
   document.getElementById("pMeta").innerHTML =
     "<span>出发地：<b style='color:#dc2626;'>" + radialOrigin.city.name + "</b></span><br>" +
     "<span>目的地：<b>" + radialDestinations.length + "</b> 个 · 成功 <b>" + successCount + "</b> 条</span><br>" +
-    "<span>总里程：<b style='color:#dc2626;'>" + (totalKm/1000).toFixed(1) + " km</b></span>";
+    "<span>总里程：<b style='color:#dc2626;'>" + (totalKm/1000).toFixed(1) + " km</b></span><br>" +
+    "<span>理论时效：<b style='color:#059669;'>" + formatTime(totalDesignTime) + "</b> <span style='font-size:10px;color:#94a3b8;'>(" + designSpeed + "km/h)</span></span>";
   
   const segList = document.getElementById("segList");
   segList.innerHTML = "";
@@ -3330,10 +3374,12 @@ function updateRadialSummary() {
     const dest = radialDestinations[i];
     const km = dest.route ? (dest.route.distance / 1000).toFixed(1) : '-';
     const timeStr = dest.route ? formatTime(dest.route.time) : '-';
+    const designTimeStr = dest.route ? formatTime(calcDesignTime(dest.route.distance)) : '-';
     segList.innerHTML += '<div class="seg-item"><span class="seg-idx">' + (i+1) + '</span>' +
       '<span class="seg-name">' + dest.city.name + '</span>' +
       '<span class="seg-dist">' + km + ' km</span>' +
-      '<span class="seg-time">' + timeStr + '</span></div>';
+      '<span class="seg-time">' + timeStr + '</span>' +
+      '<span class="seg-time" style="color:#059669;">' + designTimeStr + '</span></div>';
   }
   panel.classList.add("open");
   
@@ -3922,28 +3968,29 @@ function exportRouteCSV() {
     if(routePoints.length > 2) filename += '经' + (routePoints.length-2) + '点-';
     filename += routePoints[routePoints.length-1].city.name + '.csv';
     
-    rows.push(['序号', '起点', '终点', '距离(km)', '时间', '途经']);
+    rows.push(['序号', '起点', '终点', '距离(km)', '驾车时间', '理论时效(' + designSpeed + 'km/h)', '途经']);
     let totalDist = 0, totalTime = 0;
     for(let i = 0; i < routeSegments.length; i++) {
       const seg = routeSegments[i];
       const dist = seg.route ? (seg.route.distance / 1000).toFixed(1) : '-';
       const time = seg.route ? formatTime(seg.route.time) : '-';
+      const designTime = seg.route ? formatTime(calcDesignTime(seg.route.distance)) : '-';
       const via = seg.route && seg.route.steps ? seg.route.steps.length + '段' : '-';
-      rows.push([i+1, seg.startCity.name, seg.endCity.name, dist, time, via]);
+      rows.push([i+1, seg.startCity.name, seg.endCity.name, dist, time, designTime, via]);
       if(seg.route) {
         totalDist += seg.route.distance || 0;
         totalTime += seg.route.time || 0;
       }
     }
     rows.push([]);
-    rows.push(['合计', '', '', (totalDist/1000).toFixed(1) + ' km', formatTime(totalTime), routeSegments.length + '段']);
+    rows.push(['合计', '', '', (totalDist/1000).toFixed(1) + ' km', formatTime(totalTime), formatTime(calcDesignTime(totalDist)), routeSegments.length + '段']);
   } else {
     if(!radialOrigin || radialDestinations.length === 0) {
       alert('请先在放射状模式下规划路线');
       return;
     }
     filename = '放射状路线_' + radialOrigin.city.name + '出发.csv';
-    rows.push(['序号', '出发地', '目的地', '距离(km)', '时间', '状态']);
+    rows.push(['序号', '出发地', '目的地', '距离(km)', '驾车时间', '理论时效(' + designSpeed + 'km/h)', '状态']);
     const sorted = radialDestinations.slice().sort(function(a, b) {
       const da = a.route ? a.route.distance : Infinity;
       const db = b.route ? b.route.distance : Infinity;
@@ -3954,12 +4001,13 @@ function exportRouteCSV() {
       const d = sorted[i];
       const dist = d.route ? (d.route.distance / 1000).toFixed(1) : '-';
       const time = d.route ? formatTime(d.route.time) : '-';
+      const designTime = d.route ? formatTime(calcDesignTime(d.route.distance)) : '-';
       const status = d.route ? '已规划' : '未规划';
-      rows.push([i+1, radialOrigin.city.name, d.city.name, dist, time, status]);
+      rows.push([i+1, radialOrigin.city.name, d.city.name, dist, time, designTime, status]);
       if(d.route) totalDist += d.route.distance || 0;
     }
     rows.push([]);
-    rows.push(['合计', radialOrigin.city.name, sorted.length + '个目的地', (totalDist/1000).toFixed(1) + ' km', '', '']);
+    rows.push(['合计', radialOrigin.city.name, sorted.length + '个目的地', (totalDist/1000).toFixed(1) + ' km', '', formatTime(calcDesignTime(totalDist)), '']);
   }
   
   // 生成CSV
