@@ -425,6 +425,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
             <button class="btn more-btn" onclick="toggleMoreMenu()">☰ 菜单</button>
             <div class="more-menu" id="moreMenu">
               <div class="more-item" onclick="toggleAvoidTraffic();toggleMoreMenu()" id="avoidTrafficMenuItem">🚗 避开拥堵：关</div>
+              <div class="more-item" onclick="toggleCenterViaCapital();toggleMoreMenu()" id="centerViaCapitalMenuItem">🔄 中心中转省会：关</div>
               <div class="more-item" onclick="exportRouteCSV();toggleMoreMenu()">📊 导出路线数据</div>
               <div class="more-item" onclick="shareRouteLink();toggleMoreMenu()">🔗 复制分享链接</div>
               <div class="more-item" onclick="exportMapImage();toggleMoreMenu()">📷 导出图片</div>
@@ -566,6 +567,7 @@ let trafficRefreshTimer = null;
 let lastTrafficUpdate = null;
 let avoidTraffic = false; // 是否避开拥堵规划
 let routeTrafficStats = null; // 路线路况统计
+let centerViaCapital = false; // 中心之间是否通过最近省会中转
 
 const tipDom = document.getElementById('tip');
 const panel = document.getElementById('panel');
@@ -1232,12 +1234,21 @@ function renderRouteBar() {
     }
     const tag = document.createElement('span');
     tag.className = 'route-point-tag';
-    tag.title = '点击取消此点';
+    tag.title = p.isVia ? '中转点（自动插入）' : '点击取消此点';
+    
+    // 中转点样式
+    if(p.isVia) {
+      tag.style.background = 'rgba(148,163,184,.15)';
+      tag.style.borderColor = 'rgba(100,116,139,.4)';
+      tag.style.color = '#64748b';
+      tag.style.opacity = '0.85';
+    }
     
     // 编号 + 城市名
-    let html = '<span class="num">' + (idx+1) + '</span>' + p.city.name;
+    let html = '<span class="num" style="' + (p.isVia ? 'background:#94a3b8;' : '') + '">' + (p.isVia ? '中' : (idx+1)) + '</span>' + p.city.name;
+    if(p.isVia) html += '<span style="font-size:9px;color:#94a3b8;margin-left:2px;">中转</span>';
     
-    // 上移/下移/删除按钮（多点路线模式下）
+    // 上移/下移/删除按钮（多点路线模式下，中转点也可以删除）
     if(routePoints.length > 1) {
       html += '<span class="point-actions">';
       if(idx > 0) html += '<button class="point-action-btn" title="上移" onclick="event.stopPropagation();movePointUp(' + idx + ')">↑</button>';
@@ -1651,6 +1662,47 @@ function planFullRoute() {
   clearRoutePolylines();
   routeSegments = [];
   
+  // 清除之前的中转点
+  for(let i = routePoints.length - 1; i >= 0; i--) {
+    if(routePoints[i].isVia) {
+      if(routePoints[i].marker) map.remove(routePoints[i].marker);
+      if(routePoints[i].label) map.remove(routePoints[i].label);
+      routePoints.splice(i, 1);
+    }
+  }
+  
+  // 中心中转省会模式：在非省会中心之间插入最近省会作为中转
+  if(centerViaCapital) {
+    const newPoints = [];
+    for(let i = 0; i < routePoints.length; i++) {
+      newPoints.push(routePoints[i]);
+      if(i < routePoints.length - 1) {
+        const cur = routePoints[i].city;
+        const next = routePoints[i + 1].city;
+        // 如果两个点都是中心且都不是省会，则插入最近省会
+        if(cur.isCenter && next.isCenter && !isCapital(cur) && !isCapital(next)) {
+          const nearestCap = findNearestCapital(cur);
+          if(nearestCap && nearestCap.name !== cur.name && nearestCap.name !== next.name) {
+            // 创建中转点标记（灰色小圆点）
+            const viaMarker = new AMap.CircleMarker({
+              center: [nearestCap.lng, nearestCap.lat],
+              radius: 5,
+              fillColor: "#94a3b8",
+              fillOpacity: 0.8,
+              strokeColor: "#64748b",
+              strokeOpacity: 0.9,
+              strokeWeight: 1.5,
+              zIndex: 100
+            });
+            map.add(viaMarker);
+            newPoints.push({city: nearestCap, marker: viaMarker, label: null, isVia: true});
+          }
+        }
+      }
+    }
+    routePoints = newPoints;
+  }
+  
   // 递增版本号，旧的规划回调会被忽略
   planVersion++;
 
@@ -1713,6 +1765,40 @@ function getCurrentPolicy() {
     return AMap.DrivingPolicy.REAL_TRAFFIC || AMap.DrivingPolicy.LEAST_TIME;
   }
   return AMap.DrivingPolicy.LEAST_TIME;
+}
+
+// 判断城市是否为省会
+function isCapital(city) {
+  return CAPITAL_NAMES.indexOf(city.name) >= 0;
+}
+
+// 找到离指定城市最近的省会
+function findNearestCapital(city) {
+  let nearest = null;
+  let minDist = Infinity;
+  for(let i = 0; i < CAPITALS.length; i++) {
+    const cap = CAPITALS[i];
+    const d = Math.sqrt((cap.lng - city.lng)**2 + (cap.lat - city.lat)**2);
+    if(d < minDist) {
+      minDist = d;
+      nearest = cap;
+    }
+  }
+  return nearest;
+}
+
+// 切换中心中转省会模式
+function toggleCenterViaCapital() {
+  centerViaCapital = !centerViaCapital;
+  const item = document.getElementById('centerViaCapitalMenuItem');
+  if(item) {
+    item.innerHTML = '🔄 中心中转省会：' + (centerViaCapital ? '开' : '关');
+    item.style.color = centerViaCapital ? '#2563eb' : '#334155';
+    item.style.fontWeight = centerViaCapital ? '700' : '600';
+  }
+  if(centerViaCapital && routePoints.length >= 2) {
+    tipDom.innerHTML = '✅ 已开启中心中转省会模式，非省会中心之间将通过最近省会中转';
+  }
 }
 
 function planSegmentWithRetry(version, start, end, retryCount) {
