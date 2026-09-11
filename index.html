@@ -2210,21 +2210,9 @@ function planMultiRoutes(version, start, end, retryCount) {
       if(status === "complete" && result.routes && result.routes.length > 0) {
         const route = result.routes[0];
         route.policyName = policyNames[i];
-        // 去重：如果与已有路线距离和时间都很接近，视为同一条
-        let isDuplicate = false;
-        for(let j = 0; j < allRoutes.length; j++) {
-          const existing = allRoutes[j];
-          const distDiff = Math.abs(existing.distance - route.distance) / Math.max(existing.distance, 1);
-          const timeDiff = Math.abs(existing.time - route.time) / Math.max(existing.time, 1);
-          if(distDiff < 0.02 && timeDiff < 0.02) {
-            isDuplicate = true;
-            break;
-          }
-        }
-        if(!isDuplicate) {
-          allRoutes.push(route);
-          hasSuccess = true;
-        }
+        // 不去重，确保每段都有3条路线，选项类型统一
+        allRoutes.push(route);
+        hasSuccess = true;
       }
       // 销毁Driving对象，避免内存泄漏
       if(driving) driving.clear();
