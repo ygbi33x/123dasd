@@ -2679,6 +2679,10 @@ function replanSegmentWithPolicy(segmentIndex, policy) {
   
   driving.search([seg.startCity.lng, seg.startCity.lat], [seg.endCity.lng, seg.endCity.lat], function(status, result) {
     if(status === "complete" && result.routes && result.routes.length > 0) {
+      // 给每条路线设置policyName
+      for(let i = 0; i < result.routes.length; i++) {
+        result.routes[i].policyName = policyLabel;
+      }
       seg.route = result.routes[0];
       seg.allRoutes = result.routes;
       seg.selectedRouteIndex = 0;
