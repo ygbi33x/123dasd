@@ -1806,9 +1806,8 @@ function drawAllSegments() {
       
       polyline.on('mouseover', function(e) {
         polyline.setOptions({strokeWeight: 9, strokeOpacity: 1});
-        const midIdx = Math.floor(mseg.path.length / 2);
-        const midPos = mseg.path[midIdx];
-        showSegmentInfo(mseg, midPos);
+        // 使用完整的routeSegment显示信息，而不是小段mseg
+        showSegmentInfo(seg, [e.lnglat.getLng(), e.lnglat.getLat()]);
       });
       polyline.on('mouseout', function() {
         polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.85});
@@ -1919,12 +1918,7 @@ function showSegmentInfo(seg, position) {
     segmentInfoWindow = null;
   }
   
-  const distanceKm = (seg.distance / 1000).toFixed(1);
-  const timeStr = formatTime(seg.time);
-  const startName = seg.startCity ? seg.startCity.name : '未知';
-  const endName = seg.endCity ? seg.endCity.name : '未知';
-  
-  // 查找对应的routeSegment以获取所有可选路线
+  // 查找对应的routeSegment以获取完整信息
   let routeSeg = null;
   let segIndex = -1;
   for(let i = 0; i < routeSegments.length; i++) {
@@ -1934,6 +1928,14 @@ function showSegmentInfo(seg, position) {
       break;
     }
   }
+  
+  // 使用完整routeSegment的距离和时间，如果没有则用传入的seg
+  const fullDistance = (routeSeg && routeSeg.route) ? routeSeg.route.distance : (seg.distance || 0);
+  const fullTime = (routeSeg && routeSeg.route) ? routeSeg.route.time : (seg.time || 0);
+  const distanceKm = (fullDistance / 1000).toFixed(1);
+  const timeStr = formatTime(fullTime);
+  const startName = seg.startCity ? seg.startCity.name : '未知';
+  const endName = seg.endCity ? seg.endCity.name : '未知';
   
   let routeOptionsHtml = '';
   let trafficDetailHtml = '';
@@ -2431,10 +2433,8 @@ function planSingleRadialRoute(destObj, callback) {
             polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.95});
             const lng = e.lnglat.getLng();
             const lat = e.lnglat.getLat();
-            const nearest = findNearestRadialRoute(lng, lat);
-            if(nearest) {
-              showRadialSegmentInfo(nearest, [lng, lat]);
-            }
+            // 直接使用当前polyline对应的destObj，不用findNearestRadialRoute查找
+            showRadialSegmentInfo(destObj, [lng, lat]);
           });
           polyline.on('mouseout', function() {
             polyline.setOptions({strokeWeight: 5, strokeOpacity: 0.7});
@@ -2534,10 +2534,8 @@ function planRadialNext(version) {
             polyline.setOptions({strokeWeight: 7, strokeOpacity: 0.95});
             const lng = e.lnglat.getLng();
             const lat = e.lnglat.getLat();
-            const nearest = findNearestRadialRoute(lng, lat);
-            if(nearest) {
-              showRadialSegmentInfo(nearest, [lng, lat]);
-            }
+            // 直接使用当前polyline对应的destObj，不用findNearestRadialRoute查找
+            showRadialSegmentInfo(destObj, [lng, lat]);
           });
           polyline.on('mouseout', function() {
             polyline.setOptions({strokeWeight: 5, strokeOpacity: 0.7});
