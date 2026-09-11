@@ -224,6 +224,10 @@ button{font-family:inherit;}
 .route-option-info{flex:1;min-width:0;}
 .route-option-name{font-size:13px;font-weight:700;color:#1e293b;margin-bottom:2px;display:flex;align-items:center;gap:6px;}
 .route-option-policy{font-size:10px;font-weight:600;color:#64748b;background:rgba(0,0,0,.05);padding:1px 6px;border-radius:4px;}
+.segment-policy-btns{display:flex;gap:4px;margin-top:6px;}
+.seg-policy-btn{flex:1;font-size:10px;padding:3px 4px;border:1px solid #e2e8f0;background:#fff;color:#64748b;border-radius:4px;cursor:pointer;transition:all .15s;}
+.seg-policy-btn:hover{border-color:#3b82f6;color:#3b82f6;}
+.seg-policy-btn.active{background:#3b82f6;color:#fff;border-color:#3b82f6;}
 .route-option-detail{font-size:11px;color:#475569;font-weight:500;}
 .route-option-detail b{color:#2563eb;font-weight:700;}
 .route-option-badge{font-size:10px;font-weight:700;color:#fff;padding:2px 7px;border-radius:5px;flex-shrink:0;}
@@ -1972,12 +1976,14 @@ function updateRouteSelectorBtn() {
   const btn = document.getElementById('routeSelectorBtn');
   if(!btn) return;
   const normalPoints = routePoints.filter(p => !p.isVia);
-  const hasMultipleRoutes = normalPoints.length === 2 && routeSegments.length > 0 && 
+  // 两点之间有多条备选路线，或多个途径点有路线段时都显示
+  const hasTwoPointMultiRoutes = normalPoints.length === 2 && routeSegments.length > 0 && 
     routeSegments[0].allRoutes && routeSegments[0].allRoutes.length > 1;
-  if(hasMultipleRoutes) {
+  const hasMultiPointRoutes = normalPoints.length > 2 && routeSegments.length > 0;
+  if(hasTwoPointMultiRoutes || hasMultiPointRoutes) {
     btn.style.display = 'flex';
     // 添加数量角标
-    const count = routeSegments[0].allRoutes.length;
+    const count = hasTwoPointMultiRoutes ? routeSegments[0].allRoutes.length : routeSegments.length;
     let badge = btn.querySelector('.badge');
     if(!badge) {
       badge = document.createElement('span');
@@ -2013,54 +2019,91 @@ function updateRouteSelector() {
   const modal = document.getElementById('routeSelectorModal');
   const list = document.getElementById('routeSelectorList');
   const compareBtn = document.getElementById('compareBtn');
+  const title = document.getElementById('routeSelectorTitle');
   if(!modal || !list) return;
   
-  // 只有两点之间（一段路线）且有多条备选路线时才显示
   const normalPoints = routePoints.filter(p => !p.isVia);
-  if(normalPoints.length !== 2 || routeSegments.length === 0) {
+  if(routeSegments.length === 0 || normalPoints.length < 2) {
     modal.classList.remove('open');
     return;
   }
   
-  const seg = routeSegments[0];
-  if(!seg.allRoutes || seg.allRoutes.length <= 1) {
-    modal.classList.remove('open');
-    return;
-  }
-  
-  // 更新对比按钮状态
-  if(compareBtn) {
-    compareBtn.textContent = '📊 对比：' + (showAllRoutes ? '开' : '关');
-    compareBtn.classList.toggle('active', showAllRoutes);
-  }
-  
-  list.innerHTML = '';
-  
-  for(let i = 0; i < seg.allRoutes.length; i++) {
-    const route = seg.allRoutes[i];
-    const isSelected = i === seg.selectedRouteIndex;
-    const color = ROUTE_OPTION_COLORS[i % ROUTE_OPTION_COLORS.length];
-    const policyName = route.policyName || '默认策略';
+  // 两点之间：显示多条备选路线
+  if(normalPoints.length === 2) {
+    const seg = routeSegments[0];
+    if(!seg.allRoutes || seg.allRoutes.length <= 1) {
+      // 只有一条路线时也显示，但只有一个选项
+    }
     
-    const option = document.createElement('div');
-    option.className = 'route-option-item' + (isSelected ? ' selected' : '');
-    option.onclick = function() { selectRoute(i); };
+    if(title) title.textContent = '🛣️ 备选路线';
+    if(compareBtn) compareBtn.style.display = 'flex';
     
-    let badge = '';
-    if(i === 0) badge = '<span class="route-option-badge" style="background:#3b82f6;">推荐</span>';
-    else if(route.distance <= seg.allRoutes[0].distance) badge = '<span class="route-option-badge" style="background:#22c55e;">最短</span>';
-    else if(route.time <= seg.allRoutes[0].time) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
+    // 更新对比按钮状态
+    if(compareBtn) {
+      compareBtn.textContent = '📊 对比：' + (showAllRoutes ? '开' : '关');
+      compareBtn.classList.toggle('active', showAllRoutes);
+    }
     
-    option.innerHTML = 
-      '<div class="route-option-color" style="background:' + color + ';"></div>' +
-      '<div class="route-option-info">' +
-        '<div class="route-option-name">路线 ' + (i+1) + 
-          '<span class="route-option-policy">' + policyName + '</span>' +
-        '</div>' +
-        '<div class="route-option-detail"><b>' + (route.distance/1000).toFixed(1) + 'km</b> · ' + formatTime(route.time) + '</div>' +
-      '</div>' + badge;
+    list.innerHTML = '';
+    const routes = seg.allRoutes || [seg.route];
     
-    list.appendChild(option);
+    for(let i = 0; i < routes.length; i++) {
+      const route = routes[i];
+      const isSelected = i === (seg.selectedRouteIndex || 0);
+      const color = ROUTE_OPTION_COLORS[i % ROUTE_OPTION_COLORS.length];
+      const policyName = route.policyName || '默认策略';
+      
+      const option = document.createElement('div');
+      option.className = 'route-option-item' + (isSelected ? ' selected' : '');
+      option.onclick = function() { selectRoute(i); };
+      
+      let badge = '';
+      if(i === 0) badge = '<span class="route-option-badge" style="background:#3b82f6;">推荐</span>';
+      else if(route.distance <= routes[0].distance) badge = '<span class="route-option-badge" style="background:#22c55e;">最短</span>';
+      else if(route.time <= routes[0].time) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
+      
+      option.innerHTML = 
+        '<div class="route-option-color" style="background:' + color + ';"></div>' +
+        '<div class="route-option-info">' +
+          '<div class="route-option-name">路线 ' + (i+1) + 
+            '<span class="route-option-policy">' + policyName + '</span>' +
+          '</div>' +
+          '<div class="route-option-detail"><b>' + (route.distance/1000).toFixed(1) + 'km</b> · ' + formatTime(route.time) + '</div>' +
+        '</div>' + badge;
+      
+      list.appendChild(option);
+    }
+  } else {
+    // 多个途径点：显示每一段的路线，可单独切换策略
+    if(title) title.textContent = '🛣️ 分段路线策略';
+    if(compareBtn) compareBtn.style.display = 'none';
+    
+    list.innerHTML = '';
+    
+    for(let i = 0; i < routeSegments.length; i++) {
+      const seg = routeSegments[i];
+      const currentPolicy = seg.currentPolicy || 'LEAST_TIME';
+      const policyNames = {'LEAST_TIME': '时间最短', 'LEAST_FEE': '费用最少', 'LEAST_DISTANCE': '距离最短'};
+      
+      const item = document.createElement('div');
+      item.className = 'route-option-item selected';
+      item.style.cursor = 'default';
+      
+      item.innerHTML = 
+        '<div class="route-option-info" style="width:100%;">' +
+          '<div class="route-option-name">' + (i+1) + '. ' + seg.startCity.name + ' → ' + seg.endCity.name + '</div>' +
+          '<div class="route-option-detail"><b>' + (seg.route.distance/1000).toFixed(1) + 'km</b> · ' + formatTime(seg.route.time) + 
+            ' <span class="route-option-policy">' + (policyNames[currentPolicy] || '时间最短') + '</span>' +
+          '</div>' +
+          '<div class="segment-policy-btns">' +
+            '<button class="seg-policy-btn' + (currentPolicy === 'LEAST_TIME' ? ' active' : '') + '" onclick="replanSegmentWithPolicy(' + i + ', \'LEAST_TIME\')">⏱ 时间</button>' +
+            '<button class="seg-policy-btn' + (currentPolicy === 'LEAST_FEE' ? ' active' : '') + '" onclick="replanSegmentWithPolicy(' + i + ', \'LEAST_FEE\')">💰 费用</button>' +
+            '<button class="seg-policy-btn' + (currentPolicy === 'LEAST_DISTANCE' ? ' active' : '') + '" onclick="replanSegmentWithPolicy(' + i + ', \'LEAST_DISTANCE\')">📏 距离</button>' +
+          '</div>' +
+        '</div>';
+      
+      list.appendChild(item);
+    }
   }
 }
 
@@ -2118,7 +2161,7 @@ function planMultiRoutes(version, start, end, retryCount) {
   const policies = [
     AMap.DrivingPolicy.LEAST_TIME,
     AMap.DrivingPolicy.LEAST_FEE,
-    AMap.DrivingPolicy.SHORTEST_DISTANCE
+    AMap.DrivingPolicy.LEAST_DISTANCE
   ];
   const policyNames = ['时间最短', '费用最少', '距离最短'];
   
@@ -2612,7 +2655,8 @@ function replanSegmentWithPolicy(segmentIndex, policy) {
     segmentInfoWindow = null;
   }
   
-  tipDom.innerHTML = '⏳ 正在用' + (policy === 'LEAST_TIME' ? '时间优先' : policy === 'LEAST_FEE' ? '费用优先' : '距离优先') + '策略重新规划 ' + seg.startCity.name + ' → ' + seg.endCity.name + '...';
+  const policyLabel = policy === 'LEAST_TIME' ? '时间最短' : policy === 'LEAST_FEE' ? '费用最少' : '距离最短';
+  tipDom.innerHTML = '⏳ 正在用「' + policyLabel + '」策略重新规划 ' + seg.startCity.name + ' → ' + seg.endCity.name + '...';
   
   const policyMap = {
     'LEAST_TIME': AMap.DrivingPolicy.LEAST_TIME,
@@ -2633,12 +2677,16 @@ function replanSegmentWithPolicy(segmentIndex, policy) {
       seg.allRoutes = result.routes;
       seg.selectedRouteIndex = 0;
       seg.currentPolicy = policy;
+      seg._trafficStats = null;
       drawAllSegments();
       updateRouteSummary();
-      tipDom.innerHTML = '✅ 已切换为' + (policy === 'LEAST_TIME' ? '时间优先' : policy === 'LEAST_FEE' ? '费用优先' : '距离优先') + '路线（' + (seg.route.distance / 1000).toFixed(1) + 'km，' + formatTime(seg.route.time) + '）';
+      updateRouteSelector();
+      updateTrafficStats();
+      tipDom.innerHTML = '✅ 已切换为「' + policyLabel + '」路线（' + (seg.route.distance / 1000).toFixed(1) + 'km，' + formatTime(seg.route.time) + '）';
     } else {
       tipDom.innerHTML = '❌ 重新规划失败，请重试';
     }
+    if(driving && typeof driving.clear === 'function') driving.clear();
   });
 }
 
