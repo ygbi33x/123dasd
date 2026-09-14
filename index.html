@@ -1376,18 +1376,9 @@ let tempClickMarker = null;
 let tempInfoWindow = null;
 
 function reverseGeocodeAndShow(lng, lat) {
-  // 移除之前的临时标记
+  // 移除之前的临时标记和信息窗口
   if(tempClickMarker) { map.remove(tempClickMarker); tempClickMarker = null; }
   if(tempInfoWindow) { tempInfoWindow.close(); tempInfoWindow = null; }
-  
-  // 显示临时标记
-  tempClickMarker = new AMap.Marker({
-    position: [lng, lat],
-    content: '<div style="background:rgba(239,68,68,.85);color:#fff;border:2px solid #fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer;">📍</div>',
-    offset: new AMap.Pixel(-13, -13),
-    zIndex: 600
-  });
-  tempClickMarker.setMap(map);
   
   tipDom.innerHTML = "🔍 正在解析位置...";
   
