@@ -446,7 +446,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
     </div>
     <div id="filterArea">
       <div class="search-box">
-        <input type="text" id="searchInput" placeholder="搜索城市名称，回车精确选中..." oninput="debounceSearch(this.value)" onkeypress="if(event.key==='Enter'){if(event.shiftKey){addManualCity();}else{exactSearchSelect(this.value);}}" />
+        <input type="text" id="searchInput" placeholder="搜索城市或具体地址，回车添加..." oninput="debounceSearch(this.value)" onkeypress="if(event.key==='Enter'){if(event.shiftKey){addManualCity();}else{exactSearchSelect(this.value);}}" />
         <button class="search-locate-btn" onclick="locateSearchedCity()" title="定位到搜索的城市">📍</button>
         <button class="search-add-btn" onclick="addManualCity()" title="将搜索的城市添加到路线（Shift+回车）">+</button>
       </div>
@@ -633,32 +633,95 @@ function debounceSearch(keyword) {
   }, 200);
 }
 
-// 精确搜索选中：回车时如果精确匹配则直接选中城市
+// 精确搜索选中：回车时如果精确匹配则直接选中城市，否则地理编码地址
 function exactSearchSelect(keyword) {
   keyword = keyword.trim();
   if(!keyword) return;
   const kw = keyword.toLowerCase();
   // 先精确匹配城市名
   let city = CITIES.find(function(c) { return c.name.toLowerCase() === kw; });
-  // 再匹配去掉"市"的
-  if(!city) {
-    city = CITIES.find(function(c) { return c.name.replace(/市$/,'').toLowerCase() === kw; });
-  }
-  // 再匹配包含的第一个
-  if(!city) {
-    city = CITIES.find(function(c) { return c.name.toLowerCase().includes(kw); });
-  }
+  if(!city) city = CITIES.find(function(c) { return c.name.replace(/市$/,'').toLowerCase() === kw; });
+  if(!city) city = CITIES.find(function(c) { return c.name.toLowerCase().includes(kw); });
+  
   if(city) {
     searchKeyword = keyword;
     renderCityList(city.name);
     handleCityClick(city);
   } else {
-    searchKeyword = keyword;
-    renderCityList();
+    // 没有匹配到城市，尝试地理编码地址
+    geocodeAndAddAddress(keyword);
   }
 }
 
-// 定位到搜索的城市
+// 地理编码地址并添加到路线
+function geocodeAndAddAddress(address, addToRoute) {
+  if(addToRoute === undefined) addToRoute = true;
+  tipDom.innerHTML = "🔍 正在解析地址：" + address + "...";
+  
+  // 确保Geocoder插件已加载
+  if(typeof AMap.Geocoder === 'undefined') {
+    AMap.plugin('AMap.Geocoder', function() {
+      doGeocodeAddress(address, addToRoute);
+    });
+  } else {
+    doGeocodeAddress(address, addToRoute);
+  }
+}
+
+function doGeocodeAddress(address, addToRoute) {
+  const geocoder = new AMap.Geocoder({ city: "全国", radius: 1000 });
+  geocoder.getLocation(address, function(status, result) {
+    if(status === 'complete' && result.geocodes && result.geocodes.length > 0) {
+      const loc = result.geocodes[0];
+      const lng = loc.location.lng;
+      const lat = loc.location.lat;
+      const province = loc.province || '';
+      const cityName = loc.city || loc.district || address;
+      // 格式化地址名称（取前20字）
+      let addrName = loc.formattedAddress || address;
+      if(addrName.length > 25) addrName = addrName.substring(0, 25) + '...';
+      
+      // 创建虚拟城市对象
+      const virtualCity = {
+        name: addrName,
+        province: province,
+        region: '',
+        lng: lng,
+        lat: lat,
+        isCenter: false,
+        isAddress: true,
+        address: loc.formattedAddress
+      };
+      
+      if(addToRoute) {
+        addPoint(virtualCity);
+        tipDom.innerHTML = "✅ 已添加地址点：<b>" + addrName + "</b>（" + province + "）";
+      } else {
+        // 仅定位
+        map.setZoomAndCenter(15, [lng, lat]);
+        // 临时标记
+        if(window._tempAddrMarker) map.remove(window._tempAddrMarker);
+        window._tempAddrMarker = new AMap.Marker({
+          position: [lng, lat],
+          content: '<div style="background:rgba(239,68,68,0.8);color:#fff;border:2px solid #fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3);">📍</div>',
+          offset: new AMap.Pixel(-12, -12),
+          zIndex: 500
+        });
+        window._tempAddrMarker.setMap(map);
+        tipDom.innerHTML = "📍 已定位到：<b>" + addrName + "</b>（点击+添加到路线）";
+      }
+      searchKeyword = '';
+      document.getElementById('searchInput').value = '';
+      renderCityList();
+    } else {
+      tipDom.innerHTML = "❌ 未找到地址：" + address + "，请检查地址是否正确";
+      searchKeyword = keyword;
+      renderCityList();
+    }
+  });
+}
+
+// 定位到搜索的城市或地址
 function locateSearchedCity() {
   const input = document.getElementById('searchInput');
   const keyword = input.value.trim();
@@ -667,11 +730,11 @@ function locateSearchedCity() {
   let city = CITIES.find(function(c) { return c.name.toLowerCase() === kw; });
   if(!city) city = CITIES.find(function(c) { return c.name.replace(/市$/,'').toLowerCase() === kw; });
   if(!city) city = CITIES.find(function(c) { return c.name.toLowerCase().includes(kw); });
+  
   if(city) {
     map.setZoomAndCenter(10, [city.lng, city.lat]);
     searchKeyword = keyword;
     renderCityList(city.name);
-    // 闪烁标记
     const marker = cityMarkers[city.name];
     if(marker) {
       try {
@@ -679,6 +742,9 @@ function locateSearchedCity() {
         setTimeout(function(){ marker.setAnimation && marker.setAnimation(null); }, 1500);
       } catch(e) {}
     }
+  } else {
+    // 没有匹配到城市，尝试地理编码地址定位
+    geocodeAndAddAddress(keyword, false);
   }
 }
 let CAPITALS = [];
