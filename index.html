@@ -92,6 +92,8 @@ button{font-family:inherit;}
 .search-locate-btn{width:34px;height:34px;border:none;border-radius:8px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#fff;font-size:15px;cursor:pointer;transition:.2s;box-shadow:0 2px 6px rgba(16,185,129,.3);flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-right:4px;}
 .search-locate-btn:hover{background:linear-gradient(135deg,#059669 0%,#047857 100%);box-shadow:0 3px 10px rgba(16,185,129,.4);transform:scale(1.05);}
 .search-locate-btn:active{transform:scale(0.95);}
+.search-clear-btn{width:26px;height:26px;border:none;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:16px;font-weight:700;cursor:pointer;transition:.2s;flex-shrink:0;display:flex;align-items:center;justify-content:center;line-height:1;}
+.search-clear-btn:hover{background:#cbd5e1;color:#334155;}
 .poi-dropdown{position:absolute;top:100%;left:0;right:0;background:rgba(255,255,255,.98);backdrop-filter:blur(12px);border:1px solid rgba(59,130,246,.2);border-radius:0 0 10px 10px;box-shadow:0 8px 24px rgba(0,0,0,.15);max-height:280px;overflow-y:auto;z-index:1000;margin-top:2px;}
 .poi-dropdown .poi-item{padding:8px 12px;cursor:pointer;border-bottom:1px solid rgba(0,0,0,.05);transition:.15s;}
 .poi-dropdown .poi-item:hover{background:rgba(59,130,246,.08);}
@@ -456,6 +458,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
     <div id="filterArea">
       <div class="search-box">
         <input type="text" id="searchInput" placeholder="搜索城市/地址/地点，如复旦大学..." oninput="onSearchInput(this.value)" onkeydown="onSearchKeyDown(event)" autocomplete="off" />
+        <button class="search-clear-btn" id="searchClearBtn" onclick="clearSearchInput()" style="display:none;" title="清除">×</button>
         <button class="search-locate-btn" onclick="locateSearchedCity()" title="定位到搜索的城市/地址">📍</button>
         <button class="search-add-btn" onclick="addManualCity()" title="将搜索的城市添加到路线（Shift+回车）">+</button>
       </div>
@@ -643,6 +646,9 @@ function onSearchInput(value) {
   value = value.trim();
   searchKeyword = value;
   
+  // 显示/隐藏清除按钮
+  document.getElementById('searchClearBtn').style.display = value ? 'flex' : 'none';
+  
   // 更新城市列表筛选
   if(searchDebounceTimer) clearTimeout(searchDebounceTimer);
   searchDebounceTimer = setTimeout(function() {
@@ -672,6 +678,17 @@ function onSearchInput(value) {
   poiSearchTimer = setTimeout(function() {
     searchPOI(value);
   }, 300);
+}
+
+function clearSearchInput() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchClearBtn').style.display = 'none';
+  searchKeyword = '';
+  document.getElementById('poiDropdown').style.display = 'none';
+  currentPoiResults = [];
+  poiSelectedIndex = -1;
+  renderCityList();
+  document.getElementById('searchInput').focus();
 }
 
 function onSearchKeyDown(event) {
@@ -799,6 +816,7 @@ function selectPOI(poi) {
   
   // 清空搜索框和下拉
   document.getElementById('searchInput').value = '';
+  document.getElementById('searchClearBtn').style.display = 'none';
   searchKeyword = '';
   document.getElementById('poiDropdown').style.display = 'none';
   currentPoiResults = [];
@@ -892,6 +910,7 @@ function doGeocodeAddress(address, addToRoute) {
       }
       searchKeyword = '';
       document.getElementById('searchInput').value = '';
+      document.getElementById('searchClearBtn').style.display = 'none';
       renderCityList();
     } else {
       tipDom.innerHTML = "❌ 未找到地址：" + address + "，请检查地址是否正确";
@@ -1341,6 +1360,103 @@ function initMap() {
   
   // Panel拖动功能
   initPanelDrag();
+  
+  // 地图点击选点：点击地图空白处逆地理编码，可添加到路线
+  map.on("click", function(e) {
+    // 如果点击的是标记点，标记自己的click事件会处理，这里跳过
+    if(e.target && e.target.getExtData) return;
+    const lng = e.lnglat.getLng();
+    const lat = e.lnglat.getLat();
+    reverseGeocodeAndShow(lng, lat);
+  });
+}
+
+// 逆地理编码并显示信息窗口
+let tempClickMarker = null;
+let tempInfoWindow = null;
+
+function reverseGeocodeAndShow(lng, lat) {
+  // 移除之前的临时标记
+  if(tempClickMarker) { map.remove(tempClickMarker); tempClickMarker = null; }
+  if(tempInfoWindow) { tempInfoWindow.close(); tempInfoWindow = null; }
+  
+  // 显示临时标记
+  tempClickMarker = new AMap.Marker({
+    position: [lng, lat],
+    content: '<div style="background:rgba(239,68,68,.85);color:#fff;border:2px solid #fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer;">📍</div>',
+    offset: new AMap.Pixel(-13, -13),
+    zIndex: 600
+  });
+  tempClickMarker.setMap(map);
+  
+  tipDom.innerHTML = "🔍 正在解析位置...";
+  
+  if(typeof AMap.Geocoder === 'undefined') {
+    AMap.plugin('AMap.Geocoder', function() {
+      doReverseGeocode(lng, lat);
+    });
+  } else {
+    doReverseGeocode(lng, lat);
+  }
+}
+
+function doReverseGeocode(lng, lat) {
+  const geocoder = new AMap.Geocoder({ city: "全国", radius: 1000 });
+  geocoder.getAddress([lng, lat], function(status, result) {
+    if(status === 'complete' && result.regeocode) {
+      const addr = result.regeocode.formattedAddress || '未知位置';
+      const province = result.regeocode.addressComponent.province || '';
+      const city = result.regeocode.addressComponent.city || province;
+      
+      // 显示信息窗口
+      const content = '<div style="padding:8px;min-width:200px;max-width:280px;">' +
+        '<div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:4px;">📍 选中位置</div>' +
+        '<div style="font-size:12px;color:#475569;line-height:1.5;margin-bottom:8px;">' + addr + '</div>' +
+        '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">坐标：' + lng.toFixed(4) + ', ' + lat.toFixed(4) + '</div>' +
+        '<div style="display:flex;gap:6px;">' +
+        '<button onclick="addClickedPointToRoute(' + lng + ',' + lat + ',\'' + addr.replace(/'/g, "\\'") + '\',\'' + province + '\')" style="flex:1;padding:6px 10px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">添加到路线</button>' +
+        '<button onclick="closeTempClick()" style="padding:6px 10px;background:#f1f5f9;color:#64748b;border:none;border-radius:6px;font-size:12px;cursor:pointer;">关闭</button>' +
+        '</div></div>';
+      
+      tempInfoWindow = new AMap.InfoWindow({
+        content: content,
+        offset: new AMap.Pixel(0, -30)
+      });
+      tempInfoWindow.open(map, [lng, lat]);
+      tipDom.innerHTML = "📍 已选中位置：<b>" + addr.substring(0, 30) + "</b>（点击添加到路线）";
+    } else {
+      // 解析失败，仍显示坐标点
+      const content = '<div style="padding:8px;min-width:180px;">' +
+        '<div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:4px;">📍 选中位置</div>' +
+        '<div style="font-size:12px;color:#475569;margin-bottom:8px;">坐标：' + lng.toFixed(4) + ', ' + lat.toFixed(4) + '</div>' +
+        '<button onclick="addClickedPointToRoute(' + lng + ',' + lat + ',\'坐标点(' + lng.toFixed(2) + ',' + lat.toFixed(2) + ')\',\'\')" style="width:100%;padding:6px 10px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">添加到路线</button>' +
+        '</div>';
+      tempInfoWindow = new AMap.InfoWindow({ content: content, offset: new AMap.Pixel(0, -30) });
+      tempInfoWindow.open(map, [lng, lat]);
+      tipDom.innerHTML = "📍 已选中坐标点（点击添加到路线）";
+    }
+  });
+}
+
+// 将地图点击的点添加到路线
+function addClickedPointToRoute(lng, lat, name, province) {
+  const virtualCity = {
+    name: name.length > 25 ? name.substring(0, 25) + '...' : name,
+    province: province || '',
+    region: '',
+    lng: lng,
+    lat: lat,
+    isCenter: false,
+    isAddress: true,
+    address: name
+  };
+  addPoint(virtualCity);
+  closeTempClick();
+}
+
+function closeTempClick() {
+  if(tempClickMarker) { map.remove(tempClickMarker); tempClickMarker = null; }
+  if(tempInfoWindow) { tempInfoWindow.close(); tempInfoWindow = null; }
 }
 
 // Panel拖动
