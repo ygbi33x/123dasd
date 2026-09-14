@@ -109,6 +109,17 @@ button{font-family:inherit;}
 .poi-dropdown .poi-empty{padding:14px;text-align:center;color:#94a3b8;font-size:12px;}
 .filter-section{padding:8px 14px;border-bottom:1px solid rgba(0,0,0,.04);background:rgba(255,255,255,.3);}
 .filter-label{font-size:10px;color:#64748b;font-weight:700;margin-bottom:5px;text-transform:uppercase;letter-spacing:.8px;}
+.display-settings{padding:8px 14px;border-bottom:1px solid rgba(0,0,0,.04);background:rgba(255,255,255,.4);}
+.display-settings-btn{width:100%;padding:7px 10px;border:1px solid rgba(59,130,246,.2);border-radius:8px;background:rgba(255,255,255,.7);color:#334155;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;transition:.2s;}
+.display-settings-btn:hover{background:rgba(59,130,246,.06);border-color:rgba(59,130,246,.35);}
+.display-settings-panel{margin-top:8px;padding:10px;background:rgba(248,250,252,.9);border-radius:8px;border:1px solid rgba(0,0,0,.05);}
+.ds-section{margin-bottom:10px;}
+.ds-section:last-child{margin-bottom:0;}
+.ds-label{font-size:10px;color:#64748b;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px;}
+.ds-toggles{display:flex;flex-direction:column;gap:5px;}
+.ds-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer;}
+.ds-toggle input[type="checkbox"]{width:14px;height:14px;accent-color:#3b82f6;cursor:pointer;}
+.ds-toggle input[type="checkbox"]:checked + span{color:#2563eb;font-weight:600;}
 .filter-tabs{display:flex;flex-wrap:wrap;gap:4px;}
 .filter-tab{padding:4px 10px;font-size:10px;border:1.5px solid rgba(0,0,0,.08);border-radius:8px;cursor:pointer;color:#475569;background:rgba(255,255,255,.6);transition:.15s;font-weight:600;}
 .filter-tab:hover{border-color:#3b82f6;color:#2563eb;background:rgba(59,130,246,.06);}
@@ -467,12 +478,37 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         <button class="search-add-btn" onclick="addManualCity()" title="将搜索的城市添加到路线（Shift+回车）">+</button>
         <div id="poiDropdown" class="poi-dropdown" style="display:none;"></div>
       </div>
-      <div class="filter-section">
-        <div class="filter-label">城市类型</div>
-        <div class="type-filter">
-          <span class="filter-tab active" data-type="all" onclick="setCityTypeFilter('all')">全部</span>
-          <span class="filter-tab" data-type="center" onclick="setCityTypeFilter('center')">仅中心</span>
-          <span class="filter-tab" data-type="capital" onclick="setCityTypeFilter('capital')">仅省会</span>
+      <div class="display-settings">
+        <button class="display-settings-btn" onclick="toggleDisplaySettings()" title="显示设置">
+          <span>⚙️ 显示设置</span>
+          <span id="displaySettingsArrow">▼</span>
+        </button>
+        <div class="display-settings-panel" id="displaySettingsPanel" style="display:none;">
+          <div class="ds-section">
+            <div class="ds-label">城市类型</div>
+            <div class="type-filter">
+              <span class="filter-tab active" data-type="all" onclick="setCityTypeFilter('all')">全部</span>
+              <span class="filter-tab" data-type="center" onclick="setCityTypeFilter('center')">仅中心</span>
+              <span class="filter-tab" data-type="capital" onclick="setCityTypeFilter('capital')">仅省会</span>
+            </div>
+          </div>
+          <div class="ds-section">
+            <div class="ds-label">地图标记</div>
+            <div class="ds-toggles">
+              <label class="ds-toggle">
+                <input type="checkbox" id="showCenterMarkers" checked onchange="toggleMarkerVisibility()">
+                <span>中心城市</span>
+              </label>
+              <label class="ds-toggle">
+                <input type="checkbox" id="showCapitalMarkers" checked onchange="toggleMarkerVisibility()">
+                <span>省会城市</span>
+              </label>
+              <label class="ds-toggle">
+                <input type="checkbox" id="showNormalMarkers" checked onchange="toggleMarkerVisibility()">
+                <span>普通地级市</span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
       <div class="filter-section">
@@ -1637,6 +1673,38 @@ function setCityTypeFilter(type) {
     t.classList.toggle('active', t.dataset.type === type);
   });
   renderCityList();
+}
+
+// 显示设置面板展开/收起
+function toggleDisplaySettings() {
+  const panel = document.getElementById('displaySettingsPanel');
+  const arrow = document.getElementById('displaySettingsArrow');
+  if(panel.style.display === 'none') {
+    panel.style.display = 'block';
+    arrow.innerHTML = '▲';
+  } else {
+    panel.style.display = 'none';
+    arrow.innerHTML = '▼';
+  }
+}
+
+// 切换地图标记显示
+function toggleMarkerVisibility() {
+  const showCenter = document.getElementById('showCenterMarkers').checked;
+  const showCapital = document.getElementById('showCapitalMarkers').checked;
+  const showNormal = document.getElementById('showNormalMarkers').checked;
+  
+  cityMarkers.forEach(function(marker) {
+    const city = marker.getExtData();
+    if(!city) return;
+    const isCapital = CAPITAL_NAMES.indexOf(city.name) >= 0;
+    let visible = true;
+    if(city.isCenter && !showCenter) visible = false;
+    if(isCapital && !city.isCenter && !showCapital) visible = false;
+    if(!city.isCenter && !isCapital && !showNormal) visible = false;
+    marker.show();
+    if(!visible) marker.hide();
+  });
 }
 
 function initFilters() {
