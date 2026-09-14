@@ -89,6 +89,9 @@ button{font-family:inherit;}
 .search-add-btn{width:34px;height:34px;border:none;border-radius:8px;background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:.2s;box-shadow:0 2px 6px rgba(59,130,246,.3);flex-shrink:0;display:flex;align-items:center;justify-content:center;}
 .search-add-btn:hover{background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);box-shadow:0 3px 10px rgba(59,130,246,.4);transform:scale(1.05);}
 .search-add-btn:active{transform:scale(0.95);}
+.search-locate-btn{width:34px;height:34px;border:none;border-radius:8px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#fff;font-size:15px;cursor:pointer;transition:.2s;box-shadow:0 2px 6px rgba(16,185,129,.3);flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-right:4px;}
+.search-locate-btn:hover{background:linear-gradient(135deg,#059669 0%,#047857 100%);box-shadow:0 3px 10px rgba(16,185,129,.4);transform:scale(1.05);}
+.search-locate-btn:active{transform:scale(0.95);}
 .filter-section{padding:8px 14px;border-bottom:1px solid rgba(0,0,0,.04);background:rgba(255,255,255,.3);}
 .filter-label{font-size:10px;color:#64748b;font-weight:700;margin-bottom:5px;text-transform:uppercase;letter-spacing:.8px;}
 .filter-tabs{display:flex;flex-wrap:wrap;gap:4px;}
@@ -107,6 +110,8 @@ button{font-family:inherit;}
 .city-item.in-route{background:rgba(59,130,246,.1);border-left:3px solid #3b82f6;}
 .city-item.is-center{background:rgba(245,158,11,.04);}
 .city-item.is-center:hover{background:rgba(59,130,246,.06);}
+.city-item.exact-match{background:rgba(16,185,129,.12);border-left:3px solid #10b981;}
+.city-item.exact-match .city-name{color:#047857;font-weight:700;}
 .city-item.flash{animation:flashBg 1.2s ease;}
 @keyframes flashBg{0%{background:rgba(250,204,21,.3);}100%{background:transparent;}}
 .city-name{flex:1;color:#334155;font-weight:600;}
@@ -441,7 +446,8 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
     </div>
     <div id="filterArea">
       <div class="search-box">
-        <input type="text" id="searchInput" placeholder="搜索城市名称..." oninput="debounceSearch(this.value)" onkeypress="if(event.key==='Enter'){if(event.shiftKey){addManualCity();}else{searchKeyword=this.value;renderCityList();}}" />
+        <input type="text" id="searchInput" placeholder="搜索城市名称，回车精确选中..." oninput="debounceSearch(this.value)" onkeypress="if(event.key==='Enter'){if(event.shiftKey){addManualCity();}else{exactSearchSelect(this.value);}}" />
+        <button class="search-locate-btn" onclick="locateSearchedCity()" title="定位到搜索的城市">📍</button>
         <button class="search-add-btn" onclick="addManualCity()" title="将搜索的城市添加到路线（Shift+回车）">+</button>
       </div>
       <div class="filter-section">
@@ -625,6 +631,55 @@ function debounceSearch(keyword) {
     searchKeyword = keyword;
     renderCityList();
   }, 200);
+}
+
+// 精确搜索选中：回车时如果精确匹配则直接选中城市
+function exactSearchSelect(keyword) {
+  keyword = keyword.trim();
+  if(!keyword) return;
+  const kw = keyword.toLowerCase();
+  // 先精确匹配城市名
+  let city = CITIES.find(function(c) { return c.name.toLowerCase() === kw; });
+  // 再匹配去掉"市"的
+  if(!city) {
+    city = CITIES.find(function(c) { return c.name.replace(/市$/,'').toLowerCase() === kw; });
+  }
+  // 再匹配包含的第一个
+  if(!city) {
+    city = CITIES.find(function(c) { return c.name.toLowerCase().includes(kw); });
+  }
+  if(city) {
+    searchKeyword = keyword;
+    renderCityList(city.name);
+    handleCityClick(city);
+  } else {
+    searchKeyword = keyword;
+    renderCityList();
+  }
+}
+
+// 定位到搜索的城市
+function locateSearchedCity() {
+  const input = document.getElementById('searchInput');
+  const keyword = input.value.trim();
+  if(!keyword) return;
+  const kw = keyword.toLowerCase();
+  let city = CITIES.find(function(c) { return c.name.toLowerCase() === kw; });
+  if(!city) city = CITIES.find(function(c) { return c.name.replace(/市$/,'').toLowerCase() === kw; });
+  if(!city) city = CITIES.find(function(c) { return c.name.toLowerCase().includes(kw); });
+  if(city) {
+    map.setZoomAndCenter(10, [city.lng, city.lat]);
+    searchKeyword = keyword;
+    renderCityList(city.name);
+    // 闪烁标记
+    const marker = cityMarkers[city.name];
+    if(marker) {
+      try {
+        marker.setAnimation && marker.setAnimation('AMAP_ANIMATION_BOUNCE');
+        setTimeout(function(){ marker.setAnimation && marker.setAnimation(null); }, 1500);
+      } catch(e) {}
+    }
+  }
 }
 let CAPITALS = [];
 
@@ -1201,10 +1256,20 @@ function renderCityList(scrollToCity) {
   if(currentRegion !== "全部") filtered = filtered.filter(c => c.region === currentRegion);
   if(currentProvince !== "全部") filtered = filtered.filter(c => c.province === currentProvince);
   if(searchKeyword) {
-    const kw = searchKeyword.toLowerCase();
+    const kw = searchKeyword.toLowerCase().replace(/市$/,'');
     filtered = filtered.filter(c => c.name.toLowerCase().includes(kw) || c.province.includes(kw));
+    // 精确匹配优先排序
+    filtered.sort(function(a, b) {
+      const aName = a.name.toLowerCase().replace(/市$/,'');
+      const bName = b.name.toLowerCase().replace(/市$/,'');
+      const aExact = aName === kw ? 0 : 1;
+      const bExact = bName === kw ? 0 : 1;
+      if(aExact !== bExact) return aExact - bExact;
+      return (b.isCenter?1:0) - (a.isCenter?1:0);
+    });
+  } else {
+    filtered.sort(function(a, b) { return (b.isCenter?1:0) - (a.isCenter?1:0); });
   }
-  filtered.sort(function(a, b) { return (b.isCenter?1:0) - (a.isCenter?1:0); });
 
   if(filtered.length === 0) {
     list.innerHTML = '<div class="empty-tip">未找到匹配的城市</div>';
@@ -1215,9 +1280,10 @@ function renderCityList(scrollToCity) {
       const isRadialOrigin = currentMode === 'radial' && radialOrigin && radialOrigin.city.name === city.name;
       const radialDestIdx = currentMode === 'radial' ? radialDestinations.findIndex(function(d) { return d.city.name === city.name; }) : -1;
       const isSelected = routeIdx >= 0 || isRadialOrigin || radialDestIdx >= 0;
+      const isExactMatch = searchKeyword && (city.name.toLowerCase() === searchKeyword.toLowerCase() || city.name.replace(/市$/,'').toLowerCase() === searchKeyword.toLowerCase().replace(/市$/,''));
       
       const item = document.createElement('div');
-      item.className = 'city-item' + (isSelected ? ' in-route' : '') + (city.isCenter ? ' is-center' : '');
+      item.className = 'city-item' + (isSelected ? ' in-route' : '') + (city.isCenter ? ' is-center' : '') + (isExactMatch ? ' exact-match' : '');
       item.dataset.cityName = city.name;
       
       let numBadge = '';
