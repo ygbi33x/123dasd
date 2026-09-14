@@ -1705,6 +1705,9 @@ function toggleMarkerVisibility() {
     marker.show();
     if(!visible) marker.hide();
   });
+  
+  // 同步更新左侧城市列表
+  renderCityList();
 }
 
 function initFilters() {
@@ -1763,6 +1766,16 @@ function renderCityList(scrollToCity) {
   let filtered = CITIES;
   if(cityTypeFilter === 'center') filtered = filtered.filter(c => c.isCenter);
   if(cityTypeFilter === 'capital') filtered = filtered.filter(c => CAPITALS.some(cap => cap.name === c.name));
+  // 显示设置开关：左侧列表同步筛选
+  const showCenter = document.getElementById('showCenterMarkers') ? document.getElementById('showCenterMarkers').checked : true;
+  const showCapital = document.getElementById('showCapitalMarkers') ? document.getElementById('showCapitalMarkers').checked : true;
+  const showNormal = document.getElementById('showNormalMarkers') ? document.getElementById('showNormalMarkers').checked : true;
+  filtered = filtered.filter(function(c) {
+    const isCapital = CAPITAL_NAMES.indexOf(c.name) >= 0;
+    if(c.isCenter) return showCenter;
+    if(isCapital) return showCapital;
+    return showNormal;
+  });
   if(currentRegion !== "全部") filtered = filtered.filter(c => c.region === currentRegion);
   if(currentProvince !== "全部") filtered = filtered.filter(c => c.province === currentProvince);
   if(searchKeyword) {
