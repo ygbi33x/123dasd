@@ -94,15 +94,19 @@ button{font-family:inherit;}
 .search-locate-btn:active{transform:scale(0.95);}
 .search-clear-btn{width:26px;height:26px;border:none;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:16px;font-weight:700;cursor:pointer;transition:.2s;flex-shrink:0;display:flex;align-items:center;justify-content:center;line-height:1;}
 .search-clear-btn:hover{background:#cbd5e1;color:#334155;}
-.poi-dropdown{position:absolute;top:100%;left:0;right:0;background:rgba(255,255,255,.98);backdrop-filter:blur(12px);border:1px solid rgba(59,130,246,.2);border-radius:0 0 10px 10px;box-shadow:0 8px 24px rgba(0,0,0,.15);max-height:280px;overflow-y:auto;z-index:1000;margin-top:2px;}
-.poi-dropdown .poi-item{padding:8px 12px;cursor:pointer;border-bottom:1px solid rgba(0,0,0,.05);transition:.15s;}
-.poi-dropdown .poi-item:hover{background:rgba(59,130,246,.08);}
+.poi-dropdown{position:absolute;top:100%;left:0;right:0;background:rgba(255,255,255,.98);backdrop-filter:blur(12px);border:1px solid rgba(59,130,246,.15);border-radius:0 0 12px 12px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:340px;overflow-y:auto;z-index:1000;margin-top:2px;}
+.poi-dropdown .poi-group-title{padding:6px 12px;font-size:11px;font-weight:700;color:#94a3b8;background:rgba(241,245,249,.6);letter-spacing:.5px;}
+.poi-dropdown .poi-item{padding:8px 12px;cursor:pointer;border-bottom:1px solid rgba(0,0,0,.04);transition:.12s;display:flex;align-items:flex-start;gap:8px;}
+.poi-dropdown .poi-item:hover{background:rgba(59,130,246,.06);}
 .poi-dropdown .poi-item:last-child{border-bottom:none;}
-.poi-dropdown .poi-name{font-size:13px;font-weight:600;color:#1e293b;}
+.poi-dropdown .poi-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;}
+.poi-dropdown .poi-content{flex:1;min-width:0;}
+.poi-dropdown .poi-name{font-size:13px;font-weight:600;color:#1e293b;line-height:1.3;}
 .poi-dropdown .poi-addr{font-size:11px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.poi-dropdown .poi-type{font-size:10px;color:#3b82f6;background:rgba(59,130,246,.1);padding:1px 5px;border-radius:3px;margin-left:4px;}
-.poi-dropdown .poi-loading{padding:12px;text-align:center;color:#64748b;font-size:13px;}
-.poi-dropdown .poi-empty{padding:12px;text-align:center;color:#94a3b8;font-size:12px;}
+.poi-dropdown .poi-type{font-size:10px;color:#3b82f6;background:rgba(59,130,246,.08);padding:1px 5px;border-radius:3px;margin-left:5px;font-weight:500;}
+.poi-dropdown .poi-tel{font-size:10px;color:#16a34a;margin-left:6px;}
+.poi-dropdown .poi-loading{padding:14px;text-align:center;color:#64748b;font-size:13px;}
+.poi-dropdown .poi-empty{padding:14px;text-align:center;color:#94a3b8;font-size:12px;}
 .filter-section{padding:8px 14px;border-bottom:1px solid rgba(0,0,0,.04);background:rgba(255,255,255,.3);}
 .filter-label{font-size:10px;color:#64748b;font-weight:700;margin-bottom:5px;text-transform:uppercase;letter-spacing:.8px;}
 .filter-tabs{display:flex;flex-wrap:wrap;gap:4px;}
@@ -640,6 +644,7 @@ function hideLoading() {
 // 搜索输入处理：城市筛选 + POI搜索
 let poiSearchTimer = null;
 let currentPoiResults = [];
+let currentCityMatches = [];
 let poiSelectedIndex = -1;
 
 function onSearchInput(value) {
@@ -662,83 +667,28 @@ function onSearchInput(value) {
   if(value.length < 2) {
     dropdown.style.display = 'none';
     currentPoiResults = [];
-    return;
-  }
-  
-  // 先检查是否精确匹配城市名，如果是则不显示POI下拉
-  const kw = value.toLowerCase();
-  const exactCity = CITIES.find(function(c) { 
-    return c.name.toLowerCase() === kw || c.name.replace(/市$/,'').toLowerCase() === kw; 
-  });
-  if(exactCity) {
-    dropdown.style.display = 'none';
+    currentCityMatches = [];
     return;
   }
   
   poiSearchTimer = setTimeout(function() {
-    searchPOI(value);
-  }, 300);
+    searchAll(value);
+  }, 250);
 }
 
-function clearSearchInput() {
-  document.getElementById('searchInput').value = '';
-  document.getElementById('searchClearBtn').style.display = 'none';
-  searchKeyword = '';
-  document.getElementById('poiDropdown').style.display = 'none';
-  currentPoiResults = [];
-  poiSelectedIndex = -1;
-  renderCityList();
-  document.getElementById('searchInput').focus();
-}
-
-function onSearchKeyDown(event) {
-  const dropdown = document.getElementById('poiDropdown');
-  const isDropdownVisible = dropdown.style.display !== 'none' && currentPoiResults.length > 0;
-  
-  if(event.key === 'ArrowDown' && isDropdownVisible) {
-    event.preventDefault();
-    poiSelectedIndex = Math.min(poiSelectedIndex + 1, currentPoiResults.length - 1);
-    updatePoiHighlight();
-  } else if(event.key === 'ArrowUp' && isDropdownVisible) {
-    event.preventDefault();
-    poiSelectedIndex = Math.max(poiSelectedIndex - 1, -1);
-    updatePoiHighlight();
-  } else if(event.key === 'Enter') {
-    event.preventDefault();
-    if(event.shiftKey) {
-      addManualCity();
-    } else if(isDropdownVisible && poiSelectedIndex >= 0) {
-      // 选中POI结果
-      selectPOI(currentPoiResults[poiSelectedIndex]);
-    } else if(isDropdownVisible && currentPoiResults.length > 0) {
-      // 默认选第一个
-      selectPOI(currentPoiResults[0]);
-    } else {
-      // 没有POI结果，走原逻辑（城市匹配或地址地理编码）
-      exactSearchSelect(document.getElementById('searchInput').value);
-    }
-  } else if(event.key === 'Escape') {
-    dropdown.style.display = 'none';
-    poiSelectedIndex = -1;
-  }
-}
-
-function updatePoiHighlight() {
-  const items = document.querySelectorAll('#poiDropdown .poi-item');
-  items.forEach(function(item, i) {
-    item.style.background = i === poiSelectedIndex ? 'rgba(59,130,246,.12)' : '';
-  });
-  if(poiSelectedIndex >= 0 && items[poiSelectedIndex]) {
-    items[poiSelectedIndex].scrollIntoView({block:'nearest'});
-  }
-}
-
-// POI搜索
-function searchPOI(keyword) {
+// 同时搜索城市和POI
+function searchAll(keyword) {
   const dropdown = document.getElementById('poiDropdown');
   dropdown.innerHTML = '<div class="poi-loading">🔍 搜索中...</div>';
   dropdown.style.display = 'block';
   
+  // 搜索城市匹配
+  const kw = keyword.toLowerCase();
+  currentCityMatches = CITIES.filter(function(c) {
+    return c.name.toLowerCase().includes(kw) || c.province.includes(kw);
+  }).slice(0, 5);
+  
+  // 搜索POI
   if(typeof AMap.PlaceSearch === 'undefined') {
     AMap.plugin('AMap.PlaceSearch', function() {
       doPoiSearch(keyword);
@@ -750,48 +700,86 @@ function searchPOI(keyword) {
 
 function doPoiSearch(keyword) {
   const placeSearch = new AMap.PlaceSearch({
-    pageSize: 8,
+    pageSize: 10,
     pageIndex: 1,
     city: '全国',
-    extensions: 'base'
+    extensions: 'all'
   });
   
   placeSearch.search(keyword, function(status, result) {
     const dropdown = document.getElementById('poiDropdown');
     if(status === 'complete' && result.poiList && result.poiList.pois && result.poiList.pois.length > 0) {
       currentPoiResults = result.poiList.pois;
-      poiSelectedIndex = -1;
-      renderPoiResults();
     } else {
       currentPoiResults = [];
-      dropdown.innerHTML = '<div class="poi-empty">未找到相关地点，回车将按地址解析</div>';
     }
+    poiSelectedIndex = -1;
+    renderSearchResults();
   });
 }
 
-function renderPoiResults() {
+function renderSearchResults() {
   const dropdown = document.getElementById('poiDropdown');
-  if(currentPoiResults.length === 0) {
-    dropdown.style.display = 'none';
+  const total = currentCityMatches.length + currentPoiResults.length;
+  
+  if(total === 0) {
+    dropdown.innerHTML = '<div class="poi-empty">未找到相关地点，回车将按地址解析</div>';
+    dropdown.style.display = 'block';
     return;
   }
   
   let html = '';
-  currentPoiResults.forEach(function(poi, i) {
-    const name = poi.name || '';
-    const addr = poi.address || poi.pname + poi.cityname + poi.adname || '';
-    const type = poi.type ? poi.type.split(';')[0] : '地点';
-    html += '<div class="poi-item" onclick="selectPOI(currentPoiResults[' + i + '])" onmouseover="poiSelectedIndex=' + i + ';updatePoiHighlight();">' +
-      '<div class="poi-name">' + name + '<span class="poi-type">' + type + '</span></div>' +
-      '<div class="poi-addr">' + addr + '</div>' +
-      '</div>';
-  });
+  let idx = 0;
+  
+  // 城市匹配结果
+  if(currentCityMatches.length > 0) {
+    html += '<div class="poi-group-title">城市</div>';
+    currentCityMatches.forEach(function(city) {
+      const isCenter = city.isCenter ? '<span class="poi-type" style="background:rgba(245,158,11,.15);color:#d97706;">中心</span>' : '';
+      html += '<div class="poi-item" data-idx="' + idx + '" onclick="selectCityFromSearch(\'' + city.name.replace(/'/g, "\\'") + '\')" onmouseover="poiSelectedIndex=' + idx + ';updatePoiHighlight();">' +
+        '<div class="poi-icon" style="background:#dbeafe;color:#2563eb;">🏙</div>' +
+        '<div class="poi-content">' +
+        '<div class="poi-name">' + city.name + isCenter + '</div>' +
+        '<div class="poi-addr">' + city.province + (city.region ? ' · ' + city.region : '') + '</div>' +
+        '</div></div>';
+      idx++;
+    });
+  }
+  
+  // POI结果
+  if(currentPoiResults.length > 0) {
+    html += '<div class="poi-group-title">地点</div>';
+    currentPoiResults.forEach(function(poi, i) {
+      const name = poi.name || '';
+      const addr = poi.address || (poi.pname + poi.cityname + poi.adname) || '';
+      const type = poi.type ? poi.type.split(';')[0] : '地点';
+      const tel = poi.tel ? '<span class="poi-tel">' + poi.tel + '</span>' : '';
+      html += '<div class="poi-item" data-idx="' + idx + '" onclick="locateAndShowPOI(' + i + ')" onmouseover="poiSelectedIndex=' + idx + ';updatePoiHighlight();">' +
+        '<div class="poi-icon" style="background:#dcfce7;color:#16a34a;">📍</div>' +
+        '<div class="poi-content">' +
+        '<div class="poi-name">' + name + '<span class="poi-type">' + type + '</span></div>' +
+        '<div class="poi-addr">' + addr + tel + '</div>' +
+        '</div></div>';
+      idx++;
+    });
+  }
+  
   dropdown.innerHTML = html;
   dropdown.style.display = 'block';
 }
 
-// 选中POI并添加到路线
-function selectPOI(poi) {
+// 从搜索结果选中城市
+function selectCityFromSearch(cityName) {
+  const city = CITIES.find(function(c) { return c.name === cityName; });
+  if(city) {
+    handleCityClick(city);
+    closeSearchDropdown();
+  }
+}
+
+// 定位POI并显示信息窗口（高德风格：点击先定位，再选择添加）
+function locateAndShowPOI(poiIdx) {
+  const poi = currentPoiResults[poiIdx];
   if(!poi || !poi.location) return;
   
   const lng = poi.location.lng;
@@ -799,11 +787,36 @@ function selectPOI(poi) {
   const name = poi.name || '未命名地点';
   const addr = poi.address || '';
   const province = poi.pname || '';
+  const type = poi.type ? poi.type.split(';')[0] : '地点';
+  const tel = poi.tel || '';
   
-  // 创建虚拟城市对象
+  // 飞到该位置
+  map.setZoomAndCenter(16, [lng, lat]);
+  
+  // 显示信息窗口
+  const content = '<div style="padding:10px;min-width:220px;max-width:300px;">' +
+    '<div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:4px;">' + name + '</div>' +
+    '<div style="font-size:11px;color:#3b82f6;margin-bottom:6px;">' + type + (tel ? ' · ' + tel : '') + '</div>' +
+    '<div style="font-size:12px;color:#475569;line-height:1.5;margin-bottom:8px;">' + addr + '</div>' +
+    '<div style="font-size:11px;color:#94a3b8;margin-bottom:10px;">坐标：' + lng.toFixed(6) + ', ' + lat.toFixed(6) + '</div>' +
+    '<div style="display:flex;gap:6px;">' +
+    '<button onclick="addPOIToRoute(' + lng + ',' + lat + ',\'' + name.replace(/'/g, "\\'") + '\',\'' + province + '\',\'' + addr.replace(/'/g, "\\'") + '\')" style="flex:1;padding:7px 10px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">添加到路线</button>' +
+    '<button onclick="closeTempClick()" style="padding:7px 10px;background:#f1f5f9;color:#64748b;border:none;border-radius:6px;font-size:12px;cursor:pointer;">关闭</button>' +
+    '</div></div>';
+  
+  if(tempInfoWindow) tempInfoWindow.close();
+  tempInfoWindow = new AMap.InfoWindow({ content: content, offset: new AMap.Pixel(0, -20) });
+  tempInfoWindow.open(map, [lng, lat]);
+  
+  closeSearchDropdown();
+  tipDom.innerHTML = "📍 已定位：<b>" + name + "</b>（点击添加到路线）";
+}
+
+// 添加POI到路线
+function addPOIToRoute(lng, lat, name, province, addr) {
   const virtualCity = {
-    name: name,
-    province: province,
+    name: name.length > 25 ? name.substring(0, 25) + '...' : name,
+    province: province || '',
     region: '',
     lng: lng,
     lat: lat,
@@ -811,19 +824,86 @@ function selectPOI(poi) {
     isAddress: true,
     address: addr
   };
-  
   addPoint(virtualCity);
-  
-  // 清空搜索框和下拉
+  closeTempClick();
+}
+
+function closeSearchDropdown() {
   document.getElementById('searchInput').value = '';
   document.getElementById('searchClearBtn').style.display = 'none';
   searchKeyword = '';
   document.getElementById('poiDropdown').style.display = 'none';
   currentPoiResults = [];
+  currentCityMatches = [];
   poiSelectedIndex = -1;
   renderCityList();
+}
+
+function clearSearchInput() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchClearBtn').style.display = 'none';
+  searchKeyword = '';
+  document.getElementById('poiDropdown').style.display = 'none';
+  currentPoiResults = [];
+  currentCityMatches = [];
+  poiSelectedIndex = -1;
+  renderCityList();
+  document.getElementById('searchInput').focus();
+}
+
+function onSearchKeyDown(event) {
+  const dropdown = document.getElementById('poiDropdown');
+  const totalResults = currentCityMatches.length + currentPoiResults.length;
+  const isDropdownVisible = dropdown.style.display !== 'none' && totalResults > 0;
   
-  tipDom.innerHTML = "✅ 已添加地点：<b>" + name + "</b>" + (addr ? "（" + addr + "）" : "");
+  if(event.key === 'ArrowDown' && isDropdownVisible) {
+    event.preventDefault();
+    poiSelectedIndex = Math.min(poiSelectedIndex + 1, totalResults - 1);
+    updatePoiHighlight();
+  } else if(event.key === 'ArrowUp' && isDropdownVisible) {
+    event.preventDefault();
+    poiSelectedIndex = Math.max(poiSelectedIndex - 1, -1);
+    updatePoiHighlight();
+  } else if(event.key === 'Enter') {
+    event.preventDefault();
+    if(event.shiftKey) {
+      addManualCity();
+    } else if(isDropdownVisible && poiSelectedIndex >= 0) {
+      // 选中当前高亮的结果
+      selectSearchResult(poiSelectedIndex);
+    } else if(isDropdownVisible && totalResults > 0) {
+      // 默认选第一个
+      selectSearchResult(0);
+    } else {
+      // 没有搜索结果，走地址地理编码
+      exactSearchSelect(document.getElementById('searchInput').value);
+    }
+  } else if(event.key === 'Escape') {
+    dropdown.style.display = 'none';
+    poiSelectedIndex = -1;
+  }
+}
+
+// 根据索引选中搜索结果（城市或POI）
+function selectSearchResult(idx) {
+  if(idx < currentCityMatches.length) {
+    // 是城市
+    selectCityFromSearch(currentCityMatches[idx].name);
+  } else {
+    // 是POI
+    const poiIdx = idx - currentCityMatches.length;
+    locateAndShowPOI(poiIdx);
+  }
+}
+
+function updatePoiHighlight() {
+  const items = document.querySelectorAll('#poiDropdown .poi-item');
+  items.forEach(function(item, i) {
+    item.style.background = i === poiSelectedIndex ? 'rgba(59,130,246,.1)' : '';
+  });
+  if(poiSelectedIndex >= 0 && items[poiSelectedIndex]) {
+    items[poiSelectedIndex].scrollIntoView({block:'nearest'});
+  }
 }
 
 // 防抖搜索（保留兼容）
