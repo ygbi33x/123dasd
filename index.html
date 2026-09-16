@@ -5097,7 +5097,7 @@ function cleanSegment(s) {
 function inferDominantCityName() {
   const counts = {};
   routePoints.forEach(function(p) {
-    const cn = p.city.cityname || (!p.city.isAddress ? p.city.name : '');
+    const cn = cityOfPoint(p.city);
     if(cn) counts[cn] = (counts[cn] || 0) + 1;
   });
   let best = '', bestN = 0;
@@ -5105,6 +5105,14 @@ function inferDominantCityName() {
     if(counts[k] > bestN) { best = k; bestN = counts[k]; }
   }
   return best;
+}
+
+// 提取路线点所属城市：优先 cityname，其次从详细地址中正则提取，内置城市直接用名称
+function cityOfPoint(city) {
+  if(city.cityname) return city.cityname;
+  if(!city.isAddress) return city.name;
+  const m = (city.address || '').match(/[一-龥]{2,5}市/);
+  return m ? m[0] : (city.province || '');
 }
 
 // 从分享链接/本地缓存的数据恢复路线（统一入口，带容错）
@@ -5284,12 +5292,13 @@ async function doBatchImport() {
         const text = remaining[i];
         if(text.length < 4) { failed.push(text); continue; }
         tipDom.innerHTML = '🧩 智能拆分连写地点：' + text;
-        const domCity = inferDominantCityName();
         const segs = splitConcatenated(text);
         if(segs.length <= 1) { failed.push(text); continue; }
         for(let j = 0; j < segs.length; j++) {
           tipDom.innerHTML = '🔍 拆分解析（' + (j + 1) + '/' + segs.length + '）：' + segs[j];
-          const city = await resolvePoiSmart(segs[j], domCity).catch(function() { return null; });
+          // 每成功解析一个段就重新推断主城市，让后续段就近解析
+          const segCity = inferDominantCityName();
+          const city = await resolvePoiSmart(segs[j], segCity).catch(function() { return null; });
           if(city) { resolvedCount++; addUniquePoint(city); }
           else failed.push(segs[j]);
           await sleep(200);
