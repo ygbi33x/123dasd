@@ -5234,7 +5234,9 @@ async function doBatchImport() {
   if(importBusy) { tipDom.innerHTML = '⏳ 正在导入中，请稍候...'; return; }
   const r = parseImportText();
   const total = r.matched.length + r.unmatched.length;
-  if(total < 2) {
+  // 单个连写串也允许导入（会被智能拆分成多个地点）
+  const splittable = r.unmatched.some(function(n) { return n.length >= 4 && splitConcatenated(n).length >= 2; });
+  if(total < 2 && !splittable) {
     tipDom.innerHTML = '⚠️ 请至少输入 2 个地点';
     return;
   }
