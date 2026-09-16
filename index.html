@@ -4971,6 +4971,14 @@ function cityToShareEntry(city) {
 
 function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
+// Promise 超时保护：高德接口偶发丢响应时避免整个导入卡死
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise(function(r) { setTimeout(function() { r(null); }, ms || 8000); })
+  ]);
+}
+
 // 名称匹配度（0~1）：最长公共子串长度 / 输入名长度。容忍错别字（如"蝎埔村"→"蟳埔村"）
 function nameMatchScore(input, resultName) {
   if(!input || !resultName) return 0;
@@ -5024,12 +5032,12 @@ function resolvePlaceAsync(name, city) {
 
 // 智能解析：POI 搜索优先（带名称匹配度校验），地理编码兜底（长名称要求地址完整包含输入，防止连写串被模糊匹配成单个地址）
 async function resolvePoiSmart(name, city) {
-  const poi = await placeSearchAsync(name, city).catch(function() { return null; });
+  const poi = await withTimeout(placeSearchAsync(name, city), 8000).catch(function() { return null; });
   if(poi) {
     poi._score = nameMatchScore(name, poi.name);
     if(poi._score >= 0.5) return poi;
   }
-  const geo = await geocodeAsync(name, city).catch(function() { return null; });
+  const geo = await withTimeout(geocodeAsync(name, city), 8000).catch(function() { return null; });
   if(geo && (name.length <= 4 || geo._score >= 1 || nameMatchScore(name, geo.address) >= 0.6)) return geo;
   if(poi && name.length <= 4) return poi; // 短名称放宽，避免过度拒绝
   return null;
@@ -5327,7 +5335,7 @@ async function reresolveOutliers() {
     const p = suspects[i];
     const raw = p.city._raw || p.city.name;
     tipDom.innerHTML = '🧭 校正疑似认错城市的地点：' + raw;
-    const better = await placeSearchAsync(raw, domCity).catch(function() { return null; });
+    const better = await withTimeout(placeSearchAsync(raw, domCity), 8000).catch(function() { return null; });
     if(better) {
       const newScore = nameMatchScore(raw, better.name);
       const oldScore = p.city._score || 0.5;
