@@ -5106,10 +5106,10 @@ function cleanSegment(s) {
   return s.replace(/^[一到去往来和与跟及、的从在向]+/, '').replace(/[的了呢吧啊]+$/, '');
 }
 
-// 从已添加的路线点推断主城市（用于就近解析重名地点）
-function inferDominantCityName() {
+// 从已添加的路线点推断主城市（用于就近解析重名地点）；可指定统计的点集合
+function inferDominantCityName(pool) {
   const counts = {};
-  routePoints.forEach(function(p) {
+  (pool || routePoints).forEach(function(p) {
     const cn = cityOfPoint(p.city);
     if(cn) counts[cn] = (counts[cn] || 0) + 1;
   });
@@ -5120,11 +5120,21 @@ function inferDominantCityName() {
   return best;
 }
 
-// 提取路线点所属城市：优先 cityname，其次从详细地址中正则提取，内置城市直接用名称
+// 提取路线点所属城市：优先 cityname；地址点在内置城市表里做匹配（地址按 省→市→区 顺序，
+// 取最早出现的城市名，避免"自治区梧州市"这类正则误匹配）；兜底正则/省份
 function cityOfPoint(city) {
   if(city.cityname) return city.cityname;
   if(!city.isAddress) return city.name;
-  const m = (city.address || '').match(/[一-龥]{2,5}市/);
+  const addr = city.address || '';
+  let best = '', bestIdx = 1e9;
+  for(let i = 0; i < CITIES.length; i++) {
+    const short = CITIES[i].name.replace(/(省|市|县|区|地区|自治州|盟|旗|自治县|林区)$/, '');
+    if(short.length < 2) continue;
+    const idx = addr.indexOf(short);
+    if(idx >= 0 && idx < bestIdx) { bestIdx = idx; best = CITIES[i].name; }
+  }
+  if(best) return best;
+  const m = addr.match(/[一-龥]{2,4}市/);
   return m ? m[0] : (city.province || '');
 }
 
@@ -5332,25 +5342,34 @@ async function doBatchImport() {
 // 用主城市就近重解析；找不到聚集区附近的候选就直接移除并如实报告，不硬凑错点。
 async function reresolveOutliers(failed) {
   if(routePoints.length < 4) return;
-  const domCity = inferDominantCityName();
-  console.log('[离群校正] 入口 点数:', routePoints.length, '主城市:', domCity, '点分布:', routePoints.map(function(p) { return p.city.name + '[' + p.city.lng.toFixed(1) + ',' + p.city.lat.toFixed(1) + ']'; }));
-  if(!domCity) return;
   const NEAR_KM = 150, FAR_KM = 250;
-  // 找最大聚集簇：以"150km 内邻居最多"的点为簇心
-  let med = null, clusterSize = 0;
+  // 找最大聚集簇（150km 内邻居最多的一组点）
+  let med = null, clusterSize = 0, inCluster = [];
   for(let i = 0; i < routePoints.length; i++) {
-    const cnt = routePoints.filter(function(p) { return geoDist(routePoints[i].city, p.city) <= NEAR_KM; }).length;
-    if(cnt > clusterSize) { clusterSize = cnt; med = routePoints[i].city; }
+    const nb = routePoints.filter(function(p) { return geoDist(routePoints[i].city, p.city) <= NEAR_KM; });
+    if(nb.length > clusterSize) { clusterSize = nb.length; med = routePoints[i].city; inCluster = nb; }
   }
-  // 簇太小或不足总数一半 → 多点分散（如跨省路线），不做校正
-  if(!med || clusterSize < 3 || clusterSize < routePoints.length / 2) return;
+  if(!med || clusterSize < 3) return; // 太分散（如跨省路线），不做校正
+  // 次大簇（不在主簇内的点之间再聚一次），主簇必须明显占优才动手，避免误伤双城/多城路线
+  const rest = routePoints.filter(function(p) { return inCluster.indexOf(p) < 0; });
+  let secondSize = 0;
+  for(let i = 0; i < rest.length; i++) {
+    const cnt = rest.filter(function(p) { return geoDist(rest[i].city, p.city) <= NEAR_KM; }).length;
+    if(cnt > secondSize) secondSize = cnt;
+  }
+  if(clusterSize < Math.max(3, secondSize * 2)) return;
+  // 主城市只用簇内点推断，避免被错点的地址带偏
+  const domCity = inferDominantCityName(inCluster);
+  console.log('[离群校正] 簇心:', med.name, '簇大小:', clusterSize + '/' + routePoints.length, '次簇:', secondSize, '主城市:', domCity);
+  if(!domCity) return;
   const suspects = routePoints.filter(function(p) { return p.city.isAddress && geoDist(med, p.city) > FAR_KM; });
-  console.log('[离群校正] 簇心:', med.name, '簇大小:', clusterSize + '/' + routePoints.length, '疑似点:', suspects.map(function(p) { return p.city.name + '(' + Math.round(geoDist(med, p.city)) + 'km)'; }));
+  console.log('[离群校正] 疑似点:', suspects.map(function(p) { return p.city.name + '(' + Math.round(geoDist(med, p.city)) + 'km)'; }));
   for(let i = 0; i < suspects.length; i++) {
     const p = suspects[i];
     const raw = p.city._raw || p.city.name;
     tipDom.innerHTML = '🧭 校正疑似认错城市的地点：' + raw;
-    const better = await withTimeout(placeSearchAsync(raw, domCity), 8000).catch(function() { return null; });
+    let better = await withTimeout(placeSearchAsync(raw, domCity), 8000).catch(function() { return null; });
+    if(!better) better = await withTimeout(geocodeAsync(raw, domCity), 8000).catch(function() { return null; });
     console.log('[离群校正]', raw, '→', better ? (better.name + ' / ' + Math.round(geoDist(med, better)) + 'km / score=' + nameMatchScore(raw, better.name).toFixed(2) + ' / old=' + (p.city._score || 0.5)) : 'null');
     let replaced = false;
     if(better) {
