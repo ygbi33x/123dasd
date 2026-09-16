@@ -5140,7 +5140,6 @@ function inferDominantCityName(pool) {
     const cn = cityOfPoint(p.city);
     if(cn) counts[cn] = (counts[cn] || 0) + 1;
   });
-  console.log('[主城市推断]', JSON.stringify(counts));
   let best = '', bestN = 0;
   for(const k in counts) {
     if(counts[k] > bestN) { best = k; bestN = counts[k]; }
@@ -5321,7 +5320,6 @@ async function doBatchImport() {
       for(let i = 0; i < toResolve.length; i++) {
         tipDom.innerHTML = '🔍 正在解析（' + (i + 1) + '/' + toResolve.length + '）：' + toResolve[i];
         const city = await resolvePlaceAsync(toResolve[i], null).catch(function() { return null; });
-        console.log('[P1]', toResolve[i], '→', city ? (city.name + ' [' + city.lng.toFixed(2) + ',' + city.lat.toFixed(2) + ']') : 'null');
         if(city) { resolvedCount++; addUniquePoint(city); } else remaining.push(toResolve[i]);
         await new Promise(function(res) { setTimeout(res, 200); });
       }
@@ -5333,7 +5331,6 @@ async function doBatchImport() {
         const stillRemaining = [];
         for(let i = 0; i < remaining.length; i++) {
           const city = await resolvePoiSmart(remaining[i], domCity).catch(function() { return null; });
-          console.log('[P2|' + domCity + ']', remaining[i], '→', city ? (city.name + ' [' + city.lng.toFixed(2) + ',' + city.lat.toFixed(2) + ']') : 'null');
           if(city) { resolvedCount++; addUniquePoint(city); } else stillRemaining.push(remaining[i]);
           await sleep(200);
         }
@@ -5352,7 +5349,6 @@ async function doBatchImport() {
           // 每成功解析一个段就重新推断主城市，让后续段就近解析
           const segCity = inferDominantCityName();
           const city = await resolvePoiSmart(segs[j], segCity).catch(function() { return null; });
-          console.log('[P3|' + segCity + ']', segs[j], '→', city ? (city.name + ' [' + city.lng.toFixed(2) + ',' + city.lat.toFixed(2) + ']') : 'null');
           if(city) { resolvedCount++; addUniquePoint(city); }
           else failed.push(segs[j]);
           await sleep(200);
@@ -5391,17 +5387,14 @@ async function reresolveOutliers(failed) {
   if(clusterSize < Math.max(3, secondSize * 2)) return;
   // 主城市只用簇内点推断，避免被错点的地址带偏
   const domCity = inferDominantCityName(inCluster);
-  console.log('[离群校正] 簇心:', med.name, '簇大小:', clusterSize + '/' + routePoints.length, '次簇:', secondSize, '主城市:', domCity);
   if(!domCity) return;
   const suspects = routePoints.filter(function(p) { return p.city.isAddress && geoDist(med, p.city) > FAR_KM; });
-  console.log('[离群校正] 疑似点:', suspects.map(function(p) { return p.city.name + '(' + Math.round(geoDist(med, p.city)) + 'km)'; }));
   for(let i = 0; i < suspects.length; i++) {
     const p = suspects[i];
     const raw = p.city._raw || p.city.name;
     tipDom.innerHTML = '🧭 校正疑似认错城市的地点：' + raw;
     let better = await withTimeout(placeSearchAsync(raw, domCity), 8000).catch(function() { return null; });
     if(!better) better = await withTimeout(geocodeAsync(raw, domCity), 8000).catch(function() { return null; });
-    console.log('[离群校正]', raw, '→', better ? (better.name + ' / ' + Math.round(geoDist(med, better)) + 'km / score=' + nameMatchScore(raw, better.name).toFixed(2) + ' / old=' + (p.city._score || 0.5)) : 'null');
     let replaced = false;
     if(better) {
       const newScore = nameMatchScore(raw, better.name);
@@ -5428,7 +5421,7 @@ async function reresolveOutliers(failed) {
         routePoints.splice(idx, 1);
         renumberMarkers();
       }
-      if(failed) failed.push(raw + '（疑似名称有误，未找到）');
+      if(failed) failed.push(raw + '（附近未找到，已跳过）');
     }
     await sleep(200);
   }
