@@ -4969,11 +4969,28 @@ function cityToShareEntry(city) {
   return city.name;
 }
 
-// 在线解析地点（地理编码 + POI 搜索双保险），返回 Promise<虚拟城市对象|null>
-// city 可选：传入城市名时就近限定搜索（用于同批地点的主城市推断）
-function resolvePlaceAsync(name, city) {
+function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+// 名称匹配度（0~1）：最长公共子串长度 / 输入名长度。容忍错别字（如"蝎埔村"→"蟳埔村"）
+function nameMatchScore(input, resultName) {
+  if(!input || !resultName) return 0;
+  const a = String(input), b = String(resultName);
+  if(a.indexOf(b) >= 0 || b.indexOf(a) >= 0) return Math.min(a.length, b.length) / a.length;
+  let best = 0;
+  for(let i = 0; i < a.length; i++) {
+    for(let j = 0; j < b.length; j++) {
+      let k = 0;
+      while(i + k < a.length && j + k < b.length && a[i + k] === b[j + k]) k++;
+      if(k > best) best = k;
+    }
+  }
+  return best / a.length;
+}
+
+// 地理编码（地址解析）
+function geocodeAsync(name, city) {
   return new Promise(function(resolve) {
-    const tryGeocode = function() {
+    const run = function() {
       const geocoder = new AMap.Geocoder({ city: city || "全国", radius: 1000 });
       geocoder.getLocation(name, function(status, result) {
         if(status === 'complete' && result.geocodes && result.geocodes.length > 0) {
@@ -4985,15 +5002,35 @@ function resolvePlaceAsync(name, city) {
             name: addrName, province: loc.province || '',
             cityname: (typeof loc.city === 'string' ? loc.city : ''), region: '',
             lng: loc.location.lng, lat: loc.location.lat,
-            isCenter: false, isAddress: true, address: loc.formattedAddress || name
+            isCenter: false, isAddress: true, address: loc.formattedAddress || name,
+            _raw: name, _score: (loc.formattedAddress && loc.formattedAddress.indexOf(name) >= 0) ? 1 : 0.6
           });
         } else {
-          placeSearchAsync(name, city).then(resolve);
+          resolve(null);
         }
       });
     };
-    if(typeof AMap.Geocoder === 'undefined') AMap.plugin('AMap.Geocoder', tryGeocode); else tryGeocode();
+    if(typeof AMap.Geocoder === 'undefined') AMap.plugin('AMap.Geocoder', run); else run();
   });
+}
+
+// 在线解析地点（地理编码 + POI 搜索双保险），返回 Promise<虚拟城市对象|null>
+// city 可选：传入城市名时就近限定搜索（用于同批地点的主城市推断）
+function resolvePlaceAsync(name, city) {
+  return resolvePoiSmart(name, city);
+}
+
+// 智能解析：POI 搜索优先（带名称匹配度校验），地理编码兜底（长名称要求地址完整包含输入，防止连写串被模糊匹配成单个地址）
+async function resolvePoiSmart(name, city) {
+  const poi = await placeSearchAsync(name, city).catch(function() { return null; });
+  if(poi) {
+    poi._score = nameMatchScore(name, poi.name);
+    if(poi._score >= 0.5) return poi;
+  }
+  const geo = await geocodeAsync(name, city).catch(function() { return null; });
+  if(geo && (name.length <= 4 || geo._score >= 1 || nameMatchScore(name, geo.address) >= 0.6)) return geo;
+  if(poi && name.length <= 4) return poi; // 短名称放宽，避免过度拒绝
+  return null;
 }
 
 // POI 搜索（可带城市限定，就近解析"西街""钟楼"这类重名地点）
@@ -5010,7 +5047,8 @@ function placeSearchAsync(name, city) {
             name: poi.name || name, province: poi.pname || '', cityname: poi.cityname || '', region: '',
             lng: poi.location.lng, lat: poi.location.lat,
             isCenter: false, isAddress: true,
-            address: (poi.pname || '') + (poi.cityname || '') + (poi.adname || '') + (poi.address || '')
+            address: (poi.pname || '') + (poi.cityname || '') + (poi.adname || '') + (poi.address || ''),
+            _raw: name
           });
         } else {
           resolve(null);
@@ -5255,9 +5293,9 @@ async function doBatchImport() {
         if(domCity) tipDom.innerHTML = '🔍 已推断主区域「' + domCity + '」，就近解析剩余 ' + remaining.length + ' 个...';
         const stillRemaining = [];
         for(let i = 0; i < remaining.length; i++) {
-          const city = await placeSearchAsync(remaining[i], domCity).catch(function() { return null; });
+          const city = await resolvePoiSmart(remaining[i], domCity).catch(function() { return null; });
           if(city) { resolvedCount++; addUniquePoint(city); } else stillRemaining.push(remaining[i]);
-          await new Promise(function(res) { setTimeout(res, 200); });
+          await sleep(200);
         }
         remaining = stillRemaining;
       }
@@ -5281,10 +5319,46 @@ async function doBatchImport() {
         else if(okCount < segs.length) failed.push(text + '（部分未识别）');
       }
     }
+
+    // 阶段4：离群校正——某个地址点远离其他点的聚集区时，用主城市重新解析替换
+    await reresolveOutliers();
   } finally {
     importBusy = false;
   }
   finishBatchImport(shouldOptimize, failed, resolvedCount);
+}
+
+// 离群校正：地址点偏离主体聚集区 400km 以上时，大概率是同名地点认错城市，用主城市就近重解析
+async function reresolveOutliers() {
+  if(routePoints.length < 4) return;
+  const domCity = inferDominantCityName();
+  if(!domCity) return;
+  const lngs = routePoints.map(function(p) { return p.city.lng; }).sort(function(a, b) { return a - b; });
+  const lats = routePoints.map(function(p) { return p.city.lat; }).sort(function(a, b) { return a - b; });
+  const med = { lng: lngs[Math.floor(lngs.length / 2)], lat: lats[Math.floor(lats.length / 2)] };
+  const suspects = routePoints.filter(function(p) { return p.city.isAddress && geoDist(med, p.city) > 400; });
+  for(let i = 0; i < suspects.length; i++) {
+    const p = suspects[i];
+    const raw = p.city._raw || p.city.name;
+    tipDom.innerHTML = '🧭 校正疑似认错城市的地点：' + raw;
+    const better = await placeSearchAsync(raw, domCity).catch(function() { return null; });
+    if(better) {
+      const newScore = nameMatchScore(raw, better.name);
+      const oldScore = p.city._score || 0.5;
+      if(newScore >= oldScore && geoDist(med, better) < geoDist(med, p.city) * 0.6) {
+        const idx = routePoints.indexOf(p);
+        if(idx >= 0) {
+          if(p.marker) map.remove(p.marker);
+          if(p.label) map.remove(p.label);
+          routePoints.splice(idx, 1);
+          better._raw = raw;
+          better._score = newScore;
+          addPoint(better); // suppressAutoPlan 生效中，之后统一优化排序
+        }
+      }
+    }
+    await sleep(200);
+  }
 }
 
 function addUniquePoint(city) {
