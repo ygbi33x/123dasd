@@ -495,7 +495,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <span class="scheme-panel-title">📥 批量导入地点</span>
           <button class="scheme-save-btn" onclick="doBatchImport()">导入并规划</button>
         </div>
-        <textarea id="importText" class="import-textarea" placeholder="粘贴或输入多个地点，每行一个，也可用逗号、顿号、空格分隔，例如：&#10;昆明市&#10;成都市&#10;贵阳市"></textarea>
+        <textarea id="importText" class="import-textarea" placeholder="粘贴或输入多个地点，每行一个，也可用逗号、顿号、空格、短横线分隔&#10;支持景点、地址，甚至连写（如：开元寺西街钟楼）&#10;例如：&#10;昆明市&#10;成都市&#10;泉州市开元寺"></textarea>
         <div class="import-preview" id="importPreview">支持模糊匹配（如"昆明"自动匹配"昆明市"），未识别的名称会标出</div>
         <div class="import-actions">
           <label class="import-opt"><input type="checkbox" id="importClear" checked> 导入前清空当前路线</label>
@@ -4970,10 +4970,11 @@ function cityToShareEntry(city) {
 }
 
 // 在线解析地点（地理编码 + POI 搜索双保险），返回 Promise<虚拟城市对象|null>
-function resolvePlaceAsync(name) {
+// city 可选：传入城市名时就近限定搜索（用于同批地点的主城市推断）
+function resolvePlaceAsync(name, city) {
   return new Promise(function(resolve) {
     const tryGeocode = function() {
-      const geocoder = new AMap.Geocoder({ city: "全国", radius: 1000 });
+      const geocoder = new AMap.Geocoder({ city: city || "全国", radius: 1000 });
       geocoder.getLocation(name, function(status, result) {
         if(status === 'complete' && result.geocodes && result.geocodes.length > 0) {
           const loc = result.geocodes[0];
@@ -4981,36 +4982,114 @@ function resolvePlaceAsync(name) {
           if(loc.formattedAddress && loc.formattedAddress.indexOf(name) < 0) addrName = name + '（' + loc.formattedAddress + '）';
           if(addrName.length > 30) addrName = addrName.substring(0, 30) + '…';
           resolve({
-            name: addrName, province: loc.province || '', region: '',
+            name: addrName, province: loc.province || '',
+            cityname: (typeof loc.city === 'string' ? loc.city : ''), region: '',
             lng: loc.location.lng, lat: loc.location.lat,
             isCenter: false, isAddress: true, address: loc.formattedAddress || name
           });
         } else {
-          tryPlaceSearch();
+          placeSearchAsync(name, city).then(resolve);
         }
       });
     };
-    const tryPlaceSearch = function() {
-      const doSearch = function() {
-        const ps = new AMap.PlaceSearch({ city: '全国', citylimit: false, pageSize: 1, pageIndex: 1 });
-        ps.search(name, function(status, result) {
-          if(status === 'complete' && result.poiList && result.poiList.pois && result.poiList.pois.length > 0) {
-            const poi = result.poiList.pois[0];
-            resolve({
-              name: poi.name || name, province: poi.pname || '', region: '',
-              lng: poi.location.lng, lat: poi.location.lat,
-              isCenter: false, isAddress: true,
-              address: (poi.pname || '') + (poi.cityname || '') + (poi.adname || '') + (poi.address || '')
-            });
-          } else {
-            resolve(null);
-          }
-        });
-      };
-      if(typeof AMap.PlaceSearch === 'undefined') AMap.plugin('AMap.PlaceSearch', doSearch); else doSearch();
-    };
     if(typeof AMap.Geocoder === 'undefined') AMap.plugin('AMap.Geocoder', tryGeocode); else tryGeocode();
   });
+}
+
+// POI 搜索（可带城市限定，就近解析"西街""钟楼"这类重名地点）
+function placeSearchAsync(name, city) {
+  return new Promise(function(resolve) {
+    const doSearch = function() {
+      const opts = { city: city || '全国', pageSize: 1, pageIndex: 1 };
+      if(city) opts.citylimit = true;
+      const ps = new AMap.PlaceSearch(opts);
+      ps.search(name, function(status, result) {
+        if(status === 'complete' && result.poiList && result.poiList.pois && result.poiList.pois.length > 0) {
+          const poi = result.poiList.pois[0];
+          resolve({
+            name: poi.name || name, province: poi.pname || '', cityname: poi.cityname || '', region: '',
+            lng: poi.location.lng, lat: poi.location.lat,
+            isCenter: false, isAddress: true,
+            address: (poi.pname || '') + (poi.cityname || '') + (poi.adname || '') + (poi.address || '')
+          });
+        } else {
+          resolve(null);
+        }
+      });
+    };
+    if(typeof AMap.PlaceSearch === 'undefined') AMap.plugin('AMap.PlaceSearch', doSearch); else doSearch();
+  });
+}
+
+// 输入提示（用于连写文本的智能拆分）
+function autocompleteAsync(keyword, city) {
+  return new Promise(function(resolve) {
+    const run = function() {
+      const opts = { city: city || '全国' };
+      if(city) opts.citylimit = true;
+      const ac = new AMap.Autocomplete(opts);
+      ac.search(keyword, function(status, result) {
+        if(status === 'complete' && result.tips && result.tips.length > 0) resolve(result.tips);
+        else resolve([]);
+      });
+    };
+    if(typeof AMap.Autocomplete === 'undefined') AMap.plugin('AMap.Autocomplete', run); else run();
+  });
+}
+
+// name 作为 rest 前缀的可消费长度（容忍1个错别字，如"蝎埔村"→"蟳埔村"），不匹配返回0
+function fuzzyPrefixLen(rest, name) {
+  if(!name || name.length < 2 || rest.length < 2) return 0;
+  if(rest.indexOf(name) === 0) return name.length;
+  const len = Math.min(name.length, rest.length);
+  if(len < 2) return 0;
+  let diff = name.length > len ? (name.length - len) : 0;
+  for(let i = 0; i < len; i++) if(rest[i] !== name[i]) diff++;
+  return diff <= 1 ? len : 0;
+}
+
+// 连写文本 → 地点名数组（贪心最长前缀匹配，如"开元寺西街钟楼"→["开元寺","西街","钟楼"]）
+async function segmentStickyText(text, city) {
+  const segs = [];
+  let rest = text, guard = 0;
+  while(rest.length > 0 && guard < 15) {
+    guard++;
+    let consume = 0, segName = null;
+    const tryTips = function(tips) {
+      tips.forEach(function(t) {
+        const n = t.name || '';
+        const l = fuzzyPrefixLen(rest, n);
+        if(l > consume) { consume = l; segName = n; }
+      });
+    };
+    tryTips(await autocompleteAsync(rest.substring(0, Math.min(10, rest.length)), city));
+    if(!segName) {
+      for(let len = Math.min(6, rest.length); len >= 2 && !segName; len--) {
+        tryTips(await autocompleteAsync(rest.substring(0, len), city));
+      }
+    }
+    if(segName) {
+      segs.push(segName);
+      rest = rest.substring(consume);
+    } else {
+      rest = rest.substring(1); // 跳过无法识别的字符
+    }
+  }
+  return segs;
+}
+
+// 从已添加的路线点推断主城市（用于就近解析重名地点）
+function inferDominantCityName() {
+  const counts = {};
+  routePoints.forEach(function(p) {
+    const cn = p.city.cityname || (!p.city.isAddress ? p.city.name : '');
+    if(cn) counts[cn] = (counts[cn] || 0) + 1;
+  });
+  let best = '', bestN = 0;
+  for(const k in counts) {
+    if(counts[k] > bestN) { best = k; bestN = counts[k]; }
+  }
+  return best;
 }
 
 // 从分享链接/本地缓存的数据恢复路线（统一入口，带容错）
@@ -5106,7 +5185,7 @@ function toggleImportPanel() {
 
 function parseImportText() {
   const raw = (document.getElementById('importText').value || '');
-  const tokens = raw.split(/[\n\r,，、;；\s]+/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+  const tokens = raw.split(/[\n\r,，、;；\s\-~—–→>｜|\/\\]+/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
   const matched = [], unmatched = [], seen = {};
   tokens.forEach(function(t) {
     const city = findCityByName(t);
@@ -5130,50 +5209,82 @@ function previewImport() {
   const r = parseImportText();
   let html = '✅ 识别 <b>' + r.matched.length + '</b> 个地点';
   if(r.matched.length) html += '：' + r.matched.slice(0, 10).map(function(c) { return c.name; }).join('、') + (r.matched.length > 10 ? ' …' : '');
-  if(r.unmatched.length) html += '<br><span style="color:#b45309;">🔍 ' + r.unmatched.length + ' 个本地未识别：' + r.unmatched.slice(0, 8).join('、') + (r.unmatched.length > 8 ? ' …' : '') + '（导入时将自动在线解析）</span>';
+  if(r.unmatched.length) html += '<br><span style="color:#b45309;">🔍 ' + r.unmatched.length + ' 个本地未识别：' + r.unmatched.slice(0, 8).join('、') + (r.unmatched.length > 8 ? ' …' : '') + '（导入时自动在线解析，连写的会智能拆分）</span>';
   dom.innerHTML = html;
 }
 
-function doBatchImport() {
+let importBusy = false;
+
+async function doBatchImport() {
+  if(importBusy) { tipDom.innerHTML = '⏳ 正在导入中，请稍候...'; return; }
   const r = parseImportText();
-  if(r.matched.length + r.unmatched.length < 2) {
+  const total = r.matched.length + r.unmatched.length;
+  if(total < 2) {
     tipDom.innerHTML = '⚠️ 请至少输入 2 个地点';
     return;
   }
-  if(r.matched.length + r.unmatched.length > 60 && !confirm('一次导入 ' + (r.matched.length + r.unmatched.length) + ' 个地点，规划耗时较长且可能超出配额，继续吗？')) return;
+  if(total > 60 && !confirm('一次导入 ' + total + ' 个地点，规划耗时较长且可能超出配额，继续吗？')) return;
   const shouldClear = document.getElementById('importClear').checked;
   const shouldOptimize = document.getElementById('importOptimize').checked;
   if(shouldClear && routePoints.length) clearRoute();
 
-  // 先添加本地已识别的城市，抑制逐点自动规划
+  importBusy = true;
   suppressAutoPlan = true;
-  r.matched.forEach(addUniquePoint);
+  const failed = [];
+  let resolvedCount = 0;
+  try {
+    // 先添加本地已识别的城市
+    r.matched.forEach(addUniquePoint);
 
-  if(r.unmatched.length === 0) {
-    finishBatchImport(shouldOptimize, [], 0);
-    return;
-  }
-  // 未识别的逐个在线解析（地理编码 + POI 搜索），最多解析 20 个以防配额耗尽
-  const toResolve = r.unmatched.slice(0, 20);
-  const skipped = r.unmatched.slice(20);
-  const failed = skipped.slice();
-  let resolvedCount = 0, i = 0;
-  tipDom.innerHTML = '🔍 已添加 ' + r.matched.length + ' 个地点，正在在线解析其余 ' + toResolve.length + ' 个...';
-  (function next() {
-    if(i >= toResolve.length) {
-      finishBatchImport(shouldOptimize, failed, resolvedCount);
-      return;
+    if(r.unmatched.length > 0) {
+      const toResolve = r.unmatched.slice(0, 20);
+      r.unmatched.slice(20).forEach(function(n) { failed.push(n); });
+
+      // 阶段1：直接在线解析（地理编码 + POI 搜索）
+      let remaining = [];
+      for(let i = 0; i < toResolve.length; i++) {
+        tipDom.innerHTML = '🔍 正在解析（' + (i + 1) + '/' + toResolve.length + '）：' + toResolve[i];
+        const city = await resolvePlaceAsync(toResolve[i], null).catch(function() { return null; });
+        if(city) { resolvedCount++; addUniquePoint(city); } else remaining.push(toResolve[i]);
+        await new Promise(function(res) { setTimeout(res, 200); });
+      }
+
+      // 阶段2：按已解析地点推断主城市，就近重试（解决"西街""钟楼"等全国重名问题）
+      if(remaining.length > 0) {
+        const domCity = inferDominantCityName();
+        if(domCity) tipDom.innerHTML = '🔍 已推断主区域「' + domCity + '」，就近解析剩余 ' + remaining.length + ' 个...';
+        const stillRemaining = [];
+        for(let i = 0; i < remaining.length; i++) {
+          const city = await placeSearchAsync(remaining[i], domCity).catch(function() { return null; });
+          if(city) { resolvedCount++; addUniquePoint(city); } else stillRemaining.push(remaining[i]);
+          await new Promise(function(res) { setTimeout(res, 200); });
+        }
+        remaining = stillRemaining;
+      }
+
+      // 阶段3：连写文本智能拆分（如"开元寺西街钟楼"→开元寺/西街/钟楼）
+      for(let i = 0; i < remaining.length; i++) {
+        const text = remaining[i];
+        if(text.length < 4) { failed.push(text); continue; }
+        tipDom.innerHTML = '🧩 智能拆分连写地点：' + text;
+        const domCity = inferDominantCityName();
+        const segs = await segmentStickyText(text, domCity).catch(function() { return []; });
+        if(segs.length === 0) { failed.push(text); continue; }
+        let okCount = 0;
+        for(let j = 0; j < segs.length; j++) {
+          tipDom.innerHTML = '🔍 拆分解析（' + (j + 1) + '/' + segs.length + '）：' + segs[j];
+          const city = await placeSearchAsync(segs[j], domCity).catch(function() { return null; });
+          if(city) { resolvedCount++; okCount++; addUniquePoint(city); }
+          await new Promise(function(res) { setTimeout(res, 200); });
+        }
+        if(okCount === 0) failed.push(text);
+        else if(okCount < segs.length) failed.push(text + '（部分未识别）');
+      }
     }
-    const name = toResolve[i];
-    tipDom.innerHTML = '🔍 正在解析（' + (i + 1) + '/' + toResolve.length + '）：' + name;
-    resolvePlaceAsync(name).then(function(city) {
-      if(city) { resolvedCount++; addUniquePoint(city); }
-      else failed.push(name);
-    }).catch(function() { failed.push(name); }).finally(function() {
-      i++;
-      setTimeout(next, 250);
-    });
-  })();
+  } finally {
+    importBusy = false;
+  }
+  finishBatchImport(shouldOptimize, failed, resolvedCount);
 }
 
 function addUniquePoint(city) {
