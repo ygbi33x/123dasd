@@ -5320,31 +5320,38 @@ async function doBatchImport() {
     }
 
     // 阶段4：离群校正——某个地址点远离其他点的聚集区时，用主城市重新解析替换
-    await reresolveOutliers();
+    await reresolveOutliers(failed);
   } finally {
     importBusy = false;
   }
   finishBatchImport(shouldOptimize, failed, resolvedCount);
 }
 
-// 离群校正：地址点偏离主体聚集区 400km 以上时，大概率是同名地点认错城市，用主城市就近重解析
-async function reresolveOutliers() {
+// 离群校正：仅当存在明显的主体聚集区（≥70% 的点在中位数 150km 内）时启用，
+// 避免误伤合法的跨省多点路线。偏离聚集区 250km 以上的地址点视为疑似认错城市，
+// 用主城市就近重解析；找不到聚集区附近的候选就直接移除并如实报告，不硬凑错点。
+async function reresolveOutliers(failed) {
   if(routePoints.length < 4) return;
   const domCity = inferDominantCityName();
   if(!domCity) return;
   const lngs = routePoints.map(function(p) { return p.city.lng; }).sort(function(a, b) { return a - b; });
   const lats = routePoints.map(function(p) { return p.city.lat; }).sort(function(a, b) { return a - b; });
   const med = { lng: lngs[Math.floor(lngs.length / 2)], lat: lats[Math.floor(lats.length / 2)] };
-  const suspects = routePoints.filter(function(p) { return p.city.isAddress && geoDist(med, p.city) > 400; });
+  const NEAR_KM = 150, FAR_KM = 250;
+  const nearCnt = routePoints.filter(function(p) { return geoDist(med, p.city) <= NEAR_KM; }).length;
+  if(nearCnt / routePoints.length < 0.7) return; // 多点分散（如跨省路线），不做校正
+  const suspects = routePoints.filter(function(p) { return p.city.isAddress && geoDist(med, p.city) > FAR_KM; });
   for(let i = 0; i < suspects.length; i++) {
     const p = suspects[i];
     const raw = p.city._raw || p.city.name;
     tipDom.innerHTML = '🧭 校正疑似认错城市的地点：' + raw;
     const better = await withTimeout(placeSearchAsync(raw, domCity), 8000).catch(function() { return null; });
+    let replaced = false;
     if(better) {
       const newScore = nameMatchScore(raw, better.name);
       const oldScore = p.city._score || 0.5;
-      if(newScore >= oldScore && geoDist(med, better) < geoDist(med, p.city) * 0.6) {
+      // 新候选必须落在聚集区附近（绝对距离门槛），而不是仅仅比错点更近
+      if(newScore >= oldScore && geoDist(med, better) <= FAR_KM) {
         const idx = routePoints.indexOf(p);
         if(idx >= 0) {
           if(p.marker) map.remove(p.marker);
@@ -5353,8 +5360,19 @@ async function reresolveOutliers() {
           better._raw = raw;
           better._score = newScore;
           addPoint(better); // suppressAutoPlan 生效中，之后统一优化排序
+          replaced = true;
         }
       }
+    }
+    if(!replaced) {
+      const idx = routePoints.indexOf(p);
+      if(idx >= 0) {
+        if(p.marker) map.remove(p.marker);
+        if(p.label) map.remove(p.label);
+        routePoints.splice(idx, 1);
+        renumberMarkers();
+      }
+      if(failed) failed.push(raw + '（疑似名称有误，未找到）');
     }
     await sleep(200);
   }
