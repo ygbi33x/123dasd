@@ -408,6 +408,24 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
 #compareClose:hover{color:#111;}
 #compareBody{padding:12px 14px;overflow-y:auto;flex:1;}
 
+/* ===== 方案保存对比面板 ===== */
+.scheme-panel{display:none;margin-top:8px;padding:10px 12px;border:1px solid rgba(59,130,246,.25);border-radius:10px;background:rgba(255,255,255,.85);backdrop-filter:blur(8px);}
+.scheme-panel.open{display:block;}
+.scheme-panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.scheme-panel-title{font-size:12px;font-weight:700;color:#1e40af;}
+.scheme-save-btn{font-size:11px;font-weight:600;color:#fff;background:#2563eb;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;transition:.15s;}
+.scheme-save-btn:hover{background:#1d4ed8;}
+.scheme-empty{font-size:11px;color:#94a3b8;padding:6px 0;}
+.scheme-item{border:1px solid rgba(148,163,184,.25);border-radius:8px;padding:8px;margin-bottom:6px;background:#fff;}
+.scheme-item-head{display:flex;justify-content:space-between;align-items:center;}
+.scheme-name{font-size:12px;font-weight:700;color:#0f172a;}
+.scheme-metrics{font-size:11px;color:#64748b;margin-top:3px;line-height:1.5;}
+.scheme-metrics b{color:#1e40af;}
+.scheme-actions{margin-top:5px;display:flex;gap:6px;}
+.scheme-load-btn,.scheme-del-btn{font-size:10px;padding:2px 8px;border-radius:5px;cursor:pointer;border:1px solid rgba(59,130,246,.35);background:rgba(59,130,246,.06);color:#2563eb;font-weight:600;}
+.scheme-del-btn{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.05);color:#dc2626;}
+.scheme-load-btn:hover{background:rgba(59,130,246,.15);}
+.scheme-del-btn:hover{background:rgba(239,68,68,.12);}
 </style>
 </head>
 <body>
@@ -424,8 +442,9 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         <span>已选路线（<span id="routeCount">0</span>个点）</span>
         <div class="route-bar-actions">
           <span class="route-collapse-btn" id="routeCollapseBtn" onclick="toggleRouteBar()">▼</span>
-          <span class="route-optimize" id="addAllCentersBtn" onclick="addAllCentersAsRoutePoints()" title="一键添加所有中心城市为路线点">⭐ 中心</span>
+          <span class="route-optimize" id="addAllCentersBtn" onclick="addAllCentersAsRoutePoints()" title="一键添加全部77个中心城市为路线点（将触发批量规划，耗时较长）">⭐ 全选中心</span>
           <span class="route-optimize" id="optimizeBtn" onclick="optimizeRouteOrder()" title="自动优化访问顺序">🔄 优化</span>
+          <span class="route-optimize" id="schemeBtn" onclick="toggleSchemePanel()" title="保存当前路线为方案，多方案对比">💾 方案</span>
           <span class="route-bar-clear" id="clearRouteBtn">清空</span>
         </div>
       </div>
@@ -436,6 +455,10 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         <div class="route-summary-item">
           <span class="route-summary-label">总里程</span>
           <span class="route-summary-value" id="totalDist">-</span>
+        </div>
+        <div class="route-summary-item">
+          <span class="route-summary-label">过路费</span>
+          <span class="route-summary-value" id="totalTolls" style="color:#b45309;">-</span>
         </div>
         <div class="route-summary-item">
           <span class="route-summary-label">驾车时间</span>
@@ -449,6 +472,14 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <span class="route-summary-label">路段</span>
           <span class="route-summary-value" id="totalSegs">-</span>
         </div>
+      </div>
+      <!-- 路线方案保存与对比面板 -->
+      <div class="scheme-panel" id="schemePanel">
+        <div class="scheme-panel-head">
+          <span class="scheme-panel-title">💾 路线方案</span>
+          <button class="scheme-save-btn" onclick="saveCurrentAsScheme()">保存当前路线</button>
+        </div>
+        <div id="schemeList"></div>
       </div>
       <!-- 路线路况统计 -->
       <div class="traffic-stats" id="trafficStats" style="display:none;">
@@ -636,8 +667,15 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
 </div>
 
 <script>
+/* ===== 高德安全配置（二选一）=====
+ * 方案一【过渡期，配合控制台域名白名单使用】：明文 securityJsCode。
+ *   - 必须先到高德开放平台控制台为 key 配置域名白名单（如 ygbi33x.github.io）。
+ * 方案二【推荐，生产环境】：serviceHost 代理，密钥只存服务器。
+ *   - 部署 amap-proxy.js 后：删除 securityJsCode 那一行，启用 serviceHost。
+ */
 window._AMapSecurityConfig = {
   securityJsCode: "5709f1c855ca34155623c5fe0db7f05a"
+  // serviceHost: location.origin + "/_AMapService" // 代理部署后启用本行，并删除上面的 securityJsCode
 };
 </script>
 <script src="https://webapi.amap.com/maps?v=1.4.15&key=6ef93fcd8d5b297ae869c20eceaba5a6&plugin=AMap.Driving,AMap.TrafficLayer,AMap.Scale,AMap.ToolBar"></script>
@@ -1104,6 +1142,10 @@ window.onload = function() {
   CAPITALS = CITIES.filter(function(c) { return CAPITAL_NAMES.indexOf(c.name) >= 0; });
   renderCityList();
   loadRouteFromURL();
+  // 无分享链接时，从本地存储恢复上次未完成的路线
+  if(!window.location.hash || window.location.hash.indexOf('#route=') < 0) {
+    loadRouteFromLocal();
+  }
   
   // 点击外部关闭POI下拉
   document.addEventListener('click', function(e) {
@@ -1886,6 +1928,7 @@ function renderRouteBar() {
   }
   
   document.getElementById('routeCount').textContent = routePoints.length;
+  saveRouteToLocal(); // 每次路线变化后持久化，防止刷新丢失
   
   // 显示/隐藏总览和手动添加
   if(summary) summary.style.display = routePoints.length >= 2 ? 'flex' : 'none';
@@ -1963,13 +2006,18 @@ function updateRouteSummary() {
   const totalTimeEl = document.getElementById('totalTime');
   const totalDesignTimeEl = document.getElementById('totalDesignTime');
   const totalSegsEl = document.getElementById('totalSegs');
+  const totalTollsEl = document.getElementById('totalTolls');
   if(!totalDistEl) return;
   
-  let totalDist = 0, totalTime = 0;
+  let totalDist = 0, totalTime = 0, totalTolls = 0, hasTolls = false;
   for(let i = 0; i < routeSegments.length; i++) {
     if(routeSegments[i].route) {
       totalDist += routeSegments[i].route.distance || 0;
       totalTime += routeSegments[i].route.time || 0;
+      if(typeof routeSegments[i].route.tolls === 'number') {
+        totalTolls += routeSegments[i].route.tolls;
+        hasTolls = true;
+      }
     }
   }
   
@@ -1981,6 +2029,10 @@ function updateRouteSummary() {
     totalDesignTimeEl.title = '按设计时速 ' + designSpeed + ' km/h 计算';
   }
   totalSegsEl.textContent = routeSegments.length + ' 段';
+  if(totalTollsEl) {
+    totalTollsEl.textContent = hasTolls ? '¥' + Math.round(totalTolls) : '-';
+    totalTollsEl.title = '高速过路费估算（不含油费），数据来自高德路线规划';
+  }
   
   // 计算路线路况统计
   updateTrafficStats();
@@ -2126,10 +2178,10 @@ function geoDist(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-// 格式化时间：秒 -> X时X分
+// 格式化时间：秒 -> X时X分（分钟满60自动进位到小时）
 function formatTime(seconds) {
-  if(!seconds || seconds <= 0) return '-';
-  const totalMin = Math.ceil(seconds / 60);
+  if(!seconds || !isFinite(seconds) || seconds <= 0) return '-';
+  const totalMin = Math.round(seconds / 60);
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
   if(h > 0) return h + '时' + m + '分';
@@ -2670,6 +2722,11 @@ function updateRouteSelector() {
     list.innerHTML = '';
     const routes = seg.allRoutes || [seg.route];
     
+    // 按实际数据计算最快/最短，避免按请求顺序错标徽章
+    const validRoutes = routes.filter(function(r){ return r && isFinite(r.time) && isFinite(r.distance); });
+    const minTime = Math.min.apply(null, validRoutes.map(function(r){ return r.time; }));
+    const minDist = Math.min.apply(null, validRoutes.map(function(r){ return r.distance; }));
+    
     for(let i = 0; i < routes.length; i++) {
       const route = routes[i];
       const isSelected = i === (seg.selectedRouteIndex || 0);
@@ -2681,9 +2738,11 @@ function updateRouteSelector() {
       option.onclick = function() { selectRoute(i); };
       
       let badge = '';
-      if(i === 0) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
-      else if(route.distance <= routes[0].distance) badge = '<span class="route-option-badge" style="background:#22c55e;">最短</span>';
-      else if(route.time <= routes[0].time) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
+      if(isFinite(route.time) && isFinite(route.distance)) {
+        if(route.time === minTime && route.distance === minDist) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快·最短</span>';
+        else if(route.time === minTime) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
+        else if(route.distance === minDist) badge = '<span class="route-option-badge" style="background:#22c55e;">最短</span>';
+      }
       
       option.innerHTML = 
         '<div class="route-option-color" style="background:' + color + ';"></div>' +
@@ -2713,6 +2772,11 @@ function updateRouteSelector() {
       const policyNames = {'LEAST_TIME': '时间最短', 'LEAST_FEE': '费用最少', 'LEAST_DISTANCE': '距离最短'};
       const routes = seg.allRoutes || [seg.route];
       
+      // 按实际数据计算最快/最短，避免按请求顺序错标徽章
+      const segValidRoutes = routes.filter(function(rt){ return rt && isFinite(rt.time) && isFinite(rt.distance); });
+      const segMinTime = Math.min.apply(null, segValidRoutes.map(function(rt){ return rt.time; }));
+      const segMinDist = Math.min.apply(null, segValidRoutes.map(function(rt){ return rt.distance; }));
+      
       // 段标题
       const header = document.createElement('div');
       header.className = 'segment-header';
@@ -2731,9 +2795,11 @@ function updateRouteSelector() {
         option.onclick = function() { selectSegmentRoute(i, r); };
         
         let badge = '';
-        if(r === 0) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
-        else if(route.distance <= routes[0].distance) badge = '<span class="route-option-badge" style="background:#22c55e;">最短</span>';
-        else if(route.time <= routes[0].time) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
+        if(isFinite(route.time) && isFinite(route.distance)) {
+          if(route.time === segMinTime && route.distance === segMinDist) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快·最短</span>';
+          else if(route.time === segMinTime) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
+          else if(route.distance === segMinDist) badge = '<span class="route-option-badge" style="background:#22c55e;">最短</span>';
+        }
         
         option.innerHTML = 
           '<div class="route-option-color" style="background:' + (isSelected ? color : '#cbd5e1') + ';"></div>' +
@@ -4071,6 +4137,14 @@ function addAllCentersAsRoutePoints() {
     centers.unshift(pudong);
   }
   
+  // 大批量添加前二次确认，避免误触触发数十段高耗时规划
+  const pendingCount = centers.filter(function(c) {
+    return routePoints.findIndex(function(p) { return p.city.name === c.name; }) < 0;
+  }).length;
+  if(pendingCount > 20 && !confirm('将一键添加 ' + pendingCount + ' 个中心城市并逐段规划（可能耗时数分钟），是否继续？')) {
+    return;
+  }
+  
   let added = 0;
   // 添加所有中心城市
   for(let i = 0; i < centers.length; i++) {
@@ -4532,10 +4606,12 @@ function resetAll() {
 }
 
 // ===== 导出路线数据CSV =====
+// 注：此 formatTime 会覆盖前一定义，统一使用带进位版本，修复"X时60分"问题
 function formatTime(seconds) {
-  if(!seconds) return '-';
-  const h = Math.floor(seconds / 3600);
-  const m = Math.round((seconds % 3600) / 60);
+  if(!seconds || !isFinite(seconds) || seconds <= 0) return '-';
+  const totalMin = Math.round(seconds / 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
   if(h > 0) return h + '时' + m + '分';
   return m + '分';
 }
@@ -4670,10 +4746,163 @@ function shareRouteLink() {
 }
 
 // 从URL加载路线
+// ===== 路线方案保存与对比 =====
+const SCHEME_STORAGE_KEY = 'logistics_route_schemes_v1';
+
+function getSchemes() {
+  try { return JSON.parse(localStorage.getItem(SCHEME_STORAGE_KEY)) || []; }
+  catch(e) { return []; }
+}
+
+function saveSchemes(list) {
+  try { localStorage.setItem(SCHEME_STORAGE_KEY, JSON.stringify(list)); } catch(e) {}
+}
+
+function toggleSchemePanel() {
+  const panel = document.getElementById('schemePanel');
+  if(!panel) return;
+  panel.classList.toggle('open');
+  if(panel.classList.contains('open')) renderSchemeList();
+}
+
+function saveCurrentAsScheme() {
+  if(routePoints.length < 2) {
+    tipDom.innerHTML = '⚠️ 请先规划至少 2 个点的路线再保存方案';
+    return;
+  }
+  let totalDist = 0, totalTime = 0, totalTolls = 0, hasTolls = false;
+  routeSegments.forEach(function(s) {
+    if(s.route) {
+      totalDist += s.route.distance || 0;
+      totalTime += s.route.time || 0;
+      if(typeof s.route.tolls === 'number') { totalTolls += s.route.tolls; hasTolls = true; }
+    }
+  });
+  if(totalDist <= 0) {
+    tipDom.innerHTML = '⚠️ 路线尚未规划完成，请等待规划结束后再保存';
+    return;
+  }
+  const schemes = getSchemes();
+  const name = prompt('方案名称：', '方案' + (schemes.length + 1));
+  if(name === null) return;
+  schemes.push({
+    name: name || ('方案' + (schemes.length + 1)),
+    cities: routePoints.map(function(p) { return p.city.name; }),
+    km: (totalDist / 1000).toFixed(1),
+    time: formatTime(totalTime),
+    tolls: hasTolls ? ('¥' + Math.round(totalTolls)) : '-',
+    savedAt: Date.now()
+  });
+  saveSchemes(schemes);
+  renderSchemeList();
+  const panel = document.getElementById('schemePanel');
+  if(panel && !panel.classList.contains('open')) panel.classList.add('open');
+  tipDom.innerHTML = '💾 已保存方案「' + (name || ('方案' + schemes.length)) + '」，可与其他方案对比';
+}
+
+function deleteScheme(idx) {
+  const schemes = getSchemes();
+  if(!schemes[idx]) return;
+  if(!confirm('确定删除方案「' + schemes[idx].name + '」？')) return;
+  schemes.splice(idx, 1);
+  saveSchemes(schemes);
+  renderSchemeList();
+}
+
+function loadScheme(idx) {
+  const schemes = getSchemes();
+  const s = schemes[idx];
+  if(!s || !s.cities || s.cities.length === 0) return;
+  clearRoute();
+  let i = 0;
+  function addNext() {
+    if(i >= s.cities.length) return;
+    const city = CITIES.find(function(c) { return c.name === s.cities[i]; });
+    if(city) addPoint(city);
+    i++;
+    setTimeout(addNext, 300);
+  }
+  addNext();
+  tipDom.innerHTML = '📥 正在载入方案「' + s.name + '」（' + s.cities.length + ' 个点）...';
+}
+
+function renderSchemeList() {
+  const list = document.getElementById('schemeList');
+  if(!list) return;
+  const schemes = getSchemes();
+  if(schemes.length === 0) {
+    list.innerHTML = '<div class="scheme-empty">暂无保存的方案。规划好一条路线后，点击上方"保存当前路线"，即可与后续方案对比里程 / 时间 / 过路费。</div>';
+    return;
+  }
+  // 找出最优值用于高亮对比
+  let bestKm = Infinity, bestTime = Infinity;
+  schemes.forEach(function(s) {
+    const km = parseFloat(s.km);
+    if(isFinite(km) && km < bestKm) bestKm = km;
+  });
+  list.innerHTML = '';
+  schemes.forEach(function(s, idx) {
+    const item = document.createElement('div');
+    item.className = 'scheme-item';
+    const isBestKm = parseFloat(s.km) === bestKm && schemes.length > 1;
+    item.innerHTML =
+      '<div class="scheme-item-head">' +
+        '<span class="scheme-name">' + s.name + (isBestKm ? ' <span style="color:#16a34a;font-size:10px;">✓最省里程</span>' : '') + '</span>' +
+        '<span style="font-size:10px;color:#94a3b8;">' + new Date(s.savedAt).toLocaleDateString() + '</span>' +
+      '</div>' +
+      '<div class="scheme-metrics">' + s.cities.length + ' 个点 · <b>' + s.km + ' km</b> · ' + s.time + ' · 过路费 <b>' + s.tolls + '</b></div>' +
+      '<div class="scheme-metrics" style="color:#94a3b8;">' + s.cities.join(' → ') + '</div>' +
+      '<div class="scheme-actions">' +
+        '<button class="scheme-load-btn" onclick="loadScheme(' + idx + ')">载入此方案</button>' +
+        '<button class="scheme-del-btn" onclick="deleteScheme(' + idx + ')">删除</button>' +
+      '</div>';
+    list.appendChild(item);
+  });
+}
+
+// ===== 路线本地持久化（防止刷新丢失已选路线） =====
+const ROUTE_STORAGE_KEY = 'logistics_route_state_v1';
+
+function saveRouteToLocal() {
+  try {
+    if(currentMode !== 'multi') return;
+    if(!routePoints || routePoints.length === 0) {
+      localStorage.removeItem(ROUTE_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(ROUTE_STORAGE_KEY, JSON.stringify({
+      m: 'multi',
+      c: routePoints.map(function(p) { return p.city.name; })
+    }));
+  } catch(e) { /* localStorage 不可用时静默降级 */ }
+}
+
+function loadRouteFromLocal() {
+  let data = null;
+  try {
+    const raw = localStorage.getItem(ROUTE_STORAGE_KEY);
+    if(raw) data = JSON.parse(raw);
+  } catch(e) { return; }
+  if(!data || data.m !== 'multi' || !data.c || data.c.length === 0) return;
+  
+  setTimeout(function() {
+    if(currentMode !== 'multi') toggleMode();
+    let idx = 0;
+    function addNext() {
+      if(idx >= data.c.length) return;
+      const city = CITIES.find(function(c) { return c.name === data.c[idx]; });
+      if(city) addPoint(city);
+      idx++;
+      setTimeout(addNext, 300);
+    }
+    addNext();
+    tipDom.innerHTML = '📥 已恢复上次未完成的路线（' + data.c.length + ' 个点）';
+  }, 500);
+}
+
 function loadRouteFromURL() {
   const hash = window.location.hash;
   if(!hash || hash.indexOf('#route=') < 0) return;
-  
   try {
     const encoded = hash.substring('#route='.length);
     const data = JSON.parse(decodeURIComponent(atob(encoded)));
