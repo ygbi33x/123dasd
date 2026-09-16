@@ -5293,6 +5293,7 @@ async function doBatchImport() {
       for(let i = 0; i < toResolve.length; i++) {
         tipDom.innerHTML = '🔍 正在解析（' + (i + 1) + '/' + toResolve.length + '）：' + toResolve[i];
         const city = await resolvePlaceAsync(toResolve[i], null).catch(function() { return null; });
+        console.log('[P1]', toResolve[i], '→', city ? (city.name + ' [' + city.lng.toFixed(2) + ',' + city.lat.toFixed(2) + ']') : 'null');
         if(city) { resolvedCount++; addUniquePoint(city); } else remaining.push(toResolve[i]);
         await new Promise(function(res) { setTimeout(res, 200); });
       }
@@ -5304,6 +5305,7 @@ async function doBatchImport() {
         const stillRemaining = [];
         for(let i = 0; i < remaining.length; i++) {
           const city = await resolvePoiSmart(remaining[i], domCity).catch(function() { return null; });
+          console.log('[P2|' + domCity + ']', remaining[i], '→', city ? (city.name + ' [' + city.lng.toFixed(2) + ',' + city.lat.toFixed(2) + ']') : 'null');
           if(city) { resolvedCount++; addUniquePoint(city); } else stillRemaining.push(remaining[i]);
           await sleep(200);
         }
@@ -5322,6 +5324,7 @@ async function doBatchImport() {
           // 每成功解析一个段就重新推断主城市，让后续段就近解析
           const segCity = inferDominantCityName();
           const city = await resolvePoiSmart(segs[j], segCity).catch(function() { return null; });
+          console.log('[P3|' + segCity + ']', segs[j], '→', city ? (city.name + ' [' + city.lng.toFixed(2) + ',' + city.lat.toFixed(2) + ']') : 'null');
           if(city) { resolvedCount++; addUniquePoint(city); }
           else failed.push(segs[j]);
           await sleep(200);
