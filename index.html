@@ -5333,6 +5333,7 @@ async function doBatchImport() {
 async function reresolveOutliers(failed) {
   if(routePoints.length < 4) return;
   const domCity = inferDominantCityName();
+  console.log('[离群校正] 入口 点数:', routePoints.length, '主城市:', domCity, '点分布:', routePoints.map(function(p) { return p.city.name + '[' + p.city.lng.toFixed(1) + ',' + p.city.lat.toFixed(1) + ']'; }));
   if(!domCity) return;
   const NEAR_KM = 150, FAR_KM = 250;
   // 找最大聚集簇：以"150km 内邻居最多"的点为簇心
