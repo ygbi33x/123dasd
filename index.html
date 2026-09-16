@@ -5113,6 +5113,7 @@ function inferDominantCityName(pool) {
     const cn = cityOfPoint(p.city);
     if(cn) counts[cn] = (counts[cn] || 0) + 1;
   });
+  console.log('[主城市推断]', JSON.stringify(counts));
   let best = '', bestN = 0;
   for(const k in counts) {
     if(counts[k] > bestN) { best = k; bestN = counts[k]; }
