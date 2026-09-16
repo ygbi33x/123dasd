@@ -5344,11 +5344,13 @@ async function reresolveOutliers(failed) {
   // 簇太小或不足总数一半 → 多点分散（如跨省路线），不做校正
   if(!med || clusterSize < 3 || clusterSize < routePoints.length / 2) return;
   const suspects = routePoints.filter(function(p) { return p.city.isAddress && geoDist(med, p.city) > FAR_KM; });
+  console.log('[离群校正] 簇心:', med.name, '簇大小:', clusterSize + '/' + routePoints.length, '疑似点:', suspects.map(function(p) { return p.city.name + '(' + Math.round(geoDist(med, p.city)) + 'km)'; }));
   for(let i = 0; i < suspects.length; i++) {
     const p = suspects[i];
     const raw = p.city._raw || p.city.name;
     tipDom.innerHTML = '🧭 校正疑似认错城市的地点：' + raw;
     const better = await withTimeout(placeSearchAsync(raw, domCity), 8000).catch(function() { return null; });
+    console.log('[离群校正]', raw, '→', better ? (better.name + ' / ' + Math.round(geoDist(med, better)) + 'km / score=' + nameMatchScore(raw, better.name).toFixed(2) + ' / old=' + (p.city._score || 0.5)) : 'null');
     let replaced = false;
     if(better) {
       const newScore = nameMatchScore(raw, better.name);
