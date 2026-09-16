@@ -5035,16 +5035,43 @@ function resolvePlaceAsync(name, city) {
   return resolvePoiSmart(name, city);
 }
 
+// 逆地理编码：由坐标反查省市（PlaceSearch 返回的 pname/cityname/adname 均为空，必须用此补全）
+function reverseCityAsync(lng, lat) {
+  return new Promise(function(resolve) {
+    const run = function() {
+      const gc = new AMap.Geocoder();
+      gc.getAddress([lng, lat], function(status, result) {
+        if(status === 'complete' && result.regeocode) {
+          const ac = result.regeocode.addressComponent || {};
+          const pick = function(v) { return (typeof v === 'string' && v) ? v : ''; };
+          resolve({ city: pick(ac.city) || pick(ac.district) || pick(ac.province), province: pick(ac.province) });
+        } else resolve(null);
+      });
+    };
+    if(typeof AMap.Geocoder === 'undefined') AMap.plugin('AMap.Geocoder', run); else run();
+  });
+}
+
+// 给解析出的点补全可靠的所属城市（供主城市推断/离群校正使用）
+async function attachCityInfo(city) {
+  if(city.cityname) return;
+  const rc = await withTimeout(reverseCityAsync(city.lng, city.lat), 8000).catch(function() { return null; });
+  if(rc) {
+    if(rc.city) city.cityname = rc.city;
+    if(rc.province && !city.province) city.province = rc.province;
+  }
+}
+
 // 智能解析：POI 搜索优先（带名称匹配度校验），地理编码兜底（长名称要求地址完整包含输入，防止连写串被模糊匹配成单个地址）
 async function resolvePoiSmart(name, city) {
   const poi = await withTimeout(placeSearchAsync(name, city), 8000).catch(function() { return null; });
   if(poi) {
     poi._score = nameMatchScore(name, poi.name);
-    if(poi._score >= 0.5) return poi;
+    if(poi._score >= 0.5) { await attachCityInfo(poi); return poi; }
   }
   const geo = await withTimeout(geocodeAsync(name, city), 8000).catch(function() { return null; });
-  if(geo && (name.length <= 4 || geo._score >= 1 || nameMatchScore(name, geo.address) >= 0.6)) return geo;
-  if(poi && name.length <= 4) return poi; // 短名称放宽，避免过度拒绝
+  if(geo && (name.length <= 4 || geo._score >= 1 || nameMatchScore(name, geo.address) >= 0.6)) { await attachCityInfo(geo); return geo; }
+  if(poi && name.length <= 4) { await attachCityInfo(poi); return poi; } // 短名称放宽，避免过度拒绝
   return null;
 }
 
