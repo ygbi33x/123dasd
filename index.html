@@ -5327,19 +5327,22 @@ async function doBatchImport() {
   finishBatchImport(shouldOptimize, failed, resolvedCount);
 }
 
-// 离群校正：仅当存在明显的主体聚集区（≥70% 的点在中位数 150km 内）时启用，
-// 避免误伤合法的跨省多点路线。偏离聚集区 250km 以上的地址点视为疑似认错城市，
+// 离群校正：先找最大聚集簇（150km 内邻居最多的点为簇心），簇至少 3 个点且占总数一半以上
+// 才启用，避免误伤合法的跨省多点路线。偏离簇心 250km 以上的地址点视为疑似认错城市，
 // 用主城市就近重解析；找不到聚集区附近的候选就直接移除并如实报告，不硬凑错点。
 async function reresolveOutliers(failed) {
   if(routePoints.length < 4) return;
   const domCity = inferDominantCityName();
   if(!domCity) return;
-  const lngs = routePoints.map(function(p) { return p.city.lng; }).sort(function(a, b) { return a - b; });
-  const lats = routePoints.map(function(p) { return p.city.lat; }).sort(function(a, b) { return a - b; });
-  const med = { lng: lngs[Math.floor(lngs.length / 2)], lat: lats[Math.floor(lats.length / 2)] };
   const NEAR_KM = 150, FAR_KM = 250;
-  const nearCnt = routePoints.filter(function(p) { return geoDist(med, p.city) <= NEAR_KM; }).length;
-  if(nearCnt / routePoints.length < 0.7) return; // 多点分散（如跨省路线），不做校正
+  // 找最大聚集簇：以"150km 内邻居最多"的点为簇心
+  let med = null, clusterSize = 0;
+  for(let i = 0; i < routePoints.length; i++) {
+    const cnt = routePoints.filter(function(p) { return geoDist(routePoints[i].city, p.city) <= NEAR_KM; }).length;
+    if(cnt > clusterSize) { clusterSize = cnt; med = routePoints[i].city; }
+  }
+  // 簇太小或不足总数一半 → 多点分散（如跨省路线），不做校正
+  if(!med || clusterSize < 3 || clusterSize < routePoints.length / 2) return;
   const suspects = routePoints.filter(function(p) { return p.city.isAddress && geoDist(med, p.city) > FAR_KM; });
   for(let i = 0; i < suspects.length; i++) {
     const p = suspects[i];
