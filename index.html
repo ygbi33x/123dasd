@@ -4976,6 +4976,8 @@ function nameMatchScore(input, resultName) {
   if(!input || !resultName) return 0;
   const a = String(input), b = String(resultName);
   if(a.indexOf(b) >= 0 || b.indexOf(a) >= 0) return Math.min(a.length, b.length) / a.length;
+  // 非完全包含时，结果名不能比输入长太多，防止"簪花女"匹配到"xx(簪花岭村店)"
+  if(b.length > a.length * 2 + 2) return 0;
   let best = 0;
   for(let i = 0; i < a.length; i++) {
     for(let j = 0; j < b.length; j++) {
@@ -5059,61 +5061,36 @@ function placeSearchAsync(name, city) {
   });
 }
 
-// 输入提示（用于连写文本的智能拆分）
-function autocompleteAsync(keyword, city) {
-  return new Promise(function(resolve) {
-    const run = function() {
-      const opts = { city: city || '全国' };
-      if(city) opts.citylimit = true;
-      const ac = new AMap.Autocomplete(opts);
-      ac.search(keyword, function(status, result) {
-        if(status === 'complete' && result.tips && result.tips.length > 0) resolve(result.tips);
-        else resolve([]);
-      });
-    };
-    if(typeof AMap.Autocomplete === 'undefined') AMap.plugin('AMap.Autocomplete', run); else run();
-  });
-}
-
-// name 作为 rest 前缀的可消费长度（容忍1个错别字，如"蝎埔村"→"蟳埔村"），不匹配返回0
-function fuzzyPrefixLen(rest, name) {
-  if(!name || name.length < 2 || rest.length < 2) return 0;
-  if(rest.indexOf(name) === 0) return name.length;
-  const len = Math.min(name.length, rest.length);
-  if(len < 2) return 0;
-  let diff = name.length > len ? (name.length - len) : 0;
-  for(let i = 0; i < len; i++) if(rest[i] !== name[i]) diff++;
-  return diff <= 1 ? len : 0;
-}
-
-// 连写文本 → 地点名数组（贪心最长前缀匹配，如"开元寺西街钟楼"→["开元寺","西街","钟楼"]）
-async function segmentStickyText(text, city) {
+// 连写文本切分：按中文地名常见后缀词（寺/庙/村/路/桥…）作为边界，离线确定性地切
+// 单字后缀仅在下一字符不是后缀字时切分（避免"中山路"被切成"中山"+"路"）
+// 如"开元寺西街钟楼中山路一承天寺关岳庙"→["开元寺","西街","钟楼","中山路","承天寺","关岳庙"]
+function splitConcatenated(text) {
+  const MULTI = ['传统街区','公园','广场','海岸','海滩','沙滩','码头','港口','口岸','机场','车站','咖啡','酒吧','餐厅','书店','酒店','宾馆','民宿','古村','古镇','古城','老街','大厦','大楼','中心','基地','景区','新村'];
+  const SINGLE = '寺庙观祠庵宫塔楼阁桥村庄寨店馆城堡厝坊巷弄街路道岛湖河江溪山峰岭洞潭泉林园苑陵墓区县市州湾滩港站场';
+  const isSuffixChar = function(ch) { return !!ch && SINGLE.indexOf(ch) >= 0; };
   const segs = [];
-  let rest = text, guard = 0;
-  while(rest.length > 0 && guard < 15) {
-    guard++;
-    let consume = 0, segName = null;
-    const tryTips = function(tips) {
-      tips.forEach(function(t) {
-        const n = t.name || '';
-        const l = fuzzyPrefixLen(rest, n);
-        if(l > consume) { consume = l; segName = n; }
-      });
-    };
-    tryTips(await autocompleteAsync(rest.substring(0, Math.min(10, rest.length)), city));
-    if(!segName) {
-      for(let len = Math.min(6, rest.length); len >= 2 && !segName; len--) {
-        tryTips(await autocompleteAsync(rest.substring(0, len), city));
-      }
+  let start = 0, i = 0;
+  while(i < text.length) {
+    let cut = -1;
+    for(let w = 0; w < MULTI.length; w++) {
+      if(text.startsWith(MULTI[w], i)) { cut = i + MULTI[w].length; break; }
     }
-    if(segName) {
-      segs.push(segName);
-      rest = rest.substring(consume);
+    if(cut < 0 && isSuffixChar(text[i]) && !isSuffixChar(text[i + 1])) cut = i + 1;
+    if(cut > 0) {
+      segs.push(text.substring(start, cut));
+      start = cut;
+      i = cut;
     } else {
-      rest = rest.substring(1); // 跳过无法识别的字符
+      i++;
     }
   }
-  return segs;
+  if(start < text.length) segs.push(text.substring(start));
+  return segs.map(cleanSegment).filter(function(s) { return s.length >= 2; }).slice(0, 12);
+}
+
+// 清理段首连接字（一/到/去/往 等）和段尾语气字
+function cleanSegment(s) {
+  return s.replace(/^[一到去往来和与跟及、的从在向]+/, '').replace(/[的了呢吧啊]+$/, '');
 }
 
 // 从已添加的路线点推断主城市（用于就近解析重名地点）
@@ -5300,23 +5277,21 @@ async function doBatchImport() {
         remaining = stillRemaining;
       }
 
-      // 阶段3：连写文本智能拆分（如"开元寺西街钟楼"→开元寺/西街/钟楼）
+      // 阶段3：连写文本智能拆分（按地名后缀词边界切分，如"开元寺西街钟楼"）
       for(let i = 0; i < remaining.length; i++) {
         const text = remaining[i];
         if(text.length < 4) { failed.push(text); continue; }
         tipDom.innerHTML = '🧩 智能拆分连写地点：' + text;
         const domCity = inferDominantCityName();
-        const segs = await segmentStickyText(text, domCity).catch(function() { return []; });
-        if(segs.length === 0) { failed.push(text); continue; }
-        let okCount = 0;
+        const segs = splitConcatenated(text);
+        if(segs.length <= 1) { failed.push(text); continue; }
         for(let j = 0; j < segs.length; j++) {
           tipDom.innerHTML = '🔍 拆分解析（' + (j + 1) + '/' + segs.length + '）：' + segs[j];
-          const city = await placeSearchAsync(segs[j], domCity).catch(function() { return null; });
-          if(city) { resolvedCount++; okCount++; addUniquePoint(city); }
-          await new Promise(function(res) { setTimeout(res, 200); });
+          const city = await resolvePoiSmart(segs[j], domCity).catch(function() { return null; });
+          if(city) { resolvedCount++; addUniquePoint(city); }
+          else failed.push(segs[j]);
+          await sleep(200);
         }
-        if(okCount === 0) failed.push(text);
-        else if(okCount < segs.length) failed.push(text + '（部分未识别）');
       }
     }
 
