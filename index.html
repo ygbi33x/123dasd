@@ -4737,14 +4737,14 @@ function shareRouteLink() {
       alert('请先规划至少2个城市的路线');
       return;
     }
-    data.c = routePoints.map(function(p) { return p.city.name; });
+    data.c = routePoints.map(function(p) { return cityToShareEntry(p.city); });
   } else {
     if(!radialOrigin) {
       alert('请先在放射状模式下选择出发地');
       return;
     }
-    data.o = radialOrigin.city.name;
-    data.d = radialDestinations.map(function(d) { return d.city.name; });
+    data.o = cityToShareEntry(radialOrigin.city);
+    data.d = radialDestinations.map(function(d) { return cityToShareEntry(d.city); });
   }
   
   // URL-safe base64：避免 + / = 在转发过程中被聊天软件转义导致链接失效
@@ -4787,6 +4787,12 @@ function getSchemes() {
   catch(e) { return []; }
 }
 
+// 方案城市列表 → 显示用名称数组（兼容旧版纯字符串格式）
+function schemeCityNames(s) {
+  if(s.cityNames) return s.cityNames;
+  return (s.cities || []).map(function(c) { return typeof c === 'string' ? c : (c.n || '?'); });
+}
+
 function saveSchemes(list) {
   try { localStorage.setItem(SCHEME_STORAGE_KEY, JSON.stringify(list)); } catch(e) {}
 }
@@ -4820,7 +4826,8 @@ function saveCurrentAsScheme() {
   if(name === null) return;
   schemes.push({
     name: name || ('方案' + (schemes.length + 1)),
-    cities: routePoints.map(function(p) { return p.city.name; }),
+    cities: routePoints.map(function(p) { return cityToShareEntry(p.city); }),
+    cityNames: routePoints.map(function(p) { return p.city.name; }),
     km: (totalDist / 1000).toFixed(1),
     time: formatTime(totalTime),
     tolls: hasTolls ? ('¥' + Math.round(totalTolls)) : '-',
@@ -4850,8 +4857,8 @@ function loadScheme(idx) {
   let i = 0;
   function addNext() {
     if(i >= s.cities.length) return;
-    const city = CITIES.find(function(c) { return c.name === s.cities[i]; });
-    if(city) addPoint(city);
+    const city = entryToCity(s.cities[i]);
+    if(city) { try { addPoint(city); } catch(e) {} }
     i++;
     setTimeout(addNext, 300);
   }
@@ -4884,7 +4891,7 @@ function renderSchemeList() {
         '<span style="font-size:10px;color:#94a3b8;">' + new Date(s.savedAt).toLocaleDateString() + '</span>' +
       '</div>' +
       '<div class="scheme-metrics">' + s.cities.length + ' 个点 · <b>' + s.km + ' km</b> · ' + s.time + ' · 过路费 <b>' + s.tolls + '</b></div>' +
-      '<div class="scheme-metrics" style="color:#94a3b8;">' + s.cities.join(' → ') + '</div>' +
+      '<div class="scheme-metrics" style="color:#94a3b8;">' + schemeCityNames(s).join(' → ') + '</div>' +
       '<div class="scheme-actions">' +
         '<button class="scheme-load-btn" onclick="loadScheme(' + idx + ')">载入此方案</button>' +
         '<button class="scheme-del-btn" onclick="deleteScheme(' + idx + ')">删除</button>' +
@@ -4905,7 +4912,7 @@ function saveRouteToLocal() {
     }
     localStorage.setItem(ROUTE_STORAGE_KEY, JSON.stringify({
       m: 'multi',
-      c: routePoints.map(function(p) { return p.city.name; })
+      c: routePoints.map(function(p) { return cityToShareEntry(p.city); })
     }));
   } catch(e) { /* localStorage 不可用时静默降级 */ }
 }
@@ -4931,14 +4938,79 @@ function findCityByName(name) {
   let city = CITIES.find(function(c) { return c.name === name; });
   if(city) return city;
   const norm = function(s) {
-    return String(s).replace(/(特别行政区|维吾尔自治区|壮族自治区|回族自治区|自治区|自治州|地区|省|市|盟|州)$/g, '');
+    return String(s).replace(/(特别行政区|维吾尔自治区|壮族自治区|回族自治区|自治区|自治州|地区|省|市|县|区|盟|州|旗)$/g, '');
   };
   const key = norm(name);
   if(!key) return null;
   city = CITIES.find(function(c) { return norm(c.name) === key; });
   if(city) return city;
-  city = CITIES.find(function(c) { return c.name.indexOf(name) >= 0 || (key.length >= 2 && norm(c.name).indexOf(key) >= 0); });
+  if(key.length >= 2) {
+    city = CITIES.find(function(c) {
+      const cn = norm(c.name);
+      return cn.length >= 2 && (cn.indexOf(key) === 0 || key.indexOf(cn) === 0);
+    });
+    if(city) return city;
+  }
+  city = CITIES.find(function(c) { return c.name.indexOf(name) >= 0; });
   return city || null;
+}
+
+// 分享/存档条目（字符串=城市名；对象=带坐标的地址点）→ 城市对象
+function entryToCity(n) {
+  if(n && typeof n === 'object' && typeof n.x === 'number' && typeof n.y === 'number') {
+    return { name: n.n || '自定义地点', province: n.p || '', region: '', lng: n.x, lat: n.y, isCenter: false, isAddress: true };
+  }
+  return findCityByName(n);
+}
+
+// 城市对象 → 分享/存档条目（地址点保留坐标，保证换设备也能精确还原）
+function cityToShareEntry(city) {
+  if(city.isAddress) return { n: city.name, x: city.lng, y: city.lat, p: city.province || '' };
+  return city.name;
+}
+
+// 在线解析地点（地理编码 + POI 搜索双保险），返回 Promise<虚拟城市对象|null>
+function resolvePlaceAsync(name) {
+  return new Promise(function(resolve) {
+    const tryGeocode = function() {
+      const geocoder = new AMap.Geocoder({ city: "全国", radius: 1000 });
+      geocoder.getLocation(name, function(status, result) {
+        if(status === 'complete' && result.geocodes && result.geocodes.length > 0) {
+          const loc = result.geocodes[0];
+          let addrName = name;
+          if(loc.formattedAddress && loc.formattedAddress.indexOf(name) < 0) addrName = name + '（' + loc.formattedAddress + '）';
+          if(addrName.length > 30) addrName = addrName.substring(0, 30) + '…';
+          resolve({
+            name: addrName, province: loc.province || '', region: '',
+            lng: loc.location.lng, lat: loc.location.lat,
+            isCenter: false, isAddress: true, address: loc.formattedAddress || name
+          });
+        } else {
+          tryPlaceSearch();
+        }
+      });
+    };
+    const tryPlaceSearch = function() {
+      const doSearch = function() {
+        const ps = new AMap.PlaceSearch({ city: '全国', citylimit: false, pageSize: 1, pageIndex: 1 });
+        ps.search(name, function(status, result) {
+          if(status === 'complete' && result.poiList && result.poiList.pois && result.poiList.pois.length > 0) {
+            const poi = result.poiList.pois[0];
+            resolve({
+              name: poi.name || name, province: poi.pname || '', region: '',
+              lng: poi.location.lng, lat: poi.location.lat,
+              isCenter: false, isAddress: true,
+              address: (poi.pname || '') + (poi.cityname || '') + (poi.adname || '') + (poi.address || '')
+            });
+          } else {
+            resolve(null);
+          }
+        });
+      };
+      if(typeof AMap.PlaceSearch === 'undefined') AMap.plugin('AMap.PlaceSearch', doSearch); else doSearch();
+    };
+    if(typeof AMap.Geocoder === 'undefined') AMap.plugin('AMap.Geocoder', tryGeocode); else tryGeocode();
+  });
 }
 
 // 从分享链接/本地缓存的数据恢复路线（统一入口，带容错）
@@ -4948,7 +5020,7 @@ function restoreRouteFromData(data, source) {
     if(currentMode !== 'multi') toggleMode();
     const matched = [], unmatched = [], seen = {};
     data.c.forEach(function(n) {
-      const city = findCityByName(n);
+      const city = entryToCity(n);
       if(city) {
         if(!seen[city.name]) { seen[city.name] = 1; matched.push(city); }
       } else unmatched.push(n);
@@ -4972,14 +5044,14 @@ function restoreRouteFromData(data, source) {
     addNext();
   } else if(data.m === 'radial' && data.o) {
     if(currentMode !== 'radial') toggleMode();
-    const origin = findCityByName(data.o);
+    const origin = entryToCity(data.o);
     if(origin) {
       handleRadialCityClick(origin);
       if(data.d && data.d.length > 0) {
         let idx = 0;
         function addNext() {
           if(idx >= data.d.length) return;
-          const city = findCityByName(data.d[idx]);
+          const city = entryToCity(data.d[idx]);
           if(city) { try { handleRadialCityClick(city); } catch(e) {} }
           idx++;
           setTimeout(addNext, 300);
@@ -5058,28 +5130,60 @@ function previewImport() {
   const r = parseImportText();
   let html = '✅ 识别 <b>' + r.matched.length + '</b> 个地点';
   if(r.matched.length) html += '：' + r.matched.slice(0, 10).map(function(c) { return c.name; }).join('、') + (r.matched.length > 10 ? ' …' : '');
-  if(r.unmatched.length) html += '<br><span style="color:#dc2626;">⚠️ ' + r.unmatched.length + ' 个未识别：' + r.unmatched.slice(0, 8).join('、') + (r.unmatched.length > 8 ? ' …' : '') + '</span>';
+  if(r.unmatched.length) html += '<br><span style="color:#b45309;">🔍 ' + r.unmatched.length + ' 个本地未识别：' + r.unmatched.slice(0, 8).join('、') + (r.unmatched.length > 8 ? ' …' : '') + '（导入时将自动在线解析）</span>';
   dom.innerHTML = html;
 }
 
 function doBatchImport() {
   const r = parseImportText();
-  if(r.matched.length < 2) {
-    tipDom.innerHTML = '⚠️ 至少识别出 2 个地点才能规划路线，请检查输入';
+  if(r.matched.length + r.unmatched.length < 2) {
+    tipDom.innerHTML = '⚠️ 请至少输入 2 个地点';
     return;
   }
-  if(r.matched.length > 60 && !confirm('一次导入 ' + r.matched.length + ' 个地点，规划耗时较长且可能超出配额，继续吗？')) return;
+  if(r.matched.length + r.unmatched.length > 60 && !confirm('一次导入 ' + (r.matched.length + r.unmatched.length) + ' 个地点，规划耗时较长且可能超出配额，继续吗？')) return;
   const shouldClear = document.getElementById('importClear').checked;
   const shouldOptimize = document.getElementById('importOptimize').checked;
   if(shouldClear && routePoints.length) clearRoute();
-  // 批量添加，抑制逐点自动规划
+
+  // 先添加本地已识别的城市，抑制逐点自动规划
   suppressAutoPlan = true;
-  r.matched.forEach(function(city) {
-    const exists = routePoints.some(function(p) { return p.city.name === city.name; });
-    if(!exists) {
-      try { addPoint(city); } catch(e) { console.error('导入地点失败:', e); }
+  r.matched.forEach(addUniquePoint);
+
+  if(r.unmatched.length === 0) {
+    finishBatchImport(shouldOptimize, [], 0);
+    return;
+  }
+  // 未识别的逐个在线解析（地理编码 + POI 搜索），最多解析 20 个以防配额耗尽
+  const toResolve = r.unmatched.slice(0, 20);
+  const skipped = r.unmatched.slice(20);
+  const failed = skipped.slice();
+  let resolvedCount = 0, i = 0;
+  tipDom.innerHTML = '🔍 已添加 ' + r.matched.length + ' 个地点，正在在线解析其余 ' + toResolve.length + ' 个...';
+  (function next() {
+    if(i >= toResolve.length) {
+      finishBatchImport(shouldOptimize, failed, resolvedCount);
+      return;
     }
-  });
+    const name = toResolve[i];
+    tipDom.innerHTML = '🔍 正在解析（' + (i + 1) + '/' + toResolve.length + '）：' + name;
+    resolvePlaceAsync(name).then(function(city) {
+      if(city) { resolvedCount++; addUniquePoint(city); }
+      else failed.push(name);
+    }).catch(function() { failed.push(name); }).finally(function() {
+      i++;
+      setTimeout(next, 250);
+    });
+  })();
+}
+
+function addUniquePoint(city) {
+  const exists = routePoints.some(function(p) { return p.city.name === city.name; });
+  if(!exists) {
+    try { addPoint(city); } catch(e) { console.error('添加地点失败:', e); }
+  }
+}
+
+function finishBatchImport(shouldOptimize, failed, resolvedCount) {
   suppressAutoPlan = false;
   let optimized = false;
   if(shouldOptimize && routePoints.length >= 3) {
@@ -5090,10 +5194,15 @@ function doBatchImport() {
   renderRouteBar();
   renderCityList();
   document.getElementById('importPanel').classList.remove('open');
-  let msg = '📥 已导入 ' + r.matched.length + ' 个地点' + (optimized ? '并自动优化顺序' : '');
-  if(r.unmatched.length) msg += '（' + r.unmatched.length + ' 个未识别：' + r.unmatched.slice(0, 6).join('、') + (r.unmatched.length > 6 ? '…' : '') + '）';
+  let msg = '📥 已导入 ' + routePoints.length + ' 个地点' + (optimized ? '并自动优化顺序' : '');
+  if(resolvedCount > 0) msg += '（含在线解析 ' + resolvedCount + ' 个）';
+  if(failed.length) msg += '，<span style="color:#dc2626;">' + failed.length + ' 个无法识别：' + failed.slice(0, 6).join('、') + (failed.length > 6 ? '…' : '') + '</span>';
+  if(routePoints.length < 2) {
+    tipDom.innerHTML = msg + '。有效地点不足 2 个，无法规划';
+    return;
+  }
   tipDom.innerHTML = msg + '，正在规划路线...';
-  if(routePoints.length >= 2) planFullRoute();
+  planFullRoute();
 }
 
 // ===== 到各省会距离 =====
