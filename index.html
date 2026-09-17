@@ -40,6 +40,16 @@ button{font-family:inherit;}
 .route-points.collapsed{display:none;}
 .province-tabs-collapsed{max-height:48px;overflow:hidden;}
 .route-optimize{font-size:10px;color:#3b82f6;cursor:pointer;font-weight:600;padding:3px 8px;border:1px solid rgba(59,130,246,.3);border-radius:6px;background:rgba(59,130,246,.05);transition:.15s;}
+.route-actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;}
+.route-action-btn{font-size:11px;font-weight:600;color:#2563eb;padding:6px 2px;border:1px solid rgba(59,130,246,.25);border-radius:8px;background:rgba(59,130,246,.06);cursor:pointer;transition:.15s;font-family:inherit;}
+.route-action-btn:hover{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;border-color:transparent;box-shadow:0 2px 10px rgba(59,130,246,.35);}
+.route-action-btn:active{transform:scale(.96);}
+.scheme-section{margin-top:8px;padding-top:8px;border-top:1px dashed rgba(0,0,0,.1);}
+.scheme-section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.scheme-section-sub{font-size:10px;color:#94a3b8;}
+.scheme-save-main{width:100%;padding:8px 0;font-size:12px;font-weight:700;color:#fff;background:linear-gradient(135deg,#2563eb,#4f46e5);border:none;border-radius:8px;cursor:pointer;transition:.15s;margin-bottom:8px;font-family:inherit;box-shadow:0 2px 8px rgba(37,99,235,.25);}
+.scheme-save-main:hover{box-shadow:0 4px 14px rgba(37,99,235,.4);transform:translateY(-1px);}
+.scheme-save-main:active{transform:scale(.98);}
 .route-optimize:hover{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.5);}
 .route-points{display:flex;flex-wrap:wrap;gap:5px;align-items:center;}
 .route-point-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(255,255,255,.8);border:1px solid rgba(59,130,246,.25);border-radius:14px;font-size:10px;color:#1e40af;cursor:pointer;transition:.15s;font-weight:600;box-shadow:0 1px 4px rgba(59,130,246,.1);}
@@ -448,13 +458,15 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
       <div class="route-bar-title">
         <span>已选路线（<span id="routeCount">0</span>个点）</span>
         <div class="route-bar-actions">
-          <span class="route-collapse-btn" id="routeCollapseBtn" onclick="toggleRouteBar()">▼</span>
-          <span class="route-optimize" id="addAllCentersBtn" onclick="addAllCentersAsRoutePoints()" title="一键添加全部77个中心城市为路线点（将触发批量规划，耗时较长）">⭐ 全选中心</span>
-          <span class="route-optimize" id="importBtn" onclick="toggleImportPanel()" title="批量粘贴/导入多个地点，自动识别并规划">📥 导入</span>
-          <span class="route-optimize" id="optimizeBtn" onclick="optimizeRouteOrder()" title="自动优化访问顺序">🔄 优化</span>
-          <span class="route-optimize" id="schemeBtn" onclick="toggleSchemePanel()" title="保存当前路线为方案，多方案对比">💾 方案</span>
           <span class="route-bar-clear" id="clearRouteBtn">清空</span>
+          <span class="route-collapse-btn" id="routeCollapseBtn" onclick="toggleRouteBar()">▼</span>
         </div>
+      </div>
+      <div class="route-actions-grid">
+        <button class="route-action-btn" id="importBtn" onclick="toggleImportPanel()" title="批量粘贴/导入多个地点，自动识别并规划">📥 批量导入</button>
+        <button class="route-action-btn" id="optimizeBtn" onclick="optimizeRouteOrder()" title="自动优化访问顺序">🔄 优化顺序</button>
+        <button class="route-action-btn" id="addAllCentersBtn" onclick="addAllCentersAsRoutePoints()" title="一键添加全部77个中心城市为路线点（将触发批量规划，耗时较长）">⭐ 全选中心</button>
+        <button class="route-action-btn" onclick="shareRouteLink()" title="生成链接分享给他人，打开即恢复路线">🔗 分享路线</button>
       </div>
       <div class="route-points" id="routePointsBar">
         <span class="route-empty">尚未选择城市，点击下方列表或地图上的点开始</span>
@@ -481,12 +493,13 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <span class="route-summary-value" id="totalSegs">-</span>
         </div>
       </div>
-      <!-- 路线方案保存与对比面板 -->
-      <div class="scheme-panel" id="schemePanel">
-        <div class="scheme-panel-head">
+      <!-- 路线方案：保存与对比（常显） -->
+      <div class="scheme-section">
+        <div class="scheme-section-head">
           <span class="scheme-panel-title">💾 路线方案</span>
-          <button class="scheme-save-btn" onclick="saveCurrentAsScheme()">保存当前路线</button>
+          <span class="scheme-section-sub">保存后可对比里程/费用</span>
         </div>
+        <button class="scheme-save-main" onclick="saveCurrentAsScheme()">＋ 保存当前路线为方案</button>
         <div id="schemeList"></div>
       </div>
       <!-- 批量导入面板 -->
@@ -1163,6 +1176,7 @@ window.onload = function() {
   updateTrafficIndicator();
   CAPITALS = CITIES.filter(function(c) { return CAPITAL_NAMES.indexOf(c.name) >= 0; });
   renderCityList();
+  renderSchemeList();
   loadRouteFromURL();
   // 无分享链接时，从本地存储恢复上次未完成的路线
   if(!window.location.hash || window.location.hash.indexOf('#route=') < 0) {
@@ -4802,13 +4816,6 @@ function saveSchemes(list) {
   try { localStorage.setItem(SCHEME_STORAGE_KEY, JSON.stringify(list)); } catch(e) {}
 }
 
-function toggleSchemePanel() {
-  const panel = document.getElementById('schemePanel');
-  if(!panel) return;
-  panel.classList.toggle('open');
-  if(panel.classList.contains('open')) renderSchemeList();
-}
-
 function saveCurrentAsScheme() {
   if(routePoints.length < 2) {
     tipDom.innerHTML = '⚠️ 请先规划至少 2 个点的路线再保存方案';
@@ -4840,8 +4847,6 @@ function saveCurrentAsScheme() {
   });
   saveSchemes(schemes);
   renderSchemeList();
-  const panel = document.getElementById('schemePanel');
-  if(panel && !panel.classList.contains('open')) panel.classList.add('open');
   tipDom.innerHTML = '💾 已保存方案「' + (name || ('方案' + schemes.length)) + '」，可与其他方案对比';
 }
 
@@ -4876,7 +4881,7 @@ function renderSchemeList() {
   if(!list) return;
   const schemes = getSchemes();
   if(schemes.length === 0) {
-    list.innerHTML = '<div class="scheme-empty">暂无保存的方案。规划好一条路线后，点击上方"保存当前路线"，即可与后续方案对比里程 / 时间 / 过路费。</div>';
+    list.innerHTML = '<div class="scheme-empty">暂无方案。规划好路线后点上方按钮保存，可对比多个方案的里程 / 时间 / 过路费。</div>';
     return;
   }
   // 找出最优值用于高亮对比
