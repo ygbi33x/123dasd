@@ -48,6 +48,9 @@ button{font-family:inherit;}
 .scheme-section #schemeList{max-height:220px;overflow-y:auto;}
 .scheme-section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
 .scheme-section-sub{font-size:10px;color:#94a3b8;}
+.scheme-collapse{font-size:11px;color:#6b7280;cursor:pointer;user-select:none;white-space:nowrap;}
+.scheme-collapse:hover{color:#2563eb;}
+#schemeBody.collapsed{display:none;}
 .scheme-save-main{width:100%;padding:8px 0;font-size:12px;font-weight:700;color:#fff;background:linear-gradient(135deg,#2563eb,#4f46e5);border:none;border-radius:8px;cursor:pointer;transition:.15s;margin-bottom:8px;font-family:inherit;box-shadow:0 2px 8px rgba(37,99,235,.25);}
 .scheme-save-main:hover{box-shadow:0 4px 14px rgba(37,99,235,.4);transform:translateY(-1px);}
 .scheme-save-main:active{transform:scale(.98);}
@@ -527,10 +530,15 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
     <div class="scheme-section">
       <div class="scheme-section-head">
         <span class="scheme-panel-title">💾 路线方案</span>
-        <span class="scheme-section-sub">保存后可对比里程/费用</span>
+        <span style="display:flex;align-items:center;gap:8px;">
+          <span class="scheme-section-sub">保存后可对比里程/费用</span>
+          <span class="scheme-collapse" id="schemeCollapseBtn" onclick="toggleSchemeSection()">▲ 收起</span>
+        </span>
       </div>
-      <button class="scheme-save-main" onclick="saveCurrentAsScheme()">＋ 保存当前路线为方案</button>
-      <div id="schemeList"></div>
+      <div id="schemeBody">
+        <button class="scheme-save-main" onclick="saveCurrentAsScheme()">＋ 保存当前路线为方案</button>
+        <div id="schemeList"></div>
+      </div>
     </div>
     <div class="filter-header" onclick="toggleFilter()">
       <span class="filter-header-title">🔍 筛选</span>
@@ -1178,6 +1186,7 @@ window.onload = function() {
   CAPITALS = CITIES.filter(function(c) { return CAPITAL_NAMES.indexOf(c.name) >= 0; });
   renderCityList();
   renderSchemeList();
+  applySchemeCollapseState();
   loadRouteFromURL();
   // 无分享链接时，从本地存储恢复上次未完成的路线
   if(!window.location.hash || window.location.hash.indexOf('#route=') < 0) {
@@ -4817,6 +4826,39 @@ function saveSchemes(list) {
   try { localStorage.setItem(SCHEME_STORAGE_KEY, JSON.stringify(list)); } catch(e) {}
 }
 
+// 方案区折叠/展开（状态持久化，刷新后保持）
+const SCHEME_COLLAPSE_KEY = 'logistics_scheme_collapsed';
+
+function toggleSchemeSection() {
+  const body = document.getElementById('schemeBody');
+  const btn = document.getElementById('schemeCollapseBtn');
+  if(!body || !btn) return;
+  body.classList.toggle('collapsed');
+  const collapsed = body.classList.contains('collapsed');
+  btn.innerHTML = collapsed ? '▼ 展开' : '▲ 收起';
+  try { localStorage.setItem(SCHEME_COLLAPSE_KEY, collapsed ? '1' : ''); } catch(e) {}
+}
+
+function applySchemeCollapseState() {
+  let collapsed = false;
+  try { collapsed = localStorage.getItem(SCHEME_COLLAPSE_KEY) === '1'; } catch(e) {}
+  const body = document.getElementById('schemeBody');
+  const btn = document.getElementById('schemeCollapseBtn');
+  if(!body || !btn) return;
+  body.classList.toggle('collapsed', collapsed);
+  btn.innerHTML = collapsed ? '▼ 展开' : '▲ 收起';
+}
+
+function expandSchemeSection() {
+  const body = document.getElementById('schemeBody');
+  const btn = document.getElementById('schemeCollapseBtn');
+  if(body && body.classList.contains('collapsed')) {
+    body.classList.remove('collapsed');
+    if(btn) btn.innerHTML = '▲ 收起';
+    try { localStorage.setItem(SCHEME_COLLAPSE_KEY, ''); } catch(e) {}
+  }
+}
+
 function saveCurrentAsScheme() {
   if(routePoints.length < 2) {
     tipDom.innerHTML = '⚠️ 请先规划至少 2 个点的路线再保存方案';
@@ -4848,6 +4890,7 @@ function saveCurrentAsScheme() {
   });
   saveSchemes(schemes);
   renderSchemeList();
+  expandSchemeSection(); // 保存后自动展开，让用户看到新方案
   tipDom.innerHTML = '💾 已保存方案「' + (name || ('方案' + schemes.length)) + '」，可与其他方案对比';
 }
 
