@@ -30,7 +30,7 @@ button{font-family:inherit;}
 .sidebar-header{padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.06);background:linear-gradient(135deg,rgba(59,130,246,.08) 0%,rgba(99,102,241,.08) 100%);}
 .sidebar-title{font-size:15px;font-weight:800;background:linear-gradient(135deg,#0ea5e9 0%,#3b82f6 50%,#6366f1 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:2px;letter-spacing:.5px;}
 .sidebar-sub{font-size:10px;color:#64748b;font-weight:500;}
-.route-bar{padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.05);background:rgba(248,250,252,.6);max-height:240px;overflow-y:auto;}
+.route-bar{padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.05);background:rgba(248,250,252,.6);max-height:110px;overflow-y:auto;}
 .route-bar-title{font-size:11px;font-weight:700;color:#334155;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:4px;flex-wrap:wrap;letter-spacing:.3px;}
 .route-bar-actions{display:flex;gap:4px;align-items:center;}
 .route-bar-clear{font-size:10px;color:#ef4444;cursor:pointer;font-weight:600;padding:3px 8px;border-radius:6px;transition:.15s;}
@@ -40,20 +40,6 @@ button{font-family:inherit;}
 .route-points.collapsed{display:none;}
 .province-tabs-collapsed{max-height:48px;overflow:hidden;}
 .route-optimize{font-size:10px;color:#3b82f6;cursor:pointer;font-weight:600;padding:3px 8px;border:1px solid rgba(59,130,246,.3);border-radius:6px;background:rgba(59,130,246,.05);transition:.15s;}
-.route-actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;}
-.route-action-btn{font-size:11px;font-weight:600;color:#2563eb;padding:6px 2px;border:1px solid rgba(59,130,246,.25);border-radius:8px;background:rgba(59,130,246,.06);cursor:pointer;transition:.15s;font-family:inherit;}
-.route-action-btn:hover{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;border-color:transparent;box-shadow:0 2px 10px rgba(59,130,246,.35);}
-.route-action-btn:active{transform:scale(.96);}
-.scheme-section{padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.05);background:rgba(248,250,252,.6);flex-shrink:0;}
-.scheme-section #schemeList{max-height:220px;overflow-y:auto;}
-.scheme-section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
-.scheme-section-sub{font-size:10px;color:#94a3b8;}
-.scheme-collapse{font-size:11px;color:#6b7280;cursor:pointer;user-select:none;white-space:nowrap;}
-.scheme-collapse:hover{color:#2563eb;}
-#schemeBody.collapsed{display:none;}
-.scheme-save-main{width:100%;padding:8px 0;font-size:12px;font-weight:700;color:#fff;background:linear-gradient(135deg,#2563eb,#4f46e5);border:none;border-radius:8px;cursor:pointer;transition:.15s;margin-bottom:8px;font-family:inherit;box-shadow:0 2px 8px rgba(37,99,235,.25);}
-.scheme-save-main:hover{box-shadow:0 4px 14px rgba(37,99,235,.4);transform:translateY(-1px);}
-.scheme-save-main:active{transform:scale(.98);}
 .route-optimize:hover{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.5);}
 .route-points{display:flex;flex-wrap:wrap;gap:5px;align-items:center;}
 .route-point-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(255,255,255,.8);border:1px solid rgba(59,130,246,.25);border-radius:14px;font-size:10px;color:#1e40af;cursor:pointer;transition:.15s;font-weight:600;box-shadow:0 1px 4px rgba(59,130,246,.1);}
@@ -440,13 +426,6 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
 .scheme-del-btn{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.05);color:#dc2626;}
 .scheme-load-btn:hover{background:rgba(59,130,246,.15);}
 .scheme-del-btn:hover{background:rgba(239,68,68,.12);}
-/* ===== 批量导入面板 ===== */
-.import-textarea{width:100%;height:88px;box-sizing:border-box;border:1px solid rgba(148,163,184,.4);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.6;resize:vertical;font-family:inherit;color:#0f172a;background:#fff;}
-.import-textarea:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.15);}
-.import-preview{font-size:11px;color:#64748b;margin:6px 0 2px;line-height:1.5;word-break:break-all;}
-.import-preview b{color:#1e40af;}
-.import-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;}
-.import-opt{font-size:11px;color:#475569;display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;}
 </style>
 </head>
 <body>
@@ -462,15 +441,12 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
       <div class="route-bar-title">
         <span>已选路线（<span id="routeCount">0</span>个点）</span>
         <div class="route-bar-actions">
-          <span class="route-bar-clear" id="clearRouteBtn">清空</span>
           <span class="route-collapse-btn" id="routeCollapseBtn" onclick="toggleRouteBar()">▼</span>
+          <span class="route-optimize" id="addAllCentersBtn" onclick="addAllCentersAsRoutePoints()" title="一键添加全部77个中心城市为路线点（将触发批量规划，耗时较长）">⭐ 全选中心</span>
+          <span class="route-optimize" id="optimizeBtn" onclick="optimizeRouteOrder()" title="自动优化访问顺序">🔄 优化</span>
+          <span class="route-optimize" id="schemeBtn" onclick="toggleSchemePanel()" title="保存当前路线为方案，多方案对比">💾 方案</span>
+          <span class="route-bar-clear" id="clearRouteBtn">清空</span>
         </div>
-      </div>
-      <div class="route-actions-grid">
-        <button class="route-action-btn" id="importBtn" onclick="toggleImportPanel()" title="批量粘贴/导入多个地点，自动识别并规划">📥 批量导入</button>
-        <button class="route-action-btn" id="optimizeBtn" onclick="optimizeRouteOrder()" title="自动优化访问顺序">🔄 优化顺序</button>
-        <button class="route-action-btn" id="addAllCentersBtn" onclick="addAllCentersAsRoutePoints()" title="一键添加全部77个中心城市为路线点（将触发批量规划，耗时较长）">⭐ 全选中心</button>
-        <button class="route-action-btn" onclick="shareRouteLink()" title="生成链接分享给他人，打开即恢复路线">🔗 分享路线</button>
       </div>
       <div class="route-points" id="routePointsBar">
         <span class="route-empty">尚未选择城市，点击下方列表或地图上的点开始</span>
@@ -497,18 +473,13 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <span class="route-summary-value" id="totalSegs">-</span>
         </div>
       </div>
-      <!-- 批量导入面板 -->
-      <div class="scheme-panel" id="importPanel">
+      <!-- 路线方案保存与对比面板 -->
+      <div class="scheme-panel" id="schemePanel">
         <div class="scheme-panel-head">
-          <span class="scheme-panel-title">📥 批量导入地点</span>
-          <button class="scheme-save-btn" onclick="doBatchImport()">导入并规划</button>
+          <span class="scheme-panel-title">💾 路线方案</span>
+          <button class="scheme-save-btn" onclick="saveCurrentAsScheme()">保存当前路线</button>
         </div>
-        <textarea id="importText" class="import-textarea" placeholder="粘贴或输入多个地点，每行一个，也可用逗号、顿号、空格、短横线分隔&#10;支持景点、地址，甚至连写（如：开元寺西街钟楼）&#10;例如：&#10;昆明市&#10;成都市&#10;泉州市开元寺"></textarea>
-        <div class="import-preview" id="importPreview">支持模糊匹配（如"昆明"自动匹配"昆明市"），未识别的名称会标出</div>
-        <div class="import-actions">
-          <label class="import-opt"><input type="checkbox" id="importClear" checked> 导入前清空当前路线</label>
-          <label class="import-opt"><input type="checkbox" id="importOptimize" checked> 导入后自动优化顺序</label>
-        </div>
+        <div id="schemeList"></div>
       </div>
       <!-- 路线路况统计 -->
       <div class="traffic-stats" id="trafficStats" style="display:none;">
@@ -524,20 +495,6 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <span><span class="traffic-dot" style="background:#eab308;"></span>缓行 <b id="slowPct">0%</b></span>
           <span><span class="traffic-dot" style="background:#ef4444;"></span>拥堵 <b id="jamPct">0%</b></span>
         </div>
-      </div>
-    </div>
-    <!-- 路线方案：保存与对比（独立区块，常显） -->
-    <div class="scheme-section">
-      <div class="scheme-section-head">
-        <span class="scheme-panel-title">💾 路线方案</span>
-        <span style="display:flex;align-items:center;gap:8px;">
-          <span class="scheme-section-sub">保存后可对比里程/费用</span>
-          <span class="scheme-collapse" id="schemeCollapseBtn" onclick="toggleSchemeSection()">▲ 收起</span>
-        </span>
-      </div>
-      <div id="schemeBody">
-        <button class="scheme-save-main" onclick="saveCurrentAsScheme()">＋ 保存当前路线为方案</button>
-        <div id="schemeList"></div>
       </div>
     </div>
     <div class="filter-header" onclick="toggleFilter()">
@@ -1171,7 +1128,6 @@ let designSpeed = 60; // 设计时速（km/h），用于计算物流时效
 let planDebounceTimer = null; // 规划防抖定时器
 let isPlanningRoute = false; // 是否正在规划路线
 let needsReplan = false; // 规划完成后是否需要重新规划
-let suppressAutoPlan = false; // 批量导入时抑制逐点自动规划
 const ROUTE_OPTION_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 const tipDom = document.getElementById('tip');
@@ -1185,8 +1141,6 @@ window.onload = function() {
   updateTrafficIndicator();
   CAPITALS = CITIES.filter(function(c) { return CAPITAL_NAMES.indexOf(c.name) >= 0; });
   renderCityList();
-  renderSchemeList();
-  applySchemeCollapseState();
   loadRouteFromURL();
   // 无分享链接时，从本地存储恢复上次未完成的路线
   if(!window.location.hash || window.location.hash.indexOf('#route=') < 0) {
@@ -1201,10 +1155,6 @@ window.onload = function() {
       dropdown.style.display = 'none';
     }
   });
-
-  // 批量导入：输入时实时预览识别结果
-  const importText = document.getElementById('importText');
-  if(importText) importText.addEventListener('input', previewImport);
 };
 
 
@@ -2421,28 +2371,23 @@ function nearestNeighbor(points, dist) {
 }
 
 function twoOpt(points, dist) {
-  // dist 按 points 原始下标构建；维护下标排列，反转时下标随点走，否则 dist 与顺序错位会导致死循环
   const n = points.length;
-  let order = [];
-  for(let k = 0; k < n; k++) order.push(k);
-  const d = function(a, b) { return dist[order[a]][order[b]]; };
-  let improved = true, guard = 0;
-  while(improved && guard < 50) {
+  let improved = true;
+  let best = points.slice();
+  while(improved) {
     improved = false;
-    guard++;
     for(let i = 1; i < n - 2; i++) {
       for(let j = i + 1; j < n - 1; j++) {
-        const dBefore = d(i-1, i) + d(j, j+1);
-        const dAfter = d(i-1, j) + d(i, j+1);
+        const dBefore = dist[i-1][i] + dist[j][j+1];
+        const dAfter = dist[i-1][j] + dist[i][j+1];
         if(dAfter < dBefore - 0.01) {
-          let l = i, r = j;
-          while(l < r) { const t = order[l]; order[l] = order[r]; order[r] = t; l++; r--; }
+          best = best.slice(0, i).concat(best.slice(i, j+1).reverse()).concat(best.slice(j+1));
           improved = true;
         }
       }
     }
   }
-  return order.map(function(idx) { return points[idx]; });
+  return best;
 }
 
 // ===== 核心：单Driving实例多点路线规划 =====
@@ -4130,12 +4075,6 @@ function addPoint(city) {
 
   // 直接按顺序规划，不做自动Dijkstra优化（大量城市时会崩溃）
   renumberMarkers();
-  if(suppressAutoPlan) {
-    // 批量导入等场景：只加点，不触发逐点规划
-    renderRouteBar();
-    renderCityList(city.name);
-    return;
-  }
   if(routePoints.length >= 2) {
     tipDom.innerHTML = "🚗 正在规划路线（" + routePoints.length + "个点）...";
     // 防抖：300ms内多次添加点只规划一次
@@ -4766,18 +4705,17 @@ function shareRouteLink() {
       alert('请先规划至少2个城市的路线');
       return;
     }
-    data.c = routePoints.map(function(p) { return cityToShareEntry(p.city); });
+    data.c = routePoints.map(function(p) { return p.city.name; });
   } else {
     if(!radialOrigin) {
       alert('请先在放射状模式下选择出发地');
       return;
     }
-    data.o = cityToShareEntry(radialOrigin.city);
-    data.d = radialDestinations.map(function(d) { return cityToShareEntry(d.city); });
+    data.o = radialOrigin.city.name;
+    data.d = radialDestinations.map(function(d) { return d.city.name; });
   }
   
-  // URL-safe base64：避免 + / = 在转发过程中被聊天软件转义导致链接失效
-  const encoded = btoa(encodeURIComponent(JSON.stringify(data))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const encoded = btoa(encodeURIComponent(JSON.stringify(data)));
   const link = window.location.origin + window.location.pathname + '#route=' + encoded;
   
   // 复制到剪贴板
@@ -4816,47 +4754,15 @@ function getSchemes() {
   catch(e) { return []; }
 }
 
-// 方案城市列表 → 显示用名称数组（兼容旧版纯字符串格式）
-function schemeCityNames(s) {
-  if(s.cityNames) return s.cityNames;
-  return (s.cities || []).map(function(c) { return typeof c === 'string' ? c : (c.n || '?'); });
-}
-
 function saveSchemes(list) {
   try { localStorage.setItem(SCHEME_STORAGE_KEY, JSON.stringify(list)); } catch(e) {}
 }
 
-// 方案区折叠/展开（状态持久化，刷新后保持）
-const SCHEME_COLLAPSE_KEY = 'logistics_scheme_collapsed';
-
-function toggleSchemeSection() {
-  const body = document.getElementById('schemeBody');
-  const btn = document.getElementById('schemeCollapseBtn');
-  if(!body || !btn) return;
-  body.classList.toggle('collapsed');
-  const collapsed = body.classList.contains('collapsed');
-  btn.innerHTML = collapsed ? '▼ 展开' : '▲ 收起';
-  try { localStorage.setItem(SCHEME_COLLAPSE_KEY, collapsed ? '1' : ''); } catch(e) {}
-}
-
-function applySchemeCollapseState() {
-  let collapsed = false;
-  try { collapsed = localStorage.getItem(SCHEME_COLLAPSE_KEY) === '1'; } catch(e) {}
-  const body = document.getElementById('schemeBody');
-  const btn = document.getElementById('schemeCollapseBtn');
-  if(!body || !btn) return;
-  body.classList.toggle('collapsed', collapsed);
-  btn.innerHTML = collapsed ? '▼ 展开' : '▲ 收起';
-}
-
-function expandSchemeSection() {
-  const body = document.getElementById('schemeBody');
-  const btn = document.getElementById('schemeCollapseBtn');
-  if(body && body.classList.contains('collapsed')) {
-    body.classList.remove('collapsed');
-    if(btn) btn.innerHTML = '▲ 收起';
-    try { localStorage.setItem(SCHEME_COLLAPSE_KEY, ''); } catch(e) {}
-  }
+function toggleSchemePanel() {
+  const panel = document.getElementById('schemePanel');
+  if(!panel) return;
+  panel.classList.toggle('open');
+  if(panel.classList.contains('open')) renderSchemeList();
 }
 
 function saveCurrentAsScheme() {
@@ -4881,8 +4787,7 @@ function saveCurrentAsScheme() {
   if(name === null) return;
   schemes.push({
     name: name || ('方案' + (schemes.length + 1)),
-    cities: routePoints.map(function(p) { return cityToShareEntry(p.city); }),
-    cityNames: routePoints.map(function(p) { return p.city.name; }),
+    cities: routePoints.map(function(p) { return p.city.name; }),
     km: (totalDist / 1000).toFixed(1),
     time: formatTime(totalTime),
     tolls: hasTolls ? ('¥' + Math.round(totalTolls)) : '-',
@@ -4890,7 +4795,8 @@ function saveCurrentAsScheme() {
   });
   saveSchemes(schemes);
   renderSchemeList();
-  expandSchemeSection(); // 保存后自动展开，让用户看到新方案
+  const panel = document.getElementById('schemePanel');
+  if(panel && !panel.classList.contains('open')) panel.classList.add('open');
   tipDom.innerHTML = '💾 已保存方案「' + (name || ('方案' + schemes.length)) + '」，可与其他方案对比';
 }
 
@@ -4911,8 +4817,8 @@ function loadScheme(idx) {
   let i = 0;
   function addNext() {
     if(i >= s.cities.length) return;
-    const city = entryToCity(s.cities[i]);
-    if(city) { try { addPoint(city); } catch(e) {} }
+    const city = CITIES.find(function(c) { return c.name === s.cities[i]; });
+    if(city) addPoint(city);
     i++;
     setTimeout(addNext, 300);
   }
@@ -4925,7 +4831,7 @@ function renderSchemeList() {
   if(!list) return;
   const schemes = getSchemes();
   if(schemes.length === 0) {
-    list.innerHTML = '<div class="scheme-empty">暂无方案。规划好路线后点上方按钮保存，可对比多个方案的里程 / 时间 / 过路费。</div>';
+    list.innerHTML = '<div class="scheme-empty">暂无保存的方案。规划好一条路线后，点击上方"保存当前路线"，即可与后续方案对比里程 / 时间 / 过路费。</div>';
     return;
   }
   // 找出最优值用于高亮对比
@@ -4945,7 +4851,7 @@ function renderSchemeList() {
         '<span style="font-size:10px;color:#94a3b8;">' + new Date(s.savedAt).toLocaleDateString() + '</span>' +
       '</div>' +
       '<div class="scheme-metrics">' + s.cities.length + ' 个点 · <b>' + s.km + ' km</b> · ' + s.time + ' · 过路费 <b>' + s.tolls + '</b></div>' +
-      '<div class="scheme-metrics" style="color:#94a3b8;">' + schemeCityNames(s).join(' → ') + '</div>' +
+      '<div class="scheme-metrics" style="color:#94a3b8;">' + s.cities.join(' → ') + '</div>' +
       '<div class="scheme-actions">' +
         '<button class="scheme-load-btn" onclick="loadScheme(' + idx + ')">载入此方案</button>' +
         '<button class="scheme-del-btn" onclick="deleteScheme(' + idx + ')">删除</button>' +
@@ -4966,7 +4872,7 @@ function saveRouteToLocal() {
     }
     localStorage.setItem(ROUTE_STORAGE_KEY, JSON.stringify({
       m: 'multi',
-      c: routePoints.map(function(p) { return cityToShareEntry(p.city); })
+      c: routePoints.map(function(p) { return p.city.name; })
     }));
   } catch(e) { /* localStorage 不可用时静默降级 */ }
 }
@@ -4978,531 +4884,70 @@ function loadRouteFromLocal() {
     if(raw) data = JSON.parse(raw);
   } catch(e) { return; }
   if(!data || data.m !== 'multi' || !data.c || data.c.length === 0) return;
-
+  
   setTimeout(function() {
-    restoreRouteFromData(data, '本地缓存');
-  }, 500);
-}
-
-// 模糊匹配城市：支持"昆明"/"昆明市"、"大理"/"大理白族自治州"等写法
-function findCityByName(name) {
-  if(!name) return null;
-  name = String(name).trim();
-  if(!name) return null;
-  let city = CITIES.find(function(c) { return c.name === name; });
-  if(city) return city;
-  const norm = function(s) {
-    return String(s).replace(/(特别行政区|维吾尔自治区|壮族自治区|回族自治区|自治区|自治州|地区|省|市|县|区|盟|州|旗)$/g, '');
-  };
-  const key = norm(name);
-  if(!key) return null;
-  city = CITIES.find(function(c) { return norm(c.name) === key; });
-  if(city) return city;
-  if(key.length >= 2) {
-    city = CITIES.find(function(c) {
-      const cn = norm(c.name);
-      return cn.length >= 2 && (cn.indexOf(key) === 0 || key.indexOf(cn) === 0);
-    });
-    if(city) return city;
-  }
-  city = CITIES.find(function(c) { return c.name.indexOf(name) >= 0; });
-  return city || null;
-}
-
-// 分享/存档条目（字符串=城市名；对象=带坐标的地址点）→ 城市对象
-function entryToCity(n) {
-  if(n && typeof n === 'object' && typeof n.x === 'number' && typeof n.y === 'number') {
-    return { name: n.n || '自定义地点', province: n.p || '', region: '', lng: n.x, lat: n.y, isCenter: false, isAddress: true };
-  }
-  return findCityByName(n);
-}
-
-// 城市对象 → 分享/存档条目（地址点保留坐标，保证换设备也能精确还原）
-function cityToShareEntry(city) {
-  if(city.isAddress) return { n: city.name, x: city.lng, y: city.lat, p: city.province || '' };
-  return city.name;
-}
-
-function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
-
-// Promise 超时保护：高德接口偶发丢响应时避免整个导入卡死
-function withTimeout(promise, ms) {
-  return Promise.race([
-    promise,
-    new Promise(function(r) { setTimeout(function() { r(null); }, ms || 8000); })
-  ]);
-}
-
-// 名称匹配度（0~1）：最长公共子串长度 / 输入名长度。容忍错别字（如"蝎埔村"→"蟳埔村"）
-function nameMatchScore(input, resultName) {
-  if(!input || !resultName) return 0;
-  const a = String(input), b = String(resultName);
-  if(a.indexOf(b) >= 0 || b.indexOf(a) >= 0) return Math.min(a.length, b.length) / a.length;
-  // 非完全包含时，结果名不能比输入长太多，防止"簪花女"匹配到"xx(簪花岭村店)"
-  if(b.length > a.length * 2 + 2) return 0;
-  let best = 0;
-  for(let i = 0; i < a.length; i++) {
-    for(let j = 0; j < b.length; j++) {
-      let k = 0;
-      while(i + k < a.length && j + k < b.length && a[i + k] === b[j + k]) k++;
-      if(k > best) best = k;
-    }
-  }
-  return best / a.length;
-}
-
-// 地理编码（地址解析）
-function geocodeAsync(name, city) {
-  return new Promise(function(resolve) {
-    const run = function() {
-      const geocoder = new AMap.Geocoder({ city: city || "全国", radius: 1000 });
-      geocoder.getLocation(name, function(status, result) {
-        if(status === 'complete' && result.geocodes && result.geocodes.length > 0) {
-          const loc = result.geocodes[0];
-          let addrName = name;
-          if(loc.formattedAddress && loc.formattedAddress.indexOf(name) < 0) addrName = name + '（' + loc.formattedAddress + '）';
-          if(addrName.length > 30) addrName = addrName.substring(0, 30) + '…';
-          resolve({
-            name: addrName, province: loc.province || '',
-            cityname: (typeof loc.city === 'string' ? loc.city : ''), region: '',
-            lng: loc.location.lng, lat: loc.location.lat,
-            isCenter: false, isAddress: true, address: loc.formattedAddress || name,
-            _raw: name, _score: (loc.formattedAddress && loc.formattedAddress.indexOf(name) >= 0) ? 1 : 0.6
-          });
-        } else {
-          resolve(null);
-        }
-      });
-    };
-    if(typeof AMap.Geocoder === 'undefined') AMap.plugin('AMap.Geocoder', run); else run();
-  });
-}
-
-// 在线解析地点（地理编码 + POI 搜索双保险），返回 Promise<虚拟城市对象|null>
-// city 可选：传入城市名时就近限定搜索（用于同批地点的主城市推断）
-function resolvePlaceAsync(name, city) {
-  return resolvePoiSmart(name, city);
-}
-
-// 逆地理编码：由坐标反查省市（PlaceSearch 返回的 pname/cityname/adname 均为空，必须用此补全）
-function reverseCityAsync(lng, lat) {
-  return new Promise(function(resolve) {
-    const run = function() {
-      const gc = new AMap.Geocoder();
-      gc.getAddress([lng, lat], function(status, result) {
-        if(status === 'complete' && result.regeocode) {
-          const ac = result.regeocode.addressComponent || {};
-          const pick = function(v) { return (typeof v === 'string' && v) ? v : ''; };
-          resolve({ city: pick(ac.city) || pick(ac.district) || pick(ac.province), province: pick(ac.province) });
-        } else resolve(null);
-      });
-    };
-    if(typeof AMap.Geocoder === 'undefined') AMap.plugin('AMap.Geocoder', run); else run();
-  });
-}
-
-// 给解析出的点补全可靠的所属城市（供主城市推断/离群校正使用）
-async function attachCityInfo(city) {
-  if(city.cityname) return;
-  const rc = await withTimeout(reverseCityAsync(city.lng, city.lat), 8000).catch(function() { return null; });
-  if(rc) {
-    if(rc.city) city.cityname = rc.city;
-    if(rc.province && !city.province) city.province = rc.province;
-  }
-}
-
-// 智能解析：POI 搜索优先（带名称匹配度校验），地理编码兜底（长名称要求地址完整包含输入，防止连写串被模糊匹配成单个地址）
-async function resolvePoiSmart(name, city) {
-  const poi = await withTimeout(placeSearchAsync(name, city), 8000).catch(function() { return null; });
-  if(poi) {
-    poi._score = nameMatchScore(name, poi.name);
-    if(poi._score >= 0.5) { await attachCityInfo(poi); return poi; }
-  }
-  const geo = await withTimeout(geocodeAsync(name, city), 8000).catch(function() { return null; });
-  if(geo && (name.length <= 4 || geo._score >= 1 || nameMatchScore(name, geo.address) >= 0.6)) { await attachCityInfo(geo); return geo; }
-  if(poi && name.length <= 4) { await attachCityInfo(poi); return poi; } // 短名称放宽，避免过度拒绝
-  return null;
-}
-
-// POI 搜索（可带城市限定，就近解析"西街""钟楼"这类重名地点）
-function placeSearchAsync(name, city) {
-  return new Promise(function(resolve) {
-    const doSearch = function() {
-      const opts = { city: city || '全国', pageSize: 1, pageIndex: 1 };
-      if(city) opts.citylimit = true;
-      const ps = new AMap.PlaceSearch(opts);
-      ps.search(name, function(status, result) {
-        if(status === 'complete' && result.poiList && result.poiList.pois && result.poiList.pois.length > 0) {
-          const poi = result.poiList.pois[0];
-          resolve({
-            name: poi.name || name, province: poi.pname || '', cityname: poi.cityname || '', region: '',
-            lng: poi.location.lng, lat: poi.location.lat,
-            isCenter: false, isAddress: true,
-            address: (poi.pname || '') + (poi.cityname || '') + (poi.adname || '') + (poi.address || ''),
-            _raw: name
-          });
-        } else {
-          resolve(null);
-        }
-      });
-    };
-    if(typeof AMap.PlaceSearch === 'undefined') AMap.plugin('AMap.PlaceSearch', doSearch); else doSearch();
-  });
-}
-
-// 连写文本切分：按中文地名常见后缀词（寺/庙/村/路/桥…）作为边界，离线确定性地切
-// 单字后缀仅在下一字符不是后缀字时切分（避免"中山路"被切成"中山"+"路"）
-// 如"开元寺西街钟楼中山路一承天寺关岳庙"→["开元寺","西街","钟楼","中山路","承天寺","关岳庙"]
-function splitConcatenated(text) {
-  const MULTI = ['传统街区','公园','广场','海岸','海滩','沙滩','码头','港口','口岸','机场','车站','咖啡','酒吧','餐厅','书店','酒店','宾馆','民宿','古村','古镇','古城','老街','大厦','大楼','中心','基地','景区','新村'];
-  const SINGLE = '寺庙观祠庵宫塔楼阁桥村庄寨店馆城堡厝坊巷弄街路道岛湖河江溪山峰岭洞潭泉林园苑陵墓区县市州湾滩港站场';
-  const isSuffixChar = function(ch) { return !!ch && SINGLE.indexOf(ch) >= 0; };
-  const segs = [];
-  let start = 0, i = 0;
-  while(i < text.length) {
-    let cut = -1;
-    for(let w = 0; w < MULTI.length; w++) {
-      if(text.startsWith(MULTI[w], i)) { cut = i + MULTI[w].length; break; }
-    }
-    if(cut < 0 && isSuffixChar(text[i]) && !isSuffixChar(text[i + 1])) cut = i + 1;
-    if(cut > 0) {
-      segs.push(text.substring(start, cut));
-      start = cut;
-      i = cut;
-    } else {
-      i++;
-    }
-  }
-  if(start < text.length) segs.push(text.substring(start));
-  return segs.map(cleanSegment).filter(function(s) { return s.length >= 2; }).slice(0, 12);
-}
-
-// 清理段首连接字（一/到/去/往 等）和段尾语气字
-function cleanSegment(s) {
-  return s.replace(/^[一到去往来和与跟及、的从在向]+/, '').replace(/[的了呢吧啊]+$/, '');
-}
-
-// 从已添加的路线点推断主城市（用于就近解析重名地点）；可指定统计的点集合
-function inferDominantCityName(pool) {
-  const counts = {};
-  (pool || routePoints).forEach(function(p) {
-    const cn = cityOfPoint(p.city);
-    if(cn) counts[cn] = (counts[cn] || 0) + 1;
-  });
-  let best = '', bestN = 0;
-  for(const k in counts) {
-    if(counts[k] > bestN) { best = k; bestN = counts[k]; }
-  }
-  return best;
-}
-
-// 提取路线点所属城市：优先 cityname；地址点在内置城市表里做匹配（地址按 省→市→区 顺序，
-// 取最早出现的城市名，避免"自治区梧州市"这类正则误匹配）；兜底正则/省份
-function cityOfPoint(city) {
-  if(city.cityname) return city.cityname;
-  if(!city.isAddress) return city.name;
-  const addr = city.address || '';
-  let best = '', bestIdx = 1e9;
-  for(let i = 0; i < CITIES.length; i++) {
-    const short = CITIES[i].name.replace(/(省|市|县|区|地区|自治州|盟|旗|自治县|林区)$/, '');
-    if(short.length < 2) continue;
-    const idx = addr.indexOf(short);
-    if(idx >= 0 && idx < bestIdx) { bestIdx = idx; best = CITIES[i].name; }
-  }
-  if(best) return best;
-  const m = addr.match(/[一-龥]{2,4}市/);
-  return m ? m[0] : (city.province || '');
-}
-
-// 从分享链接/本地缓存的数据恢复路线（统一入口，带容错）
-function restoreRouteFromData(data, source) {
-  if(!data) return;
-  if(data.m === 'multi' && data.c && data.c.length >= 2) {
     if(currentMode !== 'multi') toggleMode();
-    const matched = [], unmatched = [], seen = {};
-    data.c.forEach(function(n) {
-      const city = entryToCity(n);
-      if(city) {
-        if(!seen[city.name]) { seen[city.name] = 1; matched.push(city); }
-      } else unmatched.push(n);
-    });
-    if(matched.length === 0) {
-      tipDom.innerHTML = '⚠️ ' + source + '中的地点均未识别，未恢复路线';
-      return;
-    }
     let idx = 0;
     function addNext() {
-      if(idx >= matched.length) {
-        let msg = '📥 已从' + source + '加载 ' + matched.length + ' 个城市的路线';
-        if(unmatched.length) msg += '（' + unmatched.length + ' 个未识别：' + unmatched.slice(0, 6).join('、') + (unmatched.length > 6 ? '…' : '') + '）';
-        tipDom.innerHTML = msg;
-        return;
-      }
-      try { addPoint(matched[idx]); } catch(e) { console.error('恢复路线点失败:', e); }
+      if(idx >= data.c.length) return;
+      const city = CITIES.find(function(c) { return c.name === data.c[idx]; });
+      if(city) addPoint(city);
       idx++;
       setTimeout(addNext, 300);
     }
     addNext();
-  } else if(data.m === 'radial' && data.o) {
-    if(currentMode !== 'radial') toggleMode();
-    const origin = entryToCity(data.o);
-    if(origin) {
-      handleRadialCityClick(origin);
-      if(data.d && data.d.length > 0) {
-        let idx = 0;
-        function addNext() {
-          if(idx >= data.d.length) return;
-          const city = entryToCity(data.d[idx]);
-          if(city) { try { handleRadialCityClick(city); } catch(e) {} }
-          idx++;
-          setTimeout(addNext, 300);
-        }
-        addNext();
-      }
-      tipDom.innerHTML = '📥 已从' + source + '加载放射状路线';
-    } else {
-      tipDom.innerHTML = '⚠️ ' + source + '中的出发地「' + data.o + '」未识别';
-    }
-  }
+    tipDom.innerHTML = '📥 已恢复上次未完成的路线（' + data.c.length + ' 个点）';
+  }, 500);
 }
 
 function loadRouteFromURL() {
   const hash = window.location.hash;
   if(!hash || hash.indexOf('#route=') < 0) return;
-  let data = null;
   try {
-    let encoded = hash.substring('#route='.length);
-    // 兼容 URL-safe base64（- 代 +，_ 代 /，省略填充），旧格式链接同样可解析
-    encoded = decodeURIComponent(encoded);
-    encoded = encoded.replace(/-/g, '+').replace(/_/g, '/');
-    while(encoded.length % 4 !== 0) encoded += '=';
-    data = JSON.parse(decodeURIComponent(atob(encoded)));
+    const encoded = hash.substring('#route='.length);
+    const data = JSON.parse(decodeURIComponent(atob(encoded)));
+    
+    setTimeout(function() {
+      if(data.m === 'multi' && data.c && data.c.length >= 2) {
+        // 切换到多点模式
+        if(currentMode !== 'multi') toggleMode();
+        // 逐个添加城市
+        let idx = 0;
+        function addNext() {
+          if(idx >= data.c.length) return;
+          const city = CITIES.find(function(c) { return c.name === data.c[idx]; });
+          if(city) {
+            addPoint(city);
+          }
+          idx++;
+          setTimeout(addNext, 300);
+        }
+        addNext();
+        tipDom.innerHTML = '📥 已从分享链接加载 ' + data.c.length + ' 个城市的路线';
+      } else if(data.m === 'radial' && data.o) {
+        // 切换到放射状模式
+        if(currentMode !== 'radial') toggleMode();
+        const origin = CITIES.find(function(c) { return c.name === data.o; });
+        if(origin) {
+          handleRadialCityClick(origin);
+          if(data.d && data.d.length > 0) {
+            let idx = 0;
+            function addNext() {
+              if(idx >= data.d.length) return;
+              const city = CITIES.find(function(c) { return c.name === data.d[idx]; });
+              if(city) handleRadialCityClick(city);
+              idx++;
+              setTimeout(addNext, 300);
+            }
+            addNext();
+          }
+        }
+        tipDom.innerHTML = '📥 已从分享链接加载放射状路线';
+      }
+    }, 1500); // 等待地图初始化
   } catch(e) {
     console.error('加载分享路线失败:', e);
-    tipDom.innerHTML = '⚠️ 分享链接解析失败，链接可能在转发中被截断，请重新复制完整链接';
-    return;
   }
-  // 等待地图初始化完成后再恢复（最多等20秒），避免打开过快导致路线丢失
-  let waited = 0;
-  const timer = setInterval(function() {
-    waited += 300;
-    if((window.AMap && map) || waited >= 20000) {
-      clearInterval(timer);
-      restoreRouteFromData(data, '分享链接');
-    }
-  }, 300);
-}
-
-// ===== 批量导入地点 =====
-function toggleImportPanel() {
-  if(currentMode !== 'multi') toggleMode();
-  const p = document.getElementById('importPanel');
-  if(!p) return;
-  p.classList.toggle('open');
-  if(p.classList.contains('open')) {
-    previewImport();
-    setTimeout(function() { document.getElementById('importText').focus(); }, 50);
-  }
-}
-
-function parseImportText() {
-  const raw = (document.getElementById('importText').value || '');
-  const tokens = raw.split(/[\n\r,，、;；\s\-~—–→>｜|\/\\]+/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
-  const matched = [], unmatched = [], seen = {};
-  tokens.forEach(function(t) {
-    const city = findCityByName(t);
-    if(city) {
-      if(!seen[city.name]) { seen[city.name] = 1; matched.push(city); }
-    } else {
-      unmatched.push(t);
-    }
-  });
-  return { matched: matched, unmatched: unmatched };
-}
-
-function previewImport() {
-  const dom = document.getElementById('importPreview');
-  if(!dom) return;
-  const raw = (document.getElementById('importText').value || '').trim();
-  if(!raw) {
-    dom.innerHTML = '支持模糊匹配（如"昆明"自动匹配"昆明市"），未识别的名称会标出';
-    return;
-  }
-  const r = parseImportText();
-  let html = '✅ 识别 <b>' + r.matched.length + '</b> 个地点';
-  if(r.matched.length) html += '：' + r.matched.slice(0, 10).map(function(c) { return c.name; }).join('、') + (r.matched.length > 10 ? ' …' : '');
-  if(r.unmatched.length) html += '<br><span style="color:#b45309;">🔍 ' + r.unmatched.length + ' 个本地未识别：' + r.unmatched.slice(0, 8).join('、') + (r.unmatched.length > 8 ? ' …' : '') + '（导入时自动在线解析，连写的会智能拆分）</span>';
-  dom.innerHTML = html;
-}
-
-let importBusy = false;
-
-async function doBatchImport() {
-  if(importBusy) { tipDom.innerHTML = '⏳ 正在导入中，请稍候...'; return; }
-  const r = parseImportText();
-  const total = r.matched.length + r.unmatched.length;
-  // 单个连写串也允许导入（会被智能拆分成多个地点）
-  const splittable = r.unmatched.some(function(n) { return n.length >= 4 && splitConcatenated(n).length >= 2; });
-  if(total < 2 && !splittable) {
-    tipDom.innerHTML = '⚠️ 请至少输入 2 个地点';
-    return;
-  }
-  if(total > 60 && !confirm('一次导入 ' + total + ' 个地点，规划耗时较长且可能超出配额，继续吗？')) return;
-  const shouldClear = document.getElementById('importClear').checked;
-  const shouldOptimize = document.getElementById('importOptimize').checked;
-  if(shouldClear && routePoints.length) clearRoute();
-
-  importBusy = true;
-  suppressAutoPlan = true;
-  const failed = [];
-  let resolvedCount = 0;
-  try {
-    // 先添加本地已识别的城市
-    r.matched.forEach(addUniquePoint);
-
-    if(r.unmatched.length > 0) {
-      const toResolve = r.unmatched.slice(0, 20);
-      r.unmatched.slice(20).forEach(function(n) { failed.push(n); });
-
-      // 阶段1：直接在线解析（地理编码 + POI 搜索）
-      let remaining = [];
-      for(let i = 0; i < toResolve.length; i++) {
-        tipDom.innerHTML = '🔍 正在解析（' + (i + 1) + '/' + toResolve.length + '）：' + toResolve[i];
-        const city = await resolvePlaceAsync(toResolve[i], null).catch(function() { return null; });
-        if(city) { resolvedCount++; addUniquePoint(city); } else remaining.push(toResolve[i]);
-        await new Promise(function(res) { setTimeout(res, 200); });
-      }
-
-      // 阶段2：按已解析地点推断主城市，就近重试（解决"西街""钟楼"等全国重名问题）
-      if(remaining.length > 0) {
-        const domCity = inferDominantCityName();
-        if(domCity) tipDom.innerHTML = '🔍 已推断主区域「' + domCity + '」，就近解析剩余 ' + remaining.length + ' 个...';
-        const stillRemaining = [];
-        for(let i = 0; i < remaining.length; i++) {
-          const city = await resolvePoiSmart(remaining[i], domCity).catch(function() { return null; });
-          if(city) { resolvedCount++; addUniquePoint(city); } else stillRemaining.push(remaining[i]);
-          await sleep(200);
-        }
-        remaining = stillRemaining;
-      }
-
-      // 阶段3：连写文本智能拆分（按地名后缀词边界切分，如"开元寺西街钟楼"）
-      for(let i = 0; i < remaining.length; i++) {
-        const text = remaining[i];
-        if(text.length < 4) { failed.push(text); continue; }
-        tipDom.innerHTML = '🧩 智能拆分连写地点：' + text;
-        const segs = splitConcatenated(text);
-        if(segs.length <= 1) { failed.push(text); continue; }
-        for(let j = 0; j < segs.length; j++) {
-          tipDom.innerHTML = '🔍 拆分解析（' + (j + 1) + '/' + segs.length + '）：' + segs[j];
-          // 每成功解析一个段就重新推断主城市，让后续段就近解析
-          const segCity = inferDominantCityName();
-          const city = await resolvePoiSmart(segs[j], segCity).catch(function() { return null; });
-          if(city) { resolvedCount++; addUniquePoint(city); }
-          else failed.push(segs[j]);
-          await sleep(200);
-        }
-      }
-    }
-
-    // 阶段4：离群校正——某个地址点远离其他点的聚集区时，用主城市重新解析替换
-    await reresolveOutliers(failed);
-  } finally {
-    importBusy = false;
-  }
-  finishBatchImport(shouldOptimize, failed, resolvedCount);
-}
-
-// 离群校正：先找最大聚集簇（150km 内邻居最多的点为簇心），簇至少 3 个点且占总数一半以上
-// 才启用，避免误伤合法的跨省多点路线。偏离簇心 250km 以上的地址点视为疑似认错城市，
-// 用主城市就近重解析；找不到聚集区附近的候选就直接移除并如实报告，不硬凑错点。
-async function reresolveOutliers(failed) {
-  if(routePoints.length < 4) return;
-  const NEAR_KM = 150, FAR_KM = 250;
-  // 找最大聚集簇（150km 内邻居最多的一组点）
-  let med = null, clusterSize = 0, inCluster = [];
-  for(let i = 0; i < routePoints.length; i++) {
-    const nb = routePoints.filter(function(p) { return geoDist(routePoints[i].city, p.city) <= NEAR_KM; });
-    if(nb.length > clusterSize) { clusterSize = nb.length; med = routePoints[i].city; inCluster = nb; }
-  }
-  if(!med || clusterSize < 3) return; // 太分散（如跨省路线），不做校正
-  // 次大簇（不在主簇内的点之间再聚一次），主簇必须明显占优才动手，避免误伤双城/多城路线
-  const rest = routePoints.filter(function(p) { return inCluster.indexOf(p) < 0; });
-  let secondSize = 0;
-  for(let i = 0; i < rest.length; i++) {
-    const cnt = rest.filter(function(p) { return geoDist(rest[i].city, p.city) <= NEAR_KM; }).length;
-    if(cnt > secondSize) secondSize = cnt;
-  }
-  if(clusterSize < Math.max(3, secondSize * 2)) return;
-  // 主城市只用簇内点推断，避免被错点的地址带偏
-  const domCity = inferDominantCityName(inCluster);
-  if(!domCity) return;
-  const suspects = routePoints.filter(function(p) { return p.city.isAddress && geoDist(med, p.city) > FAR_KM; });
-  for(let i = 0; i < suspects.length; i++) {
-    const p = suspects[i];
-    const raw = p.city._raw || p.city.name;
-    tipDom.innerHTML = '🧭 校正疑似认错城市的地点：' + raw;
-    let better = await withTimeout(placeSearchAsync(raw, domCity), 8000).catch(function() { return null; });
-    if(!better) better = await withTimeout(geocodeAsync(raw, domCity), 8000).catch(function() { return null; });
-    let replaced = false;
-    if(better) {
-      const newScore = nameMatchScore(raw, better.name);
-      const oldScore = p.city._score || 0.5;
-      // 新候选必须落在聚集区附近（绝对距离门槛），而不是仅仅比错点更近
-      if(newScore >= oldScore && geoDist(med, better) <= FAR_KM) {
-        const idx = routePoints.indexOf(p);
-        if(idx >= 0) {
-          if(p.marker) map.remove(p.marker);
-          if(p.label) map.remove(p.label);
-          routePoints.splice(idx, 1);
-          better._raw = raw;
-          better._score = newScore;
-          addPoint(better); // suppressAutoPlan 生效中，之后统一优化排序
-          replaced = true;
-        }
-      }
-    }
-    if(!replaced) {
-      const idx = routePoints.indexOf(p);
-      if(idx >= 0) {
-        if(p.marker) map.remove(p.marker);
-        if(p.label) map.remove(p.label);
-        routePoints.splice(idx, 1);
-        renumberMarkers();
-      }
-      if(failed) failed.push(raw + '（附近未找到，已跳过）');
-    }
-    await sleep(200);
-  }
-}
-
-function addUniquePoint(city) {
-  const exists = routePoints.some(function(p) { return p.city.name === city.name; });
-  if(!exists) {
-    try { addPoint(city); } catch(e) { console.error('添加地点失败:', e); }
-  }
-}
-
-function finishBatchImport(shouldOptimize, failed, resolvedCount) {
-  suppressAutoPlan = false;
-  let optimized = false;
-  if(shouldOptimize && routePoints.length >= 3) {
-    routePoints = optimizeRouteOrder(routePoints);
-    renumberMarkers();
-    optimized = true;
-  }
-  renderRouteBar();
-  renderCityList();
-  document.getElementById('importPanel').classList.remove('open');
-  let msg = '📥 已导入 ' + routePoints.length + ' 个地点' + (optimized ? '并自动优化顺序' : '');
-  if(resolvedCount > 0) msg += '（含在线解析 ' + resolvedCount + ' 个）';
-  if(failed.length) msg += '，<span style="color:#dc2626;">' + failed.length + ' 个无法识别：' + failed.slice(0, 6).join('、') + (failed.length > 6 ? '…' : '') + '</span>';
-  if(routePoints.length < 2) {
-    tipDom.innerHTML = msg + '。有效地点不足 2 个，无法规划';
-    return;
-  }
-  tipDom.innerHTML = msg + '，正在规划路线...';
-  planFullRoute();
 }
 
 // ===== 到各省会距离 =====
