@@ -4347,23 +4347,31 @@ function addItineraryToRoute(places, day, failedPlaces) {
   let added = 0;
   let failed = failedPlaces || [];
   
+  // 先补全失败地点的近似坐标
+  const validPlaces = [];
   places.forEach(function(place, idx) {
-    // 对于地理编码失败的地点，使用前一个成功地点的坐标（近似）
     let lng = place.lng, lat = place.lat;
-    if((!lng || !lat) && places.length > 0) {
-      // 找前一个成功的坐标
-      for(let j = idx - 1; j >= 0; j--) {
-        if(places[j].lng && places[j].lat) {
-          lng = places[j].lng;
-          lat = places[j].lat;
-          break;
-        }
-      }
+    if((!lng || !lat) && validPlaces.length > 0) {
+      // 用前一个成功坐标近似
+      lng = validPlaces[validPlaces.length - 1].lng;
+      lat = validPlaces[validPlaces.length - 1].lat;
     }
+    if(lng && lat) {
+      validPlaces.push({ name: place.name, lng: lng, lat: lat });
+    }
+  });
+  
+  // 路径优化：固定起点和终点，中间点用最近邻算法优化
+  let optimizedPlaces = validPlaces;
+  if(validPlaces.length > 3) {
+    optimizedPlaces = optimizeItineraryOrder(validPlaces);
+  }
+  
+  optimizedPlaces.forEach(function(place, idx) {
+    let lng = place.lng, lat = place.lat;
     if(!lng || !lat) return;
     
-    // 允许同名地点重复添加（行程中出发和返回可能是同一个地点）
-    // 但如果连续两个地点坐标完全相同，则跳过第二个
+    // 连续相同坐标跳过
     if(routePoints.length > 0) {
       const last = routePoints[routePoints.length - 1].city;
       if(Math.abs(last.lng - lng) < 0.0001 && Math.abs(last.lat - lat) < 0.0001) {
@@ -4405,7 +4413,7 @@ function addItineraryToRoute(places, day, failedPlaces) {
   renderCityList();
   
   if(routePoints.length >= 2) {
-    let msg = '✅ Day ' + day.day + ' 行程已加载（' + added + '个地点）';
+    let msg = '✅ Day ' + day.day + ' 行程已加载（' + added + '个地点，已优化顺序）';
     if(failed.length > 0) msg += '，' + failed.length + '个地点用近似坐标';
     msg += '，正在规划路线...';
     tipDom.innerHTML = msg;
@@ -4419,6 +4427,45 @@ function addItineraryToRoute(places, day, failedPlaces) {
       map.setFitView(null, false, [60, 60, 60, 360]);
     }, 500);
   }
+}
+
+// 行程路径优化：固定起点终点，中间点用最近邻算法
+function optimizeItineraryOrder(places) {
+  if(places.length <= 3) return places;
+  
+  const start = places[0];
+  const end = places[places.length - 1];
+  const middle = places.slice(1, -1);
+  
+  // 检查起点和终点是否相同（如出发和返回都是青旅）
+  const sameEnd = Math.abs(start.lng - end.lng) < 0.001 && Math.abs(start.lat - end.lat) < 0.001;
+  
+  // 最近邻算法优化中间点顺序
+  const optimized = [start];
+  const remaining = middle.slice();
+  let current = start;
+  
+  while(remaining.length > 0) {
+    let nearestIdx = 0;
+    let nearestDist = Infinity;
+    for(let i = 0; i < remaining.length; i++) {
+      const d = Math.sqrt((remaining[i].lng - current.lng)**2 + (remaining[i].lat - current.lat)**2);
+      if(d < nearestDist) {
+        nearestDist = d;
+        nearestIdx = i;
+      }
+    }
+    current = remaining[nearestIdx];
+    optimized.push(current);
+    remaining.splice(nearestIdx, 1);
+  }
+  
+  // 如果起点和终点不同，添加终点
+  if(!sameEnd) {
+    optimized.push(end);
+  }
+  
+  return optimized;
 }
 
 function optimizeRouteOrderBtn() {
