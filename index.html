@@ -4238,6 +4238,7 @@ const FUJIAN_ITINERARY = [
 ];
 
 let itineraryGeocoder = null;
+let itineraryPlaceSearch = null;
 let itineraryLoading = false;
 
 function openItineraryPanel() {
@@ -4288,21 +4289,23 @@ function loadItineraryDay(dayNum) {
   else if(dayNum >= 4 && dayNum <= 6) geoCity = '泉州';
   
   itineraryLoading = true;
-  showLoading('正在加载Day ' + dayNum + '行程...', '地理编码地点中 0/' + day.places.length);
+  showLoading('正在加载Day ' + dayNum + '行程...', '定位地点中 0/' + day.places.length);
   
-  if(!itineraryGeocoder) {
-    if(typeof AMap.Geocoder === 'undefined') {
-      AMap.plugin('AMap.Geocoder', function() {
-        itineraryGeocoder = new AMap.Geocoder({ city: geoCity, radius: 1000 });
-        geocodeItineraryPlaces(day, 0, [], geoCity);
-      });
-    } else {
-      itineraryGeocoder = new AMap.Geocoder({ city: geoCity, radius: 1000 });
-      geocodeItineraryPlaces(day, 0, [], geoCity);
-    }
+  // 加载地理编码器和POI搜索
+  const plugins = [];
+  if(typeof AMap.Geocoder === 'undefined') plugins.push('AMap.Geocoder');
+  if(typeof AMap.PlaceSearch === 'undefined') plugins.push('AMap.PlaceSearch');
+  
+  if(plugins.length > 0) {
+    AMap.plugin(plugins, function() {
+      if(!itineraryGeocoder) itineraryGeocoder = new AMap.Geocoder({ city: geoCity, radius: 1000 });
+      if(!itineraryPlaceSearch) itineraryPlaceSearch = new AMap.PlaceSearch({ pageSize: 3, pageIndex: 1, city: geoCity, extensions: 'base' });
+      geocodeItineraryPlaces(day, 0, [], geoCity, []);
+    });
   } else {
-    itineraryGeocoder.setCity(geoCity);
-    geocodeItineraryPlaces(day, 0, [], geoCity);
+    if(!itineraryGeocoder) itineraryGeocoder = new AMap.Geocoder({ city: geoCity, radius: 1000 });
+    if(!itineraryPlaceSearch) itineraryPlaceSearch = new AMap.PlaceSearch({ pageSize: 3, pageIndex: 1, city: geoCity, extensions: 'base' });
+    geocodeItineraryPlaces(day, 0, [], geoCity, []);
   }
 }
 
@@ -4314,13 +4317,12 @@ function geocodeItineraryPlaces(day, index, results, geoCity, failedPlaces) {
     return;
   }
   
-  if(!failedPlaces) failedPlaces = [];
-  
   const place = day.places[index];
-  document.getElementById('loadingSubText').innerHTML = '地理编码地点中 ' + (index + 1) + '/' + day.places.length + '：' + place;
+  document.getElementById('loadingSubText').innerHTML = '定位地点中 ' + (index + 1) + '/' + day.places.length + '：' + place;
   
   if(itineraryGeocoder.setCity) itineraryGeocoder.setCity(geoCity);
   
+  // 先用地理编码
   itineraryGeocoder.getLocation(place, function(status, result) {
     let lng = null, lat = null;
     if(status === 'complete' && result.geocodes && result.geocodes.length > 0) {
@@ -4329,17 +4331,34 @@ function geocodeItineraryPlaces(day, index, results, geoCity, failedPlaces) {
       lat = loc.lat;
     }
     
-    if(lng && lat) {
-      results.push({ name: place, lng: lng, lat: lat, isAddress: true });
+    // 地理编码失败，用POI搜索
+    if(!lng || !lat) {
+      if(itineraryPlaceSearch.setCity) itineraryPlaceSearch.setCity(geoCity);
+      itineraryPlaceSearch.search(place, function(status, poiResult) {
+        if(status === 'complete' && poiResult.poiList && poiResult.poiList.pois && poiResult.poiList.pois.length > 0) {
+          const poi = poiResult.poiList.pois[0];
+          if(poi.location) {
+            lng = poi.location.lng;
+            lat = poi.location.lat;
+          }
+        }
+        
+        if(lng && lat) {
+          results.push({ name: place, lng: lng, lat: lat, isAddress: true });
+        } else {
+          failedPlaces.push(place);
+        }
+        
+        setTimeout(function() {
+          geocodeItineraryPlaces(day, index + 1, results, geoCity, failedPlaces);
+        }, 150);
+      });
     } else {
-      failedPlaces.push(place);
-      // 失败的地点也加入结果，但标记为失败，后面用近似坐标
-      results.push({ name: place, lng: null, lat: null, isAddress: true, failed: true });
+      results.push({ name: place, lng: lng, lat: lat, isAddress: true });
+      setTimeout(function() {
+        geocodeItineraryPlaces(day, index + 1, results, geoCity, failedPlaces);
+      }, 150);
     }
-    
-    setTimeout(function() {
-      geocodeItineraryPlaces(day, index + 1, results, geoCity, failedPlaces);
-    }, 150);
   });
 }
 
@@ -4347,29 +4366,10 @@ function addItineraryToRoute(places, day, failedPlaces) {
   let added = 0;
   let failed = failedPlaces || [];
   
-  // 先补全失败地点的近似坐标
-  const validPlaces = [];
+  // 按原始顺序添加地点，不做路径优化
   places.forEach(function(place, idx) {
     let lng = place.lng, lat = place.lat;
-    if((!lng || !lat) && validPlaces.length > 0) {
-      // 用前一个成功坐标近似
-      lng = validPlaces[validPlaces.length - 1].lng;
-      lat = validPlaces[validPlaces.length - 1].lat;
-    }
-    if(lng && lat) {
-      validPlaces.push({ name: place.name, lng: lng, lat: lat });
-    }
-  });
-  
-  // 路径优化：固定起点和终点，中间点用最近邻算法优化
-  let optimizedPlaces = validPlaces;
-  if(validPlaces.length > 3) {
-    optimizedPlaces = optimizeItineraryOrder(validPlaces);
-  }
-  
-  optimizedPlaces.forEach(function(place, idx) {
-    let lng = place.lng, lat = place.lat;
-    if(!lng || !lat) return;
+    if(!lng || !lat) return; // 地理编码失败的地点跳过，不使用近似坐标
     
     // 连续相同坐标跳过
     if(routePoints.length > 0) {
@@ -4413,8 +4413,8 @@ function addItineraryToRoute(places, day, failedPlaces) {
   renderCityList();
   
   if(routePoints.length >= 2) {
-    let msg = '✅ Day ' + day.day + ' 行程已加载（' + added + '个地点，已优化顺序）';
-    if(failed.length > 0) msg += '，' + failed.length + '个地点用近似坐标';
+    let msg = '✅ Day ' + day.day + ' 行程已加载（' + added + '个地点，按原顺序）';
+    if(failed.length > 0) msg += '，' + failed.length + '个地点未定位';
     msg += '，正在规划路线...';
     tipDom.innerHTML = msg;
     planFullRoute();
@@ -4427,45 +4427,6 @@ function addItineraryToRoute(places, day, failedPlaces) {
       map.setFitView(null, false, [60, 60, 60, 360]);
     }, 500);
   }
-}
-
-// 行程路径优化：固定起点终点，中间点用最近邻算法
-function optimizeItineraryOrder(places) {
-  if(places.length <= 3) return places;
-  
-  const start = places[0];
-  const end = places[places.length - 1];
-  const middle = places.slice(1, -1);
-  
-  // 检查起点和终点是否相同（如出发和返回都是青旅）
-  const sameEnd = Math.abs(start.lng - end.lng) < 0.001 && Math.abs(start.lat - end.lat) < 0.001;
-  
-  // 最近邻算法优化中间点顺序
-  const optimized = [start];
-  const remaining = middle.slice();
-  let current = start;
-  
-  while(remaining.length > 0) {
-    let nearestIdx = 0;
-    let nearestDist = Infinity;
-    for(let i = 0; i < remaining.length; i++) {
-      const d = Math.sqrt((remaining[i].lng - current.lng)**2 + (remaining[i].lat - current.lat)**2);
-      if(d < nearestDist) {
-        nearestDist = d;
-        nearestIdx = i;
-      }
-    }
-    current = remaining[nearestIdx];
-    optimized.push(current);
-    remaining.splice(nearestIdx, 1);
-  }
-  
-  // 如果起点和终点不同，添加终点
-  if(!sameEnd) {
-    optimized.push(end);
-  }
-  
-  return optimized;
 }
 
 function optimizeRouteOrderBtn() {
