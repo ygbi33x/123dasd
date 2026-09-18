@@ -644,7 +644,6 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
   <div id="itineraryDays" style="flex:1;overflow-y:auto;padding:10px;"></div>
   <div style="padding:10px 14px;border-top:1px solid rgba(0,0,0,.06);background:rgba(248,250,252,.8);display:flex;gap:6px;">
     <button onclick="saveItineraryToStorage()" style="flex:1;padding:6px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">💾 保存行程</button>
-    <button onclick="exportToAmap()" style="flex:1;padding:6px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚗 导出到高德</button>
     <button onclick="resetItinerary()" style="padding:6px 10px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;cursor:pointer;">重置</button>
   </div>
 </div>
@@ -4393,116 +4392,6 @@ function addPoiToItinerary(poiIdx) {
   if(input) input.value = '';
   
   tipDom.innerHTML = '✅ 已加入Day' + dayNum + '：' + poi.name;
-}
-
-// 导出到高德地图
-let currentExportUrl = ''; // 全局保存链接，避免onclick截断
-function exportToAmap() {
-  if(routePoints.length < 2) {
-    tipDom.innerHTML = '⚠️ 请先加载一天的行程再导出';
-    return;
-  }
-  
-  // 一天内所有点：第一个=起点，最后一个=终点，中间全部=途经点
-  const start = routePoints[0].city;
-  const end = routePoints[routePoints.length - 1].city;
-  const viaPoints = routePoints.slice(1, -1);
-  
-  // 用高德Web版路线规划格式
-  let url = 'https://ditu.amap.com/dir?type=car';
-  url += '&from%5Blnglat%5D=' + start.lng + ',' + start.lat;
-  url += '&to%5Blnglat%5D=' + end.lng + ',' + end.lat;
-  
-  viaPoints.forEach(function(p, i) {
-    url += '&via%5B' + i + '%5D%5Blnglat%5D=' + p.city.lng + ',' + p.city.lat;
-  });
-  
-  currentExportUrl = url;
-  showExportModal(url, routePoints.length, viaPoints.length);
-}
-
-// 从全局变量打开链接
-function openExportUrl() {
-  window.open(currentExportUrl, '_blank');
-}
-
-// 从全局变量复制链接
-function copyExportUrl(btn) {
-  const url = currentExportUrl;
-  if(navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(url).then(function() {
-      btn.textContent = '✅ 已复制到剪贴板';
-      btn.style.background = '#16a34a';
-      setTimeout(function() { btn.textContent = '📋 一键复制链接'; btn.style.background = ''; }, 2000);
-    }).catch(function() { fallbackExportCopy(btn); });
-  } else {
-    fallbackExportCopy(btn);
-  }
-}
-function fallbackExportCopy(btn) {
-  const ta = document.createElement('textarea');
-  ta.value = currentExportUrl;
-  ta.style.position = 'fixed';
-  ta.style.opacity = '0';
-  document.body.appendChild(ta);
-  ta.select();
-  try {
-    document.execCommand('copy');
-    btn.textContent = '✅ 已复制到剪贴板';
-    btn.style.background = '#16a34a';
-    setTimeout(function() { btn.textContent = '📋 一键复制链接'; btn.style.background = ''; }, 2000);
-  } catch(e) { alert('复制失败，请手动选择textarea里的链接复制'); }
-  document.body.removeChild(ta);
-}
-
-function showExportModal(url, totalPoints, viaCount) {
-  let modal = document.getElementById('exportModal');
-  if(!modal) {
-    modal = document.createElement('div');
-    modal.id = 'exportModal';
-    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
-    document.body.appendChild(modal);
-  }
-  
-  // 生成纯文本路线
-  let textRoute = '【当日行程路线（共' + totalPoints + '个点）】\n';
-  routePoints.forEach(function(p, i) {
-    const tag = i === 0 ? '【起点】' : (i === routePoints.length - 1 ? '【终点】' : '途经点' + i);
-    textRoute += (i+1) + '. ' + tag + ' ' + p.city.name + ' (' + p.city.lng.toFixed(5) + ',' + p.city.lat.toFixed(5) + ')\n';
-  });
-  
-  if(routeSegments.length > 0) {
-    textRoute += '\n【各段距离和时间】\n';
-    let totalDist = 0, totalTime = 0;
-    routeSegments.forEach(function(seg, i) {
-      if(!seg.route) return;
-      const distKm = (seg.route.distance || 0) / 1000;
-      const timeMin = Math.round((seg.route.time || 0) / 60);
-      totalDist += distKm;
-      totalTime += timeMin;
-      textRoute += (i+1) + '. ' + seg.startCity.name.substring(0,12) + ' → ' + seg.endCity.name.substring(0,12) + '：' + distKm.toFixed(1) + 'km，' + Math.floor(timeMin/60) + '时' + (timeMin%60>0 ? (timeMin%60)+'分' : '') + '\n';
-    });
-    textRoute += '\n合计：' + totalDist.toFixed(0) + 'km，约' + Math.floor(totalTime/60) + '时' + (totalTime%60>0 ? (totalTime%60)+'分' : '');
-  }
-  
-  modal.innerHTML = '<div style="background:#fff;border-radius:12px;padding:20px;max-width:480px;width:92%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);">' +
-    '<div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:8px;">🚗 导出到高德地图</div>' +
-    '<div style="font-size:12px;color:#64748b;margin-bottom:12px;line-height:1.5;">共' + totalPoints + '个点：起点1个 + 途经点' + viaCount + '个 + 终点1个，全部在一个链接里：</div>' +
-    
-    // 高德导航链接
-    '<div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;">📱 高德路线链接（复制发给别人）：</div>' +
-    '<button onclick="openExportUrl()" style="display:block;width:100%;padding:12px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;text-align:center;margin-bottom:8px;cursor:pointer;">📍 点此在高德中打开完整路线</button>' +
-    '<button onclick="copyExportUrl(this)" style="width:100%;padding:8px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:8px;">📋 一键复制链接</button>' +
-    '<textarea readonly style="width:100%;height:60px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:10px;color:#475569;box-sizing:border-box;resize:none;" onclick="this.select()">' + url + '</textarea>' +
-    '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">💡 手机点开直接唤起高德APP，电脑点开打开网页版路线</div>' +
-    
-    // 文本路线
-    '<div style="font-size:12px;font-weight:700;color:#334155;margin:16px 0 6px;">📋 路线详情（复制发给别人）：</div>' +
-    '<textarea readonly style="width:100%;height:180px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:11px;color:#475569;box-sizing:border-box;resize:none;line-height:1.6;" onclick="this.select()">' + textRoute + '</textarea>' +
-    
-    '<button onclick="document.getElementById(\'exportModal\').remove()" style="width:100%;padding:10px;margin-top:12px;background:#f1f5f9;color:#475569;border:none;border-radius:8px;font-size:12px;cursor:pointer;">关闭</button>' +
-  '</div>';
-  modal.onclick = function(e) { if(e.target === modal) modal.remove(); };
 }
 
 function openItineraryPanel() {
