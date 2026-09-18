@@ -2531,6 +2531,8 @@ function planNextSegment(version) {
     updateRouteSummary();
     updateRouteSelector();
     updateRouteSelectorBtn();
+    // 更新行程出行建议
+    if(typeof updateItineraryTransport === 'function') updateItineraryTransport();
     // 两点之间有多条备选路线时，自动弹出路线选择器
     const normalPoints = routePoints.filter(p => !p.isVia);
     if(normalPoints.length === 2 && routeSegments.length > 0 && routeSegments[0].allRoutes && routeSegments[0].allRoutes.length > 1) {
@@ -4240,6 +4242,7 @@ const FUJIAN_ITINERARY = [
 let itineraryGeocoder = null;
 let itineraryPlaceSearch = null;
 let itineraryLoading = false;
+let expandedDay = 0; // 当前展开的天数，0=全部收起
 
 function openItineraryPanel() {
   const panel = document.getElementById('itineraryPanel');
@@ -4256,20 +4259,140 @@ function renderItineraryDays() {
   container.innerHTML = '';
   FUJIAN_ITINERARY.forEach(function(day) {
     const card = document.createElement('div');
-    card.style.cssText = 'margin-bottom:10px;padding:12px;border-radius:10px;background:rgba(255,255,255,.8);border:1px solid rgba(0,0,0,.06);cursor:pointer;transition:.2s;';
-    card.onmouseover = function() { this.style.background = 'rgba(59,130,246,.08)'; this.style.borderColor = 'rgba(59,130,246,.3)'; };
-    card.onmouseout = function() { this.style.background = 'rgba(255,255,255,.8)'; this.style.borderColor = 'rgba(0,0,0,.06)'; };
-    card.onclick = function() { loadItineraryDay(day.day); };
+    card.style.cssText = 'margin-bottom:10px;border-radius:10px;background:rgba(255,255,255,.8);border:1px solid rgba(0,0,0,.06);transition:.2s;overflow:hidden;';
     
-    const placesPreview = day.places.slice(0, 3).join(' → ') + (day.places.length > 3 ? ' → ...' : '');
-    card.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+    // 卡片头部
+    const header = document.createElement('div');
+    header.style.cssText = 'padding:12px;cursor:pointer;transition:.2s;';
+    header.onmouseover = function() { header.style.background = 'rgba(59,130,246,.06)'; };
+    header.onmouseout = function() { header.style.background = 'transparent'; };
+    header.onclick = function() { toggleDayExpand(day.day); };
+    
+    const placesPreview = day.places.slice(0, 2).join(' → ') + (day.places.length > 2 ? ' → ...' : '');
+    header.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
       '<span style="font-size:18px;">' + day.icon + '</span>' +
       '<div><div style="font-size:13px;font-weight:700;color:#1e293b;">Day ' + day.day + ' · ' + day.date + '</div>' +
       '<div style="font-size:11px;color:#64748b;">' + day.title + '</div></div>' +
-      '<span style="margin-left:auto;font-size:10px;color:#3b82f6;font-weight:600;background:rgba(59,130,246,.1);padding:3px 8px;border-radius:10px;">' + day.places.length + '点</span></div>' +
+      '<span style="margin-left:auto;font-size:10px;color:#3b82f6;font-weight:600;background:rgba(59,130,246,.1);padding:3px 8px;border-radius:10px;">' + day.places.length + '点</span>' +
+      '<span style="font-size:12px;color:#94a3b8;">' + (expandedDay === day.day ? '▲' : '▼') + '</span></div>' +
       '<div style="font-size:10px;color:#94a3b8;line-height:1.5;">' + placesPreview + '</div>';
+    
+    card.appendChild(header);
+    
+    // 展开内容：地点列表+编辑+出行信息
+    if(expandedDay === day.day) {
+      const detail = document.createElement('div');
+      detail.style.cssText = 'padding:0 12px 12px;border-top:1px solid rgba(0,0,0,.06);';
+      
+      // 地点列表
+      const listDiv = document.createElement('div');
+      listDiv.style.cssText = 'margin:8px 0;max-height:200px;overflow-y:auto;';
+      
+      day.places.forEach(function(place, idx) {
+        const item = document.createElement('div');
+        item.style.cssText = 'display:flex;align-items:center;gap:6px;padding:5px 0;font-size:11px;color:#475569;border-bottom:1px dashed rgba(0,0,0,.04);';
+        item.innerHTML = '<span style="width:18px;height:18px;border-radius:50%;background:#e0e7ff;color:#3b82f6;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + (idx+1) + '</span>' +
+          '<span style="flex:1;line-height:1.4;">' + place + '</span>' +
+          '<button onclick="removeItineraryPlace(' + day.day + ',' + idx + ')" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;">×</button>';
+        listDiv.appendChild(item);
+      });
+      
+      detail.appendChild(listDiv);
+      
+      // 添加地点输入框
+      const addDiv = document.createElement('div');
+      addDiv.style.cssText = 'display:flex;gap:6px;margin-top:6px;';
+      addDiv.innerHTML = '<input type="text" id="newPlaceInput_' + day.day + '" placeholder="添加新地点..." style="flex:1;padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;">' +
+        '<button onclick="addItineraryPlace(' + day.day + ')" style="padding:5px 10px;background:#3b82f6;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;">添加</button>';
+      detail.appendChild(addDiv);
+      
+      // 加载路线按钮
+      const loadBtn = document.createElement('button');
+      loadBtn.style.cssText = 'width:100%;margin-top:8px;padding:8px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;';
+      loadBtn.textContent = '📍 加载路线规划';
+      loadBtn.onclick = function(e) { e.stopPropagation(); loadItineraryDay(day.day); };
+      detail.appendChild(loadBtn);
+      
+      // 出行方式建议（规划完成后填充）
+      const transportDiv = document.createElement('div');
+      transportDiv.id = 'itineraryTransport_' + day.day;
+      transportDiv.style.cssText = 'margin-top:8px;padding:8px;background:rgba(248,250,252,.9);border-radius:8px;font-size:10px;color:#64748b;line-height:1.6;';
+      transportDiv.innerHTML = '<span style="color:#94a3b8;">规划路线后显示出行建议...</span>';
+      detail.appendChild(transportDiv);
+      
+      card.appendChild(detail);
+    }
+    
     container.appendChild(card);
   });
+}
+
+function toggleDayExpand(dayNum) {
+  expandedDay = (expandedDay === dayNum) ? 0 : dayNum;
+  renderItineraryDays();
+}
+
+function removeItineraryPlace(dayNum, idx) {
+  const day = FUJIAN_ITINERARY.find(function(d) { return d.day === dayNum; });
+  if(day) {
+    day.places.splice(idx, 1);
+    renderItineraryDays();
+  }
+}
+
+function addItineraryPlace(dayNum) {
+  const input = document.getElementById('newPlaceInput_' + dayNum);
+  const val = input.value.trim();
+  if(!val) return;
+  const day = FUJIAN_ITINERARY.find(function(d) { return d.day === dayNum; });
+  if(day) {
+    day.places.push(val);
+    renderItineraryDays();
+  }
+}
+
+// 规划完成后更新出行建议
+function updateItineraryTransport() {
+  if(expandedDay === 0) return;
+  const transportDiv = document.getElementById('itineraryTransport_' + expandedDay);
+  if(!transportDiv) return;
+  
+  if(routeSegments.length === 0) {
+    transportDiv.innerHTML = '<span style="color:#94a3b8;">暂无路线数据</span>';
+    return;
+  }
+  
+  let html = '<div style="font-weight:700;color:#334155;margin-bottom:4px;">🚗 出行建议</div>';
+  let totalDist = 0;
+  let totalTime = 0;
+  
+  routeSegments.forEach(function(seg, i) {
+    if(!seg.route) return;
+    const dist = seg.route.distance || 0; // 米
+    const time = seg.route.time || 0; // 秒
+    totalDist += dist;
+    totalTime += time;
+    
+    const distKm = dist / 1000;
+    const timeMin = Math.round(time / 60);
+    
+    // 根据距离推荐出行方式
+    let transport = '🚶 步行';
+    if(distKm >= 2 && distKm < 15) transport = '🚕 打车/公交';
+    else if(distKm >= 15 && distKm < 100) transport = '🚗 自驾/打车';
+    else if(distKm >= 100) transport = '🚄 高铁/自驾';
+    
+    html += '<div style="padding:2px 0;">' + (i+1) + '. ' + seg.startCity.name.substring(0,8) + ' → ' + seg.endCity.name.substring(0,8) + 
+      ' <span style="color:#3b82f6;font-weight:600;">' + distKm.toFixed(1) + 'km · ' + Math.floor(timeMin/60) + '时' + (timeMin%60>0 ? (timeMin%60)+'分' : '') + '</span> ' + transport + '</div>';
+  });
+  
+  // 总计
+  const totalKm = totalDist / 1000;
+  const totalMin = Math.round(totalTime / 60);
+  html += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,0,0,.08);font-weight:600;color:#1e293b;">' +
+    '📊 合计：' + totalKm.toFixed(0) + 'km · ' + Math.floor(totalMin/60) + '时' + (totalMin%60>0 ? (totalMin%60)+'分' : '') + '</div>';
+  
+  transportDiv.innerHTML = html;
 }
 
 function loadItineraryDay(dayNum) {
