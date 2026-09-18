@@ -4306,18 +4306,19 @@ function loadItineraryDay(dayNum) {
   }
 }
 
-function geocodeItineraryPlaces(day, index, results, geoCity) {
+function geocodeItineraryPlaces(day, index, results, geoCity, failedPlaces) {
   if(index >= day.places.length) {
     hideLoading();
     itineraryLoading = false;
-    addItineraryToRoute(results, day);
+    addItineraryToRoute(results, day, failedPlaces);
     return;
   }
+  
+  if(!failedPlaces) failedPlaces = [];
   
   const place = day.places[index];
   document.getElementById('loadingSubText').innerHTML = '地理编码地点中 ' + (index + 1) + '/' + day.places.length + '：' + place;
   
-  // 每次地理编码都设置城市范围
   if(itineraryGeocoder.setCity) itineraryGeocoder.setCity(geoCity);
   
   itineraryGeocoder.getLocation(place, function(status, result) {
@@ -4328,49 +4329,73 @@ function geocodeItineraryPlaces(day, index, results, geoCity) {
       lat = loc.lat;
     }
     
-    if(results.length > 0 && results[results.length - 1].name === place) {
-      geocodeItineraryPlaces(day, index + 1, results, geoCity);
-      return;
+    if(lng && lat) {
+      results.push({ name: place, lng: lng, lat: lat, isAddress: true });
+    } else {
+      failedPlaces.push(place);
+      // 失败的地点也加入结果，但标记为失败，后面用近似坐标
+      results.push({ name: place, lng: null, lat: null, isAddress: true, failed: true });
     }
     
-    results.push({ name: place, lng: lng, lat: lat, isAddress: true });
     setTimeout(function() {
-      geocodeItineraryPlaces(day, index + 1, results, geoCity);
+      geocodeItineraryPlaces(day, index + 1, results, geoCity, failedPlaces);
     }, 150);
   });
 }
 
-function addItineraryToRoute(places, day) {
+function addItineraryToRoute(places, day, failedPlaces) {
   let added = 0;
-  places.forEach(function(place) {
-    if(!place.lng || !place.lat) return;
+  let failed = failedPlaces || [];
+  
+  places.forEach(function(place, idx) {
+    // 对于地理编码失败的地点，使用前一个成功地点的坐标（近似）
+    let lng = place.lng, lat = place.lat;
+    if((!lng || !lat) && places.length > 0) {
+      // 找前一个成功的坐标
+      for(let j = idx - 1; j >= 0; j--) {
+        if(places[j].lng && places[j].lat) {
+          lng = places[j].lng;
+          lat = places[j].lat;
+          break;
+        }
+      }
+    }
+    if(!lng || !lat) return;
     
+    // 允许同名地点重复添加（行程中出发和返回可能是同一个地点）
+    // 但如果连续两个地点坐标完全相同，则跳过第二个
+    if(routePoints.length > 0) {
+      const last = routePoints[routePoints.length - 1].city;
+      if(Math.abs(last.lng - lng) < 0.0001 && Math.abs(last.lat - lat) < 0.0001) {
+        return;
+      }
+    }
+    
+    const displayName = place.name.length > 18 ? place.name.substring(0, 18) + '...' : place.name;
     const virtualCity = {
-      name: place.name.length > 20 ? place.name.substring(0, 20) + '...' : place.name,
+      name: displayName,
       province: '',
       region: '',
-      lng: place.lng,
-      lat: place.lat,
+      lng: lng,
+      lat: lat,
       isCenter: false,
       isAddress: true,
       address: place.name
     };
     
-    if(routePoints.findIndex(function(p) { return p.city.name === virtualCity.name; }) >= 0) return;
-    
     const marker = new AMap.Marker({
-      position: [place.lng, place.lat],
+      position: [lng, lat],
       content: '<div style="background:rgba(22,163,74,0.75);color:#fff;border:2px solid rgba(255,255,255,0.85);border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;">' + (routePoints.length + 1) + '</div>',
       offset: new AMap.Pixel(-13, -13),
       zIndex: 300 + routePoints.length
     });
     marker.on('click', function() {
-      const idx = routePoints.findIndex(function(p) { return p.city.name === virtualCity.name; });
+      const idx = routePoints.findIndex(function(p) { return p.marker === marker; });
       if(idx >= 0) removePointAt(idx);
     });
     marker.setMap(map);
     
-    const label = createCityLabel(virtualCity, [place.lng, place.lat]);
+    const label = createCityLabel(virtualCity, [lng, lat]);
     routePoints.push({ city: virtualCity, marker: marker, label: label });
     added++;
   });
@@ -4380,14 +4405,19 @@ function addItineraryToRoute(places, day) {
   renderCityList();
   
   if(routePoints.length >= 2) {
-    tipDom.innerHTML = '✅ Day ' + day.day + ' 行程已加载（' + added + '个地点），正在规划路线...';
+    let msg = '✅ Day ' + day.day + ' 行程已加载（' + added + '个地点）';
+    if(failed.length > 0) msg += '，' + failed.length + '个地点用近似坐标';
+    msg += '，正在规划路线...';
+    tipDom.innerHTML = msg;
     planFullRoute();
   } else {
     tipDom.innerHTML = '⚠️ Day ' + day.day + ' 行程地点地理编码失败较多，请检查网络';
   }
   
   if(routePoints.length > 0) {
-    map.setFitView(null, false, [60, 60, 60, 360]);
+    setTimeout(function() {
+      map.setFitView(null, false, [60, 60, 60, 360]);
+    }, 500);
   }
 }
 
