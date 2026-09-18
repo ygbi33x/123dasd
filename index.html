@@ -4422,6 +4422,41 @@ function exportToAmap() {
   showExportModal(url, routePoints.length, viaPoints.length);
 }
 
+// 复制文本到剪贴板
+function copyTextToClipboard(text, btn) {
+  if(navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() {
+      const oldText = btn.textContent;
+      btn.textContent = '✅ 已复制到剪贴板';
+      btn.style.background = '#16a34a';
+      setTimeout(function() { btn.textContent = oldText; btn.style.background = ''; }, 2000);
+    }).catch(function() {
+      fallbackCopy(text, btn);
+    });
+  } else {
+    fallbackCopy(text, btn);
+  }
+}
+
+function fallbackCopy(text, btn) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    const oldText = btn.textContent;
+    btn.textContent = '✅ 已复制到剪贴板';
+    btn.style.background = '#16a34a';
+    setTimeout(function() { btn.textContent = oldText; btn.style.background = ''; }, 2000);
+  } catch(e) {
+    alert('复制失败，请手动选择复制');
+  }
+  document.body.removeChild(ta);
+}
+
 function showExportModal(url, totalPoints, viaCount) {
   let modal = document.getElementById('exportModal');
   if(!modal) {
@@ -4457,9 +4492,10 @@ function showExportModal(url, totalPoints, viaCount) {
     '<div style="font-size:12px;color:#64748b;margin-bottom:12px;line-height:1.5;">共' + totalPoints + '个点：起点1个 + 途经点' + viaCount + '个 + 终点1个，全部在一个链接里：</div>' +
     
     // 高德导航链接
-    '<div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;">📱 高德导航链接（复制发给别人）：</div>' +
+    '<div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;">📱 高德路线链接（复制发给别人）：</div>' +
     '<a href="' + url + '" target="_blank" style="display:block;padding:12px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;text-align:center;margin-bottom:8px;">📍 点此在高德中打开完整路线</a>' +
-    '<textarea readonly style="width:100%;height:80px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:10px;color:#475569;box-sizing:border-box;resize:none;" onclick="this.select()">' + url + '</textarea>' +
+    '<button onclick="copyTextToClipboard(\'' + url.replace(/'/g, "\\'") + '\', this)" style="width:100%;padding:8px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:8px;">📋 一键复制链接</button>' +
+    '<textarea readonly style="width:100%;height:60px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:10px;color:#475569;box-sizing:border-box;resize:none;" onclick="this.select()">' + url + '</textarea>' +
     '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">💡 手机点开直接唤起高德APP，电脑点开打开网页版路线</div>' +
     
     // 文本路线
