@@ -4384,11 +4384,11 @@ function renderItineraryDays() {
       
       detail.appendChild(listDiv);
       
-      // 添加地点输入框
+      // 添加地点输入框（带搜索下拉）
       const addDiv = document.createElement('div');
-      addDiv.style.cssText = 'display:flex;gap:6px;margin-top:6px;';
-      addDiv.innerHTML = '<input type="text" id="newPlaceInput_' + day.day + '" placeholder="添加新地点..." style="flex:1;padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;">' +
-        '<button onclick="addItineraryPlace(' + day.day + ')" style="padding:5px 10px;background:#3b82f6;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;">添加</button>';
+      addDiv.style.cssText = 'position:relative;margin-top:6px;';
+      addDiv.innerHTML = '<input type="text" id="newPlaceInput_' + day.day + '" placeholder="搜索地点后选择..." style="width:100%;padding:7px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;box-sizing:border-box;outline:none;" oninput="onItinerarySearchInput(this.value,' + day.day + ')" autocomplete="off">' +
+        '<div id="itineraryDropdown_' + day.day + '" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:200px;overflow-y:auto;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:1000;margin-top:4px;"></div>';
       detail.appendChild(addDiv);
       
       // 加载路线按钮
@@ -4444,6 +4444,77 @@ function addItineraryPlace(dayNum) {
   if(day) {
     day.places.push(val);
     renderItineraryDays();
+  }
+}
+
+// 行程搜索输入
+let itinerarySearchTimer = null;
+let itinerarySearchResults = [];
+
+function onItinerarySearchInput(value, dayNum) {
+  const dropdown = document.getElementById('itineraryDropdown_' + dayNum);
+  if(itinerarySearchTimer) clearTimeout(itinerarySearchTimer);
+  
+  if(value.trim().length < 2) {
+    dropdown.style.display = 'none';
+    return;
+  }
+  
+  itinerarySearchTimer = setTimeout(function() {
+    searchItineraryPOI(value.trim(), dayNum);
+  }, 300);
+}
+
+function searchItineraryPOI(keyword, dayNum) {
+  const dropdown = document.getElementById('itineraryDropdown_' + dayNum);
+  dropdown.innerHTML = '<div style="padding:10px;font-size:11px;color:#94a3b8;text-align:center;">🔍 搜索中...</div>';
+  dropdown.style.display = 'block';
+  
+  if(typeof AMap.PlaceSearch === 'undefined') {
+    AMap.plugin('AMap.PlaceSearch', function() {
+      doItinerarySearch(keyword, dayNum);
+    });
+  } else {
+    doItinerarySearch(keyword, dayNum);
+  }
+}
+
+function doItinerarySearch(keyword, dayNum) {
+  const placeSearch = new AMap.PlaceSearch({
+    pageSize: 8,
+    pageIndex: 1,
+    city: '全国',
+    extensions: 'base'
+  });
+  
+  placeSearch.search(keyword, function(status, result) {
+    const dropdown = document.getElementById('itineraryDropdown_' + dayNum);
+    if(status === 'complete' && result.poiList && result.poiList.pois && result.poiList.pois.length > 0) {
+      itinerarySearchResults = result.poiList.pois;
+      let html = '';
+      result.poiList.pois.forEach(function(poi, i) {
+        const name = poi.name || '';
+        const addr = poi.address || (poi.pname + poi.cityname + poi.adname) || '';
+        html += '<div onclick="selectItineraryPOI(' + dayNum + ',' + i + ')" style="padding:8px 10px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:11px;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#fff\'">' +
+          '<div style="color:#1e293b;font-weight:600;">📍 ' + name + '</div>' +
+          '<div style="color:#94a3b8;margin-top:2px;">' + addr + '</div></div>';
+      });
+      dropdown.innerHTML = html;
+    } else {
+      itinerarySearchResults = [];
+      dropdown.innerHTML = '<div style="padding:10px;font-size:11px;color:#94a3b8;text-align:center;">未找到相关地点</div>';
+    }
+  });
+}
+
+function selectItineraryPOI(dayNum, idx) {
+  const poi = itinerarySearchResults[idx];
+  if(!poi) return;
+  const day = FUJIAN_ITINERARY.find(function(d) { return d.day === dayNum; });
+  if(day) {
+    day.places.push(poi.name);
+    renderItineraryDays();
+    tipDom.innerHTML = '✅ 已添加：' + poi.name;
   }
 }
 
