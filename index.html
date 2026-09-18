@@ -4407,20 +4407,17 @@ function exportToAmap() {
   const end = routePoints[routePoints.length - 1].city;
   const viaPoints = routePoints.slice(1, -1);
   
-  // 构建高德导航链接
-  // from=lng,lat,起点名 & to=lng,lat,终点名 & via=lng,lat,点1;lng,lat,点2...
-  let url = 'https://uri.amap.com/navigation?';
-  url += 'from=' + start.lng + ',' + start.lat + ',' + encodeURIComponent(start.name);
-  url += '&to=' + end.lng + ',' + end.lat + ',' + encodeURIComponent(end.name);
+  // 用高德Web版路线规划格式（支持多个途经点）
+  let url = 'https://ditu.amap.com/dir?type=car';
+  url += '&from[lnglat]=' + start.lng + ',' + start.lat;
+  url += '&from[name]=' + encodeURIComponent(start.name);
+  url += '&to[lnglat]=' + end.lng + ',' + end.lat;
+  url += '&to[name]=' + encodeURIComponent(end.name);
   
-  if(viaPoints.length > 0) {
-    const viaStr = viaPoints.map(function(p) {
-      return p.city.lng + ',' + p.city.lat + ',' + encodeURIComponent(p.city.name);
-    }).join(';');
-    url += '&via=' + viaStr;
-  }
-  
-  url += '&mode=car&policy=1&src=mypage&coordinate=gaode&callnative=1';
+  viaPoints.forEach(function(p, i) {
+    url += '&via[' + i + '][lnglat]=' + p.city.lng + ',' + p.city.lat;
+    url += '&via[' + i + '][name]=' + encodeURIComponent(p.city.name);
+  });
   
   showExportModal(url, routePoints.length, viaPoints.length);
 }
