@@ -634,6 +634,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
   <div id="itineraryDays" style="flex:1;overflow-y:auto;padding:10px;"></div>
   <div style="padding:10px 14px;border-top:1px solid rgba(0,0,0,.06);background:rgba(248,250,252,.8);display:flex;gap:6px;">
     <button onclick="saveItineraryToStorage()" style="flex:1;padding:6px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">💾 保存行程</button>
+    <button onclick="exportToAmap()" style="flex:1;padding:6px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚗 导出到高德</button>
     <button onclick="resetItinerary()" style="padding:6px 10px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;cursor:pointer;">重置</button>
   </div>
 </div>
@@ -4274,6 +4275,56 @@ function resetItinerary() {
   localStorage.removeItem('fujianItinerary');
   renderItineraryDays();
   tipDom.innerHTML = '🔄 已恢复默认行程';
+}
+
+// 导出到高德地图
+function exportToAmap() {
+  if(routePoints.length < 2) {
+    tipDom.innerHTML = '⚠️ 请先加载一天的行程再导出';
+    return;
+  }
+  
+  // 高德导航URL最多支持from + to + 3个途经点（共5个点）
+  // 超过5个点时，按每段4个点分组生成链接
+  const points = routePoints.map(function(p) {
+    return p.city.lng + ',' + p.city.lat + ',' + encodeURIComponent(p.city.name);
+  });
+  
+  // 生成分段链接
+  const links = [];
+  const chunkSize = 5; // 每段最多5个点
+  for(let i = 0; i < points.length - 1; i += chunkSize - 1) {
+    const chunk = points.slice(i, i + chunkSize);
+    if(chunk.length < 2) break;
+    const from = chunk[0];
+    const to = chunk[chunk.length - 1];
+    const via = chunk.slice(1, -1).join(';');
+    let url = 'https://uri.amap.com/navigation?from=' + from + '&to=' + to + '&mode=car&policy=1&src=mypage&coordinate=gaode&callnative=1';
+    if(via) url += '&via=' + via;
+    links.push({ start: i, end: Math.min(i + chunkSize - 1, points.length - 1), url: url });
+  }
+  
+  // 显示导出弹窗
+  showExportModal(links);
+}
+
+function showExportModal(links) {
+  let modal = document.getElementById('exportModal');
+  if(!modal) {
+    modal = document.createElement('div');
+    modal.id = 'exportModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = '<div style="background:#fff;border-radius:12px;padding:20px;max-width:400px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);">' +
+    '<div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:12px;">🚗 导出到高德地图</div>' +
+    '<div style="font-size:12px;color:#64748b;margin-bottom:12px;line-height:1.5;">点击下方链接直接在高德APP中打开导航（手机端），或在浏览器中打开网页版路线。共' + routePoints.length + '个地点，分' + links.length + '段：</div>' +
+    links.map(function(l, i) {
+      return '<a href="' + l.url + '" target="_blank" style="display:block;padding:10px 12px;margin-bottom:8px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;color:#16a34a;text-decoration:none;font-size:12px;font-weight:600;">📍 第' + (i+1) + '段（地点' + (l.start+1) + '-' + (l.end+1) + '）→ 打开高德导航</a>';
+    }).join('') +
+    '<button onclick="document.getElementById(\'exportModal\').remove()" style="width:100%;padding:10px;margin-top:8px;background:#f1f5f9;color:#475569;border:none;border-radius:8px;font-size:12px;cursor:pointer;">关闭</button>' +
+  '</div>';
+  modal.onclick = function(e) { if(e.target === modal) modal.remove(); };
 }
 
 function openItineraryPanel() {
