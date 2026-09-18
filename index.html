@@ -4396,7 +4396,8 @@ function addPoiToItinerary(poiIdx) {
 }
 
 // 导出到高德地图
-let currentExportUrl = '';
+let currentExportUrl = '';      // 电脑网页版链接
+let currentAppUrl = '';         // 手机APP链接
 function exportToAmap() {
   if(routePoints.length < 2) {
     tipDom.innerHTML = '⚠️ 请先加载一天的行程路线再导出';
@@ -4406,18 +4407,44 @@ function exportToAmap() {
   const end = routePoints[routePoints.length - 1].city;
   const viaPoints = routePoints.slice(1, -1);
   
-  let url = 'https://ditu.amap.com/dir?type=car';
-  url += '&from%5Blnglat%5D=' + start.lng + ',' + start.lat;
-  url += '&to%5Blnglat%5D=' + end.lng + ',' + end.lat;
+  // 电脑网页版链接（ditu.amap.com，支持多途经点）
+  let webUrl = 'https://ditu.amap.com/dir?type=car';
+  webUrl += '&from%5Blnglat%5D=' + start.lng + ',' + start.lat;
+  webUrl += '&to%5Blnglat%5D=' + end.lng + ',' + end.lat;
   viaPoints.forEach(function(p, i) {
-    url += '&via%5B' + i + '%5D%5Blnglat%5D=' + p.city.lng + ',' + p.city.lat;
+    webUrl += '&via%5B' + i + '%5D%5Blnglat%5D=' + p.city.lng + ',' + p.city.lat;
   });
-  currentExportUrl = url;
+  currentExportUrl = webUrl;
+  
+  // 手机APP链接（amapuri://，支持多途经点，vialons/vialats用|分隔）
+  let appUrl = 'amapuri://route/plan/?dev=0&t=0&m=0&sourceApplication=routeApp';
+  appUrl += '&slon=' + start.lng + '&slat=' + start.lat + '&sname=' + encodeURIComponent(start.name || '起点');
+  appUrl += '&dlon=' + end.lng + '&dlat=' + end.lat + '&dname=' + encodeURIComponent(end.name || '终点');
+  if(viaPoints.length > 0) {
+    appUrl += '&vian=' + viaPoints.length;
+    appUrl += '&vialons=' + viaPoints.map(function(p){ return p.city.lng; }).join('|');
+    appUrl += '&vialats=' + viaPoints.map(function(p){ return p.city.lat; }).join('|');
+    appUrl += '&vianames=' + encodeURIComponent(viaPoints.map(function(p){ return p.city.name || ''; }).join('|'));
+  }
+  currentAppUrl = appUrl;
+  
   showExportModal(routePoints.length, viaPoints.length);
 }
 
 function openExportUrl() {
-  window.open(currentExportUrl, '_blank');
+  // 手机端尝试唤起高德APP，电脑端打开网页版
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  if(isMobile && currentAppUrl) {
+    // 先尝试唤起APP，1.5秒后没成功则打开网页版
+    var startT = Date.now();
+    var timer = setTimeout(function() {
+      if(Date.now() - startT < 2000) window.open(currentExportUrl, '_blank');
+    }, 1500);
+    window.location.href = currentAppUrl;
+    setTimeout(function(){ clearTimeout(timer); }, 2000);
+  } else {
+    window.open(currentExportUrl, '_blank');
+  }
 }
 
 function copyExportUrl(btn) {
@@ -4425,10 +4452,10 @@ function copyExportUrl(btn) {
     navigator.clipboard.writeText(currentExportUrl).then(function() {
       btn.textContent = '✅ 已复制';
       btn.style.background = '#16a34a';
-      setTimeout(function() { btn.textContent = '📋 复制链接'; btn.style.background = ''; }, 2000);
+      setTimeout(function() { btn.textContent = '📋 复制网页链接'; btn.style.background = ''; }, 2000);
     });
   } else {
-    const ta = document.createElement('textarea');
+    var ta = document.createElement('textarea');
     ta.value = currentExportUrl;
     ta.style.position = 'fixed'; ta.style.opacity = '0';
     document.body.appendChild(ta); ta.select();
@@ -4436,12 +4463,12 @@ function copyExportUrl(btn) {
     document.body.removeChild(ta);
     btn.textContent = '✅ 已复制';
     btn.style.background = '#16a34a';
-    setTimeout(function() { btn.textContent = '📋 复制链接'; btn.style.background = ''; }, 2000);
+    setTimeout(function() { btn.textContent = '📋 复制网页链接'; btn.style.background = ''; }, 2000);
   }
 }
 
 function showExportModal(totalPoints, viaCount) {
-  let modal = document.getElementById('exportModal');
+  var modal = document.getElementById('exportModal');
   if(!modal) {
     modal = document.createElement('div');
     modal.id = 'exportModal';
@@ -4452,8 +4479,9 @@ function showExportModal(totalPoints, viaCount) {
     '<div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:8px;">🚗 导出到高德</div>' +
     '<div style="font-size:12px;color:#64748b;margin-bottom:12px;">共' + totalPoints + '个点：起点1 + 途经点' + viaCount + ' + 终点1</div>' +
     '<button onclick="openExportUrl()" style="display:block;width:100%;padding:12px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;text-align:center;margin-bottom:8px;cursor:pointer;">📍 在高德中打开路线</button>' +
-    '<button onclick="copyExportUrl(this)" style="width:100%;padding:8px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:8px;">📋 复制链接</button>' +
+    '<button onclick="copyExportUrl(this)" style="width:100%;padding:8px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:8px;">📋 复制网页链接</button>' +
     '<textarea readonly style="width:100%;height:60px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:10px;color:#475569;box-sizing:border-box;resize:none;" onclick="this.select()">' + currentExportUrl + '</textarea>' +
+    '<div style="font-size:10px;color:#94a3b8;margin-top:6px;line-height:1.5;">💡 手机点绿色按钮自动唤起高德APP；电脑点绿色按钮打开网页版路线。复制链接可发给别人。</div>' +
     '<button onclick="this.parentElement.parentElement.remove()" style="width:100%;padding:10px;margin-top:12px;background:#f1f5f9;color:#475569;border:none;border-radius:8px;font-size:12px;cursor:pointer;">关闭</button>' +
   '</div>';
   modal.onclick = function(e) { if(e.target === modal) modal.remove(); };
