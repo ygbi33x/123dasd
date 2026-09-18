@@ -408,24 +408,6 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
 #compareClose:hover{color:#111;}
 #compareBody{padding:12px 14px;overflow-y:auto;flex:1;}
 
-/* ===== 方案保存对比面板 ===== */
-.scheme-panel{display:none;margin-top:8px;padding:10px 12px;border:1px solid rgba(59,130,246,.25);border-radius:10px;background:rgba(255,255,255,.85);backdrop-filter:blur(8px);}
-.scheme-panel.open{display:block;}
-.scheme-panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
-.scheme-panel-title{font-size:12px;font-weight:700;color:#1e40af;}
-.scheme-save-btn{font-size:11px;font-weight:600;color:#fff;background:#2563eb;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;transition:.15s;}
-.scheme-save-btn:hover{background:#1d4ed8;}
-.scheme-empty{font-size:11px;color:#94a3b8;padding:6px 0;}
-.scheme-item{border:1px solid rgba(148,163,184,.25);border-radius:8px;padding:8px;margin-bottom:6px;background:#fff;}
-.scheme-item-head{display:flex;justify-content:space-between;align-items:center;}
-.scheme-name{font-size:12px;font-weight:700;color:#0f172a;}
-.scheme-metrics{font-size:11px;color:#64748b;margin-top:3px;line-height:1.5;}
-.scheme-metrics b{color:#1e40af;}
-.scheme-actions{margin-top:5px;display:flex;gap:6px;}
-.scheme-load-btn,.scheme-del-btn{font-size:10px;padding:2px 8px;border-radius:5px;cursor:pointer;border:1px solid rgba(59,130,246,.35);background:rgba(59,130,246,.06);color:#2563eb;font-weight:600;}
-.scheme-del-btn{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.05);color:#dc2626;}
-.scheme-load-btn:hover{background:rgba(59,130,246,.15);}
-.scheme-del-btn:hover{background:rgba(239,68,68,.12);}
 </style>
 </head>
 <body>
@@ -442,9 +424,8 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         <span>已选路线（<span id="routeCount">0</span>个点）</span>
         <div class="route-bar-actions">
           <span class="route-collapse-btn" id="routeCollapseBtn" onclick="toggleRouteBar()">▼</span>
-          <span class="route-optimize" id="addAllCentersBtn" onclick="addAllCentersAsRoutePoints()" title="一键添加全部77个中心城市为路线点（将触发批量规划，耗时较长）">⭐ 全选中心</span>
+          <span class="route-optimize" id="addAllCentersBtn" onclick="addAllCentersAsRoutePoints()" title="一键添加所有中心城市为路线点">⭐ 中心</span>
           <span class="route-optimize" id="optimizeBtn" onclick="optimizeRouteOrder()" title="自动优化访问顺序">🔄 优化</span>
-          <span class="route-optimize" id="schemeBtn" onclick="toggleSchemePanel()" title="保存当前路线为方案，多方案对比">💾 方案</span>
           <span class="route-bar-clear" id="clearRouteBtn">清空</span>
         </div>
       </div>
@@ -455,10 +436,6 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         <div class="route-summary-item">
           <span class="route-summary-label">总里程</span>
           <span class="route-summary-value" id="totalDist">-</span>
-        </div>
-        <div class="route-summary-item">
-          <span class="route-summary-label">过路费</span>
-          <span class="route-summary-value" id="totalTolls" style="color:#b45309;">-</span>
         </div>
         <div class="route-summary-item">
           <span class="route-summary-label">驾车时间</span>
@@ -472,14 +449,6 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <span class="route-summary-label">路段</span>
           <span class="route-summary-value" id="totalSegs">-</span>
         </div>
-      </div>
-      <!-- 路线方案保存与对比面板 -->
-      <div class="scheme-panel" id="schemePanel">
-        <div class="scheme-panel-head">
-          <span class="scheme-panel-title">💾 路线方案</span>
-          <button class="scheme-save-btn" onclick="saveCurrentAsScheme()">保存当前路线</button>
-        </div>
-        <div id="schemeList"></div>
       </div>
       <!-- 路线路况统计 -->
       <div class="traffic-stats" id="trafficStats" style="display:none;">
@@ -584,6 +553,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
                   </div>
                 </div>
               </div>
+              <div class="more-item" onclick="openItineraryPanel();toggleMoreMenu()">🗺️ 福建行程</div>
               <div class="more-item" onclick="toggleAvoidTraffic();toggleMoreMenu()" id="avoidTrafficMenuItem">🚗 避开拥堵：关</div>
               <div class="more-item" onclick="toggleCenterViaCapital();toggleMoreMenu()" id="centerViaCapitalMenuItem">🔄 中心中转省会：关</div>
               <div class="more-item" onclick="exportRouteCSV();toggleMoreMenu()">📊 导出路线数据</div>
@@ -623,6 +593,17 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
   <div style="width:40px;height:40px;border:3px solid rgba(59,130,246,.2);border-top-color:#3b82f6;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;"></div>
   <div id="loadingText" style="font-size:13px;color:#334155;font-weight:600;">正在规划路线...</div>
   <div id="loadingSubText" style="font-size:11px;color:#94a3b8;margin-top:4px;">请稍候</div>
+</div>
+<!-- 福建行程面板 -->
+<div id="itineraryPanel" style="display:none;position:absolute;top:80px;right:20px;z-index:500;width:340px;max-height:calc(100vh - 120px);background:rgba(255,255,255,.95);backdrop-filter:blur(24px);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.15);border:1px solid rgba(0,0,0,.08);overflow:hidden;flex-direction:column;">
+  <div style="padding:14px 18px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;display:flex;align-items:center;justify-content:space-between;">
+    <div style="font-size:15px;font-weight:700;">🗺️ 福建6日行程</div>
+    <button onclick="closeItineraryPanel()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 4px;opacity:.8;">×</button>
+  </div>
+  <div id="itineraryDays" style="flex:1;overflow-y:auto;padding:10px;"></div>
+  <div style="padding:10px 14px;border-top:1px solid rgba(0,0,0,.06);background:rgba(248,250,252,.8);font-size:11px;color:#64748b;">
+    点击某天自动加载地点并规划路线
+  </div>
 </div>
 <div id="landscapeOverlay" style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;z-index:500;background:transparent;touch-action:none;"></div>
 <div id="landscapeTip" style="display:none;position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10000;background:rgba(0,0,0,0.7);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;white-space:nowrap;">横屏模式：可拖拽缩放查看，点击城市请先退出横屏</div>
@@ -667,15 +648,8 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
 </div>
 
 <script>
-/* ===== 高德安全配置（二选一）=====
- * 方案一【过渡期，配合控制台域名白名单使用】：明文 securityJsCode。
- *   - 必须先到高德开放平台控制台为 key 配置域名白名单（如 ygbi33x.github.io）。
- * 方案二【推荐，生产环境】：serviceHost 代理，密钥只存服务器。
- *   - 部署 amap-proxy.js 后：删除 securityJsCode 那一行，启用 serviceHost。
- */
 window._AMapSecurityConfig = {
   securityJsCode: "5709f1c855ca34155623c5fe0db7f05a"
-  // serviceHost: location.origin + "/_AMapService" // 代理部署后启用本行，并删除上面的 securityJsCode
 };
 </script>
 <script src="https://webapi.amap.com/maps?v=1.4.15&key=6ef93fcd8d5b297ae869c20eceaba5a6&plugin=AMap.Driving,AMap.TrafficLayer,AMap.Scale,AMap.ToolBar"></script>
@@ -1142,10 +1116,6 @@ window.onload = function() {
   CAPITALS = CITIES.filter(function(c) { return CAPITAL_NAMES.indexOf(c.name) >= 0; });
   renderCityList();
   loadRouteFromURL();
-  // 无分享链接时，从本地存储恢复上次未完成的路线
-  if(!window.location.hash || window.location.hash.indexOf('#route=') < 0) {
-    loadRouteFromLocal();
-  }
   
   // 点击外部关闭POI下拉
   document.addEventListener('click', function(e) {
@@ -1928,7 +1898,6 @@ function renderRouteBar() {
   }
   
   document.getElementById('routeCount').textContent = routePoints.length;
-  saveRouteToLocal(); // 每次路线变化后持久化，防止刷新丢失
   
   // 显示/隐藏总览和手动添加
   if(summary) summary.style.display = routePoints.length >= 2 ? 'flex' : 'none';
@@ -2006,18 +1975,13 @@ function updateRouteSummary() {
   const totalTimeEl = document.getElementById('totalTime');
   const totalDesignTimeEl = document.getElementById('totalDesignTime');
   const totalSegsEl = document.getElementById('totalSegs');
-  const totalTollsEl = document.getElementById('totalTolls');
   if(!totalDistEl) return;
   
-  let totalDist = 0, totalTime = 0, totalTolls = 0, hasTolls = false;
+  let totalDist = 0, totalTime = 0;
   for(let i = 0; i < routeSegments.length; i++) {
     if(routeSegments[i].route) {
       totalDist += routeSegments[i].route.distance || 0;
       totalTime += routeSegments[i].route.time || 0;
-      if(typeof routeSegments[i].route.tolls === 'number') {
-        totalTolls += routeSegments[i].route.tolls;
-        hasTolls = true;
-      }
     }
   }
   
@@ -2029,10 +1993,6 @@ function updateRouteSummary() {
     totalDesignTimeEl.title = '按设计时速 ' + designSpeed + ' km/h 计算';
   }
   totalSegsEl.textContent = routeSegments.length + ' 段';
-  if(totalTollsEl) {
-    totalTollsEl.textContent = hasTolls ? '¥' + Math.round(totalTolls) : '-';
-    totalTollsEl.title = '高速过路费估算（不含油费），数据来自高德路线规划';
-  }
   
   // 计算路线路况统计
   updateTrafficStats();
@@ -2178,10 +2138,10 @@ function geoDist(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-// 格式化时间：秒 -> X时X分（分钟满60自动进位到小时）
+// 格式化时间：秒 -> X时X分
 function formatTime(seconds) {
-  if(!seconds || !isFinite(seconds) || seconds <= 0) return '-';
-  const totalMin = Math.round(seconds / 60);
+  if(!seconds || seconds <= 0) return '-';
+  const totalMin = Math.ceil(seconds / 60);
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
   if(h > 0) return h + '时' + m + '分';
@@ -2722,11 +2682,6 @@ function updateRouteSelector() {
     list.innerHTML = '';
     const routes = seg.allRoutes || [seg.route];
     
-    // 按实际数据计算最快/最短，避免按请求顺序错标徽章
-    const validRoutes = routes.filter(function(r){ return r && isFinite(r.time) && isFinite(r.distance); });
-    const minTime = Math.min.apply(null, validRoutes.map(function(r){ return r.time; }));
-    const minDist = Math.min.apply(null, validRoutes.map(function(r){ return r.distance; }));
-    
     for(let i = 0; i < routes.length; i++) {
       const route = routes[i];
       const isSelected = i === (seg.selectedRouteIndex || 0);
@@ -2738,11 +2693,9 @@ function updateRouteSelector() {
       option.onclick = function() { selectRoute(i); };
       
       let badge = '';
-      if(isFinite(route.time) && isFinite(route.distance)) {
-        if(route.time === minTime && route.distance === minDist) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快·最短</span>';
-        else if(route.time === minTime) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
-        else if(route.distance === minDist) badge = '<span class="route-option-badge" style="background:#22c55e;">最短</span>';
-      }
+      if(i === 0) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
+      else if(route.distance <= routes[0].distance) badge = '<span class="route-option-badge" style="background:#22c55e;">最短</span>';
+      else if(route.time <= routes[0].time) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
       
       option.innerHTML = 
         '<div class="route-option-color" style="background:' + color + ';"></div>' +
@@ -2772,11 +2725,6 @@ function updateRouteSelector() {
       const policyNames = {'LEAST_TIME': '时间最短', 'LEAST_FEE': '费用最少', 'LEAST_DISTANCE': '距离最短'};
       const routes = seg.allRoutes || [seg.route];
       
-      // 按实际数据计算最快/最短，避免按请求顺序错标徽章
-      const segValidRoutes = routes.filter(function(rt){ return rt && isFinite(rt.time) && isFinite(rt.distance); });
-      const segMinTime = Math.min.apply(null, segValidRoutes.map(function(rt){ return rt.time; }));
-      const segMinDist = Math.min.apply(null, segValidRoutes.map(function(rt){ return rt.distance; }));
-      
       // 段标题
       const header = document.createElement('div');
       header.className = 'segment-header';
@@ -2795,11 +2743,9 @@ function updateRouteSelector() {
         option.onclick = function() { selectSegmentRoute(i, r); };
         
         let badge = '';
-        if(isFinite(route.time) && isFinite(route.distance)) {
-          if(route.time === segMinTime && route.distance === segMinDist) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快·最短</span>';
-          else if(route.time === segMinTime) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
-          else if(route.distance === segMinDist) badge = '<span class="route-option-badge" style="background:#22c55e;">最短</span>';
-        }
+        if(r === 0) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
+        else if(route.distance <= routes[0].distance) badge = '<span class="route-option-badge" style="background:#22c55e;">最短</span>';
+        else if(route.time <= routes[0].time) badge = '<span class="route-option-badge" style="background:#f59e0b;">最快</span>';
         
         option.innerHTML = 
           '<div class="route-option-color" style="background:' + (isSelected ? color : '#cbd5e1') + ';"></div>' +
@@ -4137,14 +4083,6 @@ function addAllCentersAsRoutePoints() {
     centers.unshift(pudong);
   }
   
-  // 大批量添加前二次确认，避免误触触发数十段高耗时规划
-  const pendingCount = centers.filter(function(c) {
-    return routePoints.findIndex(function(p) { return p.city.name === c.name; }) < 0;
-  }).length;
-  if(pendingCount > 20 && !confirm('将一键添加 ' + pendingCount + ' 个中心城市并逐段规划（可能耗时数分钟），是否继续？')) {
-    return;
-  }
-  
   let added = 0;
   // 添加所有中心城市
   for(let i = 0; i < centers.length; i++) {
@@ -4194,6 +4132,185 @@ function addAllCentersAsRoutePoints() {
     planFullRoute();
   } else {
     tipDom.innerHTML = '✅ 已添加 ' + added + ' 个中心城市';
+  }
+}
+
+// ==================== 福建6日行程 ====================
+const FUJIAN_ITINERARY = [
+  {
+    day: 1, date: '10月1日', title: '福州（市区+鼓山）', icon: '🚗',
+    places: ['福州站', '福州榕宿青旅(三坊七巷东街口地铁站店)', '三坊七巷', '西禅古寺', '鼓山缆车', '中洲岛', '福州榕宿青旅(三坊七巷东街口地铁站店)']
+  },
+  {
+    day: 2, date: '10月2日', title: '平潭（北线）', icon: '🚄',
+    places: ['福州榕宿青旅(三坊七巷东街口地铁站店)', '福州南站', '平潭站', '出逃计划青年旅舍(龙王头沙滩店)', '龙王头', '猫头墘', '潭水村', '镜沙', '无涯海', '最美环岛路', '北港村', '仙人井', '北部湾', '长江澳', '出逃计划青年旅舍(龙王头沙滩店)']
+  },
+  {
+    day: 3, date: '10月3日', title: '平潭（南线）', icon: '🛵',
+    places: ['出逃计划青年旅舍(龙王头沙滩店)', '龙王头', '坛南湾', '大福湾', 'yolo落日山海咖啡', '月海湾', '出逃计划青年旅舍(龙王头沙滩店)']
+  },
+  {
+    day: 4, date: '10月4日', title: '泉州（蟳埔村方向）', icon: '🚄',
+    places: ['出逃计划青年旅舍(龙王头沙滩店)', '平潭站', '泉州站', '七月居青年旅舍(西街开元寺店)', '蟳埔村', '百年红砖厝', '蚵壳厝', '蟳埔妈祖庙', '泉州木偶剧院', '七月居青年旅舍(西街开元寺店)']
+  },
+  {
+    day: 5, date: '10月5日', title: '泉州（石狮海岸线）', icon: '🌊',
+    places: ['七月居青年旅舍(西街开元寺店)', '石狮小威海', '橘若咖啡', '红塔湾', '洛伽寺', '看海计划-浮石隐地', '橘若码头', '七月居青年旅舍(西街开元寺店)']
+  },
+  {
+    day: 6, date: '10月6日', title: '泉州市区+梧林→返程', icon: '🏛️',
+    places: ['七月居青年旅舍(西街开元寺店)', '西街', '中山路', '关岳庙', '天后宫', '梧林古村落', '泉州南站']
+  }
+];
+
+let itineraryGeocoder = null;
+let itineraryLoading = false;
+
+function openItineraryPanel() {
+  const panel = document.getElementById('itineraryPanel');
+  panel.style.display = 'flex';
+  renderItineraryDays();
+}
+
+function closeItineraryPanel() {
+  document.getElementById('itineraryPanel').style.display = 'none';
+}
+
+function renderItineraryDays() {
+  const container = document.getElementById('itineraryDays');
+  container.innerHTML = '';
+  FUJIAN_ITINERARY.forEach(function(day) {
+    const card = document.createElement('div');
+    card.style.cssText = 'margin-bottom:10px;padding:12px;border-radius:10px;background:rgba(255,255,255,.8);border:1px solid rgba(0,0,0,.06);cursor:pointer;transition:.2s;';
+    card.onmouseover = function() { this.style.background = 'rgba(59,130,246,.08)'; this.style.borderColor = 'rgba(59,130,246,.3)'; };
+    card.onmouseout = function() { this.style.background = 'rgba(255,255,255,.8)'; this.style.borderColor = 'rgba(0,0,0,.06)'; };
+    card.onclick = function() { loadItineraryDay(day.day); };
+    
+    const placesPreview = day.places.slice(0, 3).join(' → ') + (day.places.length > 3 ? ' → ...' : '');
+    card.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+      '<span style="font-size:18px;">' + day.icon + '</span>' +
+      '<div><div style="font-size:13px;font-weight:700;color:#1e293b;">Day ' + day.day + ' · ' + day.date + '</div>' +
+      '<div style="font-size:11px;color:#64748b;">' + day.title + '</div></div>' +
+      '<span style="margin-left:auto;font-size:10px;color:#3b82f6;font-weight:600;background:rgba(59,130,246,.1);padding:3px 8px;border-radius:10px;">' + day.places.length + '点</span></div>' +
+      '<div style="font-size:10px;color:#94a3b8;line-height:1.5;">' + placesPreview + '</div>';
+    container.appendChild(card);
+  });
+}
+
+function loadItineraryDay(dayNum) {
+  if(itineraryLoading) {
+    tipDom.innerHTML = '⚠️ 正在加载行程，请稍候...';
+    return;
+  }
+  const day = FUJIAN_ITINERARY.find(function(d) { return d.day === dayNum; });
+  if(!day) return;
+  
+  // 清空当前路线
+  clearRoute();
+  
+  itineraryLoading = true;
+  showLoading('正在加载Day ' + dayNum + '行程...', '地理编码地点中 0/' + day.places.length);
+  
+  // 确保地理编码器加载
+  if(!itineraryGeocoder) {
+    if(typeof AMap.Geocoder === 'undefined') {
+      AMap.plugin('AMap.Geocoder', function() {
+        itineraryGeocoder = new AMap.Geocoder({ city: '全国', radius: 1000 });
+        geocodeItineraryPlaces(day, 0, []);
+      });
+    } else {
+      itineraryGeocoder = new AMap.Geocoder({ city: '全国', radius: 1000 });
+      geocodeItineraryPlaces(day, 0, []);
+    }
+  } else {
+    geocodeItineraryPlaces(day, 0, []);
+  }
+}
+
+function geocodeItineraryPlaces(day, index, results) {
+  if(index >= day.places.length) {
+    // 所有地点地理编码完成，添加到路线
+    hideLoading();
+    itineraryLoading = false;
+    addItineraryToRoute(results, day);
+    return;
+  }
+  
+  const place = day.places[index];
+  document.getElementById('loadingSubText').innerHTML = '地理编码地点中 ' + (index + 1) + '/' + day.places.length + '：' + place;
+  
+  itineraryGeocoder.getLocation(place, function(status, result) {
+    let lng = null, lat = null;
+    if(status === 'complete' && result.geocodes && result.geocodes.length > 0) {
+      const loc = result.geocodes[0].location;
+      lng = loc.lng;
+      lat = loc.lat;
+    }
+    
+    // 去重：和上一个地点相同则跳过
+    if(results.length > 0 && results[results.length - 1].name === place) {
+      geocodeItineraryPlaces(day, index + 1, results);
+      return;
+    }
+    
+    results.push({ name: place, lng: lng, lat: lat, isAddress: true });
+    setTimeout(function() {
+      geocodeItineraryPlaces(day, index + 1, results);
+    }, 150);
+  });
+}
+
+function addItineraryToRoute(places, day) {
+  let added = 0;
+  places.forEach(function(place) {
+    if(!place.lng || !place.lat) return;
+    
+    const virtualCity = {
+      name: place.name.length > 20 ? place.name.substring(0, 20) + '...' : place.name,
+      province: '',
+      region: '',
+      lng: place.lng,
+      lat: place.lat,
+      isCenter: false,
+      isAddress: true,
+      address: place.name
+    };
+    
+    // 检查是否已存在
+    if(routePoints.findIndex(function(p) { return p.city.name === virtualCity.name; }) >= 0) return;
+    
+    const marker = new AMap.Marker({
+      position: [place.lng, place.lat],
+      content: '<div style="background:rgba(22,163,74,0.75);color:#fff;border:2px solid rgba(255,255,255,0.85);border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;">' + (routePoints.length + 1) + '</div>',
+      offset: new AMap.Pixel(-13, -13),
+      zIndex: 300 + routePoints.length
+    });
+    marker.on('click', function() {
+      const idx = routePoints.findIndex(function(p) { return p.city.name === virtualCity.name; });
+      if(idx >= 0) removePointAt(idx);
+    });
+    marker.setMap(map);
+    
+    const label = createCityLabel(virtualCity, [place.lng, place.lat]);
+    routePoints.push({ city: virtualCity, marker: marker, label: label });
+    added++;
+  });
+  
+  renumberMarkers();
+  renderRouteBar();
+  renderCityList();
+  
+  if(routePoints.length >= 2) {
+    tipDom.innerHTML = '✅ Day ' + day.day + ' 行程已加载（' + added + '个地点），正在规划路线...';
+    planFullRoute();
+  } else {
+    tipDom.innerHTML = '⚠️ Day ' + day.day + ' 行程地点地理编码失败较多，请检查网络';
+  }
+  
+  // 调整地图视野
+  if(routePoints.length > 0) {
+    const positions = routePoints.map(function(p) { return [p.city.lng, p.city.lat]; });
+    map.setFitView(null, false, [60, 60, 60, 360]);
   }
 }
 
@@ -4606,12 +4723,10 @@ function resetAll() {
 }
 
 // ===== 导出路线数据CSV =====
-// 注：此 formatTime 会覆盖前一定义，统一使用带进位版本，修复"X时60分"问题
 function formatTime(seconds) {
-  if(!seconds || !isFinite(seconds) || seconds <= 0) return '-';
-  const totalMin = Math.round(seconds / 60);
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
+  if(!seconds) return '-';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
   if(h > 0) return h + '时' + m + '分';
   return m + '分';
 }
@@ -4746,163 +4861,10 @@ function shareRouteLink() {
 }
 
 // 从URL加载路线
-// ===== 路线方案保存与对比 =====
-const SCHEME_STORAGE_KEY = 'logistics_route_schemes_v1';
-
-function getSchemes() {
-  try { return JSON.parse(localStorage.getItem(SCHEME_STORAGE_KEY)) || []; }
-  catch(e) { return []; }
-}
-
-function saveSchemes(list) {
-  try { localStorage.setItem(SCHEME_STORAGE_KEY, JSON.stringify(list)); } catch(e) {}
-}
-
-function toggleSchemePanel() {
-  const panel = document.getElementById('schemePanel');
-  if(!panel) return;
-  panel.classList.toggle('open');
-  if(panel.classList.contains('open')) renderSchemeList();
-}
-
-function saveCurrentAsScheme() {
-  if(routePoints.length < 2) {
-    tipDom.innerHTML = '⚠️ 请先规划至少 2 个点的路线再保存方案';
-    return;
-  }
-  let totalDist = 0, totalTime = 0, totalTolls = 0, hasTolls = false;
-  routeSegments.forEach(function(s) {
-    if(s.route) {
-      totalDist += s.route.distance || 0;
-      totalTime += s.route.time || 0;
-      if(typeof s.route.tolls === 'number') { totalTolls += s.route.tolls; hasTolls = true; }
-    }
-  });
-  if(totalDist <= 0) {
-    tipDom.innerHTML = '⚠️ 路线尚未规划完成，请等待规划结束后再保存';
-    return;
-  }
-  const schemes = getSchemes();
-  const name = prompt('方案名称：', '方案' + (schemes.length + 1));
-  if(name === null) return;
-  schemes.push({
-    name: name || ('方案' + (schemes.length + 1)),
-    cities: routePoints.map(function(p) { return p.city.name; }),
-    km: (totalDist / 1000).toFixed(1),
-    time: formatTime(totalTime),
-    tolls: hasTolls ? ('¥' + Math.round(totalTolls)) : '-',
-    savedAt: Date.now()
-  });
-  saveSchemes(schemes);
-  renderSchemeList();
-  const panel = document.getElementById('schemePanel');
-  if(panel && !panel.classList.contains('open')) panel.classList.add('open');
-  tipDom.innerHTML = '💾 已保存方案「' + (name || ('方案' + schemes.length)) + '」，可与其他方案对比';
-}
-
-function deleteScheme(idx) {
-  const schemes = getSchemes();
-  if(!schemes[idx]) return;
-  if(!confirm('确定删除方案「' + schemes[idx].name + '」？')) return;
-  schemes.splice(idx, 1);
-  saveSchemes(schemes);
-  renderSchemeList();
-}
-
-function loadScheme(idx) {
-  const schemes = getSchemes();
-  const s = schemes[idx];
-  if(!s || !s.cities || s.cities.length === 0) return;
-  clearRoute();
-  let i = 0;
-  function addNext() {
-    if(i >= s.cities.length) return;
-    const city = CITIES.find(function(c) { return c.name === s.cities[i]; });
-    if(city) addPoint(city);
-    i++;
-    setTimeout(addNext, 300);
-  }
-  addNext();
-  tipDom.innerHTML = '📥 正在载入方案「' + s.name + '」（' + s.cities.length + ' 个点）...';
-}
-
-function renderSchemeList() {
-  const list = document.getElementById('schemeList');
-  if(!list) return;
-  const schemes = getSchemes();
-  if(schemes.length === 0) {
-    list.innerHTML = '<div class="scheme-empty">暂无保存的方案。规划好一条路线后，点击上方"保存当前路线"，即可与后续方案对比里程 / 时间 / 过路费。</div>';
-    return;
-  }
-  // 找出最优值用于高亮对比
-  let bestKm = Infinity, bestTime = Infinity;
-  schemes.forEach(function(s) {
-    const km = parseFloat(s.km);
-    if(isFinite(km) && km < bestKm) bestKm = km;
-  });
-  list.innerHTML = '';
-  schemes.forEach(function(s, idx) {
-    const item = document.createElement('div');
-    item.className = 'scheme-item';
-    const isBestKm = parseFloat(s.km) === bestKm && schemes.length > 1;
-    item.innerHTML =
-      '<div class="scheme-item-head">' +
-        '<span class="scheme-name">' + s.name + (isBestKm ? ' <span style="color:#16a34a;font-size:10px;">✓最省里程</span>' : '') + '</span>' +
-        '<span style="font-size:10px;color:#94a3b8;">' + new Date(s.savedAt).toLocaleDateString() + '</span>' +
-      '</div>' +
-      '<div class="scheme-metrics">' + s.cities.length + ' 个点 · <b>' + s.km + ' km</b> · ' + s.time + ' · 过路费 <b>' + s.tolls + '</b></div>' +
-      '<div class="scheme-metrics" style="color:#94a3b8;">' + s.cities.join(' → ') + '</div>' +
-      '<div class="scheme-actions">' +
-        '<button class="scheme-load-btn" onclick="loadScheme(' + idx + ')">载入此方案</button>' +
-        '<button class="scheme-del-btn" onclick="deleteScheme(' + idx + ')">删除</button>' +
-      '</div>';
-    list.appendChild(item);
-  });
-}
-
-// ===== 路线本地持久化（防止刷新丢失已选路线） =====
-const ROUTE_STORAGE_KEY = 'logistics_route_state_v1';
-
-function saveRouteToLocal() {
-  try {
-    if(currentMode !== 'multi') return;
-    if(!routePoints || routePoints.length === 0) {
-      localStorage.removeItem(ROUTE_STORAGE_KEY);
-      return;
-    }
-    localStorage.setItem(ROUTE_STORAGE_KEY, JSON.stringify({
-      m: 'multi',
-      c: routePoints.map(function(p) { return p.city.name; })
-    }));
-  } catch(e) { /* localStorage 不可用时静默降级 */ }
-}
-
-function loadRouteFromLocal() {
-  let data = null;
-  try {
-    const raw = localStorage.getItem(ROUTE_STORAGE_KEY);
-    if(raw) data = JSON.parse(raw);
-  } catch(e) { return; }
-  if(!data || data.m !== 'multi' || !data.c || data.c.length === 0) return;
-  
-  setTimeout(function() {
-    if(currentMode !== 'multi') toggleMode();
-    let idx = 0;
-    function addNext() {
-      if(idx >= data.c.length) return;
-      const city = CITIES.find(function(c) { return c.name === data.c[idx]; });
-      if(city) addPoint(city);
-      idx++;
-      setTimeout(addNext, 300);
-    }
-    addNext();
-    tipDom.innerHTML = '📥 已恢复上次未完成的路线（' + data.c.length + ' 个点）';
-  }, 500);
-}
-
 function loadRouteFromURL() {
   const hash = window.location.hash;
   if(!hash || hash.indexOf('#route=') < 0) return;
+  
   try {
     const encoded = hash.substring('#route='.length);
     const data = JSON.parse(decodeURIComponent(atob(encoded)));
