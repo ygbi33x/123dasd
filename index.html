@@ -4281,25 +4281,32 @@ function loadItineraryDay(dayNum) {
   
   clearRoute();
   
+  // 根据天数确定地理编码城市范围
+  let geoCity = '全国';
+  if(dayNum === 1) geoCity = '福州';
+  else if(dayNum === 2 || dayNum === 3) geoCity = '福州'; // 平潭属福州
+  else if(dayNum >= 4 && dayNum <= 6) geoCity = '泉州';
+  
   itineraryLoading = true;
   showLoading('正在加载Day ' + dayNum + '行程...', '地理编码地点中 0/' + day.places.length);
   
   if(!itineraryGeocoder) {
     if(typeof AMap.Geocoder === 'undefined') {
       AMap.plugin('AMap.Geocoder', function() {
-        itineraryGeocoder = new AMap.Geocoder({ city: '全国', radius: 1000 });
-        geocodeItineraryPlaces(day, 0, []);
+        itineraryGeocoder = new AMap.Geocoder({ city: geoCity, radius: 1000 });
+        geocodeItineraryPlaces(day, 0, [], geoCity);
       });
     } else {
-      itineraryGeocoder = new AMap.Geocoder({ city: '全国', radius: 1000 });
-      geocodeItineraryPlaces(day, 0, []);
+      itineraryGeocoder = new AMap.Geocoder({ city: geoCity, radius: 1000 });
+      geocodeItineraryPlaces(day, 0, [], geoCity);
     }
   } else {
-    geocodeItineraryPlaces(day, 0, []);
+    itineraryGeocoder.setCity(geoCity);
+    geocodeItineraryPlaces(day, 0, [], geoCity);
   }
 }
 
-function geocodeItineraryPlaces(day, index, results) {
+function geocodeItineraryPlaces(day, index, results, geoCity) {
   if(index >= day.places.length) {
     hideLoading();
     itineraryLoading = false;
@@ -4310,6 +4317,9 @@ function geocodeItineraryPlaces(day, index, results) {
   const place = day.places[index];
   document.getElementById('loadingSubText').innerHTML = '地理编码地点中 ' + (index + 1) + '/' + day.places.length + '：' + place;
   
+  // 每次地理编码都设置城市范围
+  if(itineraryGeocoder.setCity) itineraryGeocoder.setCity(geoCity);
+  
   itineraryGeocoder.getLocation(place, function(status, result) {
     let lng = null, lat = null;
     if(status === 'complete' && result.geocodes && result.geocodes.length > 0) {
@@ -4319,13 +4329,13 @@ function geocodeItineraryPlaces(day, index, results) {
     }
     
     if(results.length > 0 && results[results.length - 1].name === place) {
-      geocodeItineraryPlaces(day, index + 1, results);
+      geocodeItineraryPlaces(day, index + 1, results, geoCity);
       return;
     }
     
     results.push({ name: place, lng: lng, lat: lat, isAddress: true });
     setTimeout(function() {
-      geocodeItineraryPlaces(day, index + 1, results);
+      geocodeItineraryPlaces(day, index + 1, results, geoCity);
     }, 150);
   });
 }
