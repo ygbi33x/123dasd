@@ -556,6 +556,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
     </div>
     <div class="city-list" id="cityList"></div>
     <div class="city-count" id="cityCount">显示 0 个城市</div>
+    
     </div>
   </div>
   <button class="sidebar-expand-btn" id="sidebarExpandBtn" onclick="toggleSidebar()" title="展开侧边栏">▶</button>
@@ -584,6 +585,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
                   </div>
                 </div>
               </div>
+              <div class="more-item" onclick="openItineraryPanel();toggleMoreMenu()">🗺️ 行程规划</div>
               <div class="more-item" onclick="toggleAvoidTraffic();toggleMoreMenu()" id="avoidTrafficMenuItem">🚗 避开拥堵：关</div>
               <div class="more-item" onclick="toggleCenterViaCapital();toggleMoreMenu()" id="centerViaCapitalMenuItem">🔄 中心中转省会：关</div>
               <div class="more-item" onclick="exportRouteCSV();toggleMoreMenu()">📊 导出路线数据</div>
@@ -623,6 +625,28 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
   <div style="width:40px;height:40px;border:3px solid rgba(59,130,246,.2);border-top-color:#3b82f6;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;"></div>
   <div id="loadingText" style="font-size:13px;color:#334155;font-weight:600;">正在规划路线...</div>
   <div id="loadingSubText" style="font-size:11px;color:#94a3b8;margin-top:4px;">请稍候</div>
+</div>
+<!-- 福建行程面板 -->
+<div id="itineraryPanel" style="display:none;position:absolute;top:80px;right:20px;z-index:500;width:340px;max-height:calc(100vh - 120px);background:rgba(255,255,255,.95);backdrop-filter:blur(24px);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.15);border:1px solid rgba(0,0,0,.08);overflow:hidden;flex-direction:column;">
+  <div style="padding:14px 18px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;display:flex;align-items:center;justify-content:space-between;">
+    <div style="font-size:15px;font-weight:700;">🗺️ 行程规划</div>
+    <button onclick="closeItineraryPanel()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 4px;opacity:.8;">×</button>
+  </div>
+  <div style="padding:8px 14px;background:rgba(248,250,252,.9);border-bottom:1px solid rgba(0,0,0,.06);">
+    <div style="display:flex;gap:6px;align-items:center;">
+      <select id="itinerarySelect" onchange="switchItinerary(this.value)" style="flex:1;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;outline:none;">
+        <option value="fujian">福建6日（福州→平潭→泉州）</option>
+        <option value="custom">自定义行程</option>
+      </select>
+      <button onclick="newItinerary()" style="padding:6px 10px;background:#10b981;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;">+ 新建</button>
+    </div>
+  </div>
+  <div id="itineraryDays" style="flex:1;overflow-y:auto;padding:10px;"></div>
+  <div style="padding:10px 14px;border-top:1px solid rgba(0,0,0,.06);background:rgba(248,250,252,.8);display:flex;gap:6px;">
+    <button onclick="saveItineraryToStorage()" style="flex:1;padding:6px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">💾 保存行程</button>
+    <button onclick="exportToAmap()" style="flex:1;padding:6px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🚗 导出到高德</button>
+    <button onclick="resetItinerary()" style="padding:6px 10px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;cursor:pointer;">重置</button>
+  </div>
 </div>
 <div id="landscapeOverlay" style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;z-index:500;background:transparent;touch-action:none;"></div>
 <div id="landscapeTip" style="display:none;position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10000;background:rgba(0,0,0,0.7);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;white-space:nowrap;">横屏模式：可拖拽缩放查看，点击城市请先退出横屏</div>
@@ -830,10 +854,12 @@ function renderSearchResults() {
       const tel = poi.tel ? '<span class="poi-tel">' + poi.tel + '</span>' : '';
       html += '<div class="poi-item" data-idx="' + idx + '" onclick="locateAndShowPOI(' + i + ')" onmouseover="poiSelectedIndex=' + idx + ';updatePoiHighlight();">' +
         '<div class="poi-icon" style="background:#dcfce7;color:#16a34a;">📍</div>' +
-        '<div class="poi-content">' +
+        '<div class="poi-content" style="flex:1;">' +
         '<div class="poi-name">' + name + '<span class="poi-type">' + type + '</span></div>' +
         '<div class="poi-addr">' + addr + tel + '</div>' +
-        '</div></div>';
+        '</div>' +
+        '<button onclick="event.stopPropagation();addPoiToItinerary(' + i + ')" style="background:#3b82f6;color:#fff;border:none;border-radius:4px;font-size:10px;padding:3px 6px;cursor:pointer;flex-shrink:0;">+行程</button>' +
+        '</div>';
       idx++;
     });
   }
@@ -2519,6 +2545,8 @@ function planNextSegment(version) {
     updateRouteSummary();
     updateRouteSelector();
     updateRouteSelectorBtn();
+    // 更新行程出行建议
+    if(typeof updateItineraryTransport === 'function') updateItineraryTransport();
     // 两点之间有多条备选路线时，自动弹出路线选择器
     const normalPoints = routePoints.filter(p => !p.isVia);
     if(normalPoints.length === 2 && routeSegments.length > 0 && routeSegments[0].allRoutes && routeSegments[0].allRoutes.length > 1) {
@@ -4194,6 +4222,677 @@ function addAllCentersAsRoutePoints() {
     planFullRoute();
   } else {
     tipDom.innerHTML = '✅ 已添加 ' + added + ' 个中心城市';
+  }
+}
+
+// ==================== 福建6日行程 ====================
+let itineraryGeocoder = null;
+let itineraryPlaceSearch = null;
+let itineraryLoading = false;
+let expandedDay = 0; // 当前展开的天数，0=全部收起
+
+// 默认行程数据
+const DEFAULT_FUJIAN_ITINERARY = [
+  {
+    day: 1, date: '10月1日', title: '福州（市区+鼓山）', icon: '🚗',
+    places: ['福州站', '福州榕宿青旅(三坊七巷东街口地铁站店)', '三坊七巷', '西禅古寺', '鼓山缆车', '中洲岛', '福州榕宿青旅(三坊七巷东街口地铁站店)']
+  },
+  {
+    day: 2, date: '10月2日', title: '平潭（北线）', icon: '🚄',
+    places: ['福州榕宿青旅(三坊七巷东街口地铁站店)', '福州南站', '平潭站', '出逃计划青年旅舍(龙王头沙滩店)', '龙王头', '猫头墘', '潭水村', '镜沙', '无涯海', '最美环岛路', '北港村', '仙人井', '北部湾', '长江澳', '出逃计划青年旅舍(龙王头沙滩店)']
+  },
+  {
+    day: 3, date: '10月3日', title: '平潭（南线）', icon: '🛵',
+    places: ['出逃计划青年旅舍(龙王头沙滩店)', '龙王头', '坛南湾', '大福湾', 'yolo落日山海咖啡', '月海湾', '出逃计划青年旅舍(龙王头沙滩店)']
+  },
+  {
+    day: 4, date: '10月4日', title: '泉州（蟳埔村方向）', icon: '🚄',
+    places: ['出逃计划青年旅舍(龙王头沙滩店)', '平潭站', '泉州站', '七月居青年旅舍(西街开元寺店)', '蟳埔村', '百年红砖厝', '蚵壳厝', '蟳埔妈祖庙', '泉州木偶剧院', '七月居青年旅舍(西街开元寺店)']
+  },
+  {
+    day: 5, date: '10月5日', title: '泉州（石狮海岸线）', icon: '🌊',
+    places: ['七月居青年旅舍(西街开元寺店)', '石狮小威海', '橘若咖啡', '红塔湾', '洛伽寺', '看海计划-浮石隐地', '橘若码头', '七月居青年旅舍(西街开元寺店)']
+  },
+  {
+    day: 6, date: '10月6日', title: '泉州市区+梧林→返程', icon: '🏛️',
+    places: ['七月居青年旅舍(西街开元寺店)', '西街', '中山路', '关岳庙', '天后宫', '梧林古村落', '泉州南站']
+  }
+];
+
+// 从localStorage加载行程
+let FUJIAN_ITINERARY = loadItineraryFromStorage();
+
+function loadItineraryFromStorage() {
+  try {
+    const saved = localStorage.getItem('fujianItinerary');
+    if(saved) {
+      const parsed = JSON.parse(saved);
+      if(Array.isArray(parsed) && parsed.length === 6) return parsed;
+    }
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_FUJIAN_ITINERARY));
+}
+
+function saveItineraryToStorage() {
+  try {
+    localStorage.setItem('fujianItinerary', JSON.stringify(FUJIAN_ITINERARY));
+    tipDom.innerHTML = '✅ 行程已保存';
+  } catch(e) {
+    tipDom.innerHTML = '⚠️ 保存失败';
+  }
+}
+
+function resetItinerary() {
+  FUJIAN_ITINERARY = JSON.parse(JSON.stringify(DEFAULT_FUJIAN_ITINERARY));
+  localStorage.removeItem('fujianItinerary');
+  renderItineraryDays();
+  tipDom.innerHTML = '🔄 已恢复默认行程';
+}
+
+// 左侧栏行程区块展开/收起
+let sidebarItineraryOpen = false;
+function toggleSidebarItinerary() {
+  sidebarItineraryOpen = !sidebarItineraryOpen;
+  document.getElementById('sidebarItineraryContent').style.display = sidebarItineraryOpen ? 'block' : 'none';
+  document.getElementById('sidebarItineraryArrow').textContent = sidebarItineraryOpen ? '▲' : '▼';
+}
+
+// 当前行程方案
+let currentItineraryKey = 'fujian';
+let customItinerary = {
+  day: 1, date: '自定义', title: '自定义行程', icon: '📝',
+  places: []
+};
+
+function switchItinerary(key) {
+  currentItineraryKey = key;
+  if(key === 'fujian') {
+    renderItineraryDays();
+  } else if(key === 'custom') {
+    // 自定义行程：只显示一天，用户自己加地点
+    FUJIAN_ITINERARY = [customItinerary];
+    expandedDay = 1;
+    renderItineraryDays();
+  }
+}
+
+function newItinerary() {
+  const name = prompt('请输入新行程名称（如：浙江5日）：');
+  if(!name || !name.trim()) return;
+  customItinerary = {
+    day: 1, date: '自定义', title: name.trim(), icon: '📝',
+    places: []
+  };
+  currentItineraryKey = 'custom';
+  FUJIAN_ITINERARY = [customItinerary];
+  expandedDay = 1;
+  
+  // 更新下拉选项
+  const sel = document.getElementById('itinerarySelect');
+  const opt = document.createElement('option');
+  opt.value = 'custom';
+  opt.textContent = name.trim();
+  sel.innerHTML = '';
+  sel.appendChild(new Option('福建6日（福州→平潭→泉州）', 'fujian'));
+  sel.appendChild(opt);
+  sel.value = 'custom';
+  
+  renderItineraryDays();
+  tipDom.innerHTML = '✅ 新行程已创建：' + name.trim();
+}
+
+// 将当前搜索到的POI加入当天行程
+function addCurrentPoiToItinerary(poiIdx) {
+  if(!itineraryPlaceSearch) {
+    tipDom.innerHTML = '⚠️ 请先打开行程面板再添加';
+    openItineraryPanel();
+    return;
+  }
+  // 取当前展开的天，没展开就加到Day1
+  const dayNum = expandedDay > 0 ? expandedDay : 1;
+  const day = FUJIAN_ITINERARY.find(function(d) { return d.day === dayNum; });
+  if(!day) return;
+  
+  // 从当前搜索结果中取POI
+  if(typeof currentPoiResults !== 'undefined' && currentPoiResults[poiIdx]) {
+    day.places.push(currentPoiResults[poiIdx].name);
+    renderItineraryDays();
+    tipDom.innerHTML = '✅ 已加入Day' + dayNum + '：' + currentPoiResults[poiIdx].name;
+  }
+}
+
+// 从搜索结果下拉中直接加POI到行程
+function addPoiToItinerary(poiIdx) {
+  if(typeof currentPoiResults === 'undefined' || !currentPoiResults[poiIdx]) {
+    alert('未找到该地点，请重新搜索');
+    return;
+  }
+  const poi = currentPoiResults[poiIdx];
+  
+  // 取当前展开的天，没展开就加到Day1
+  const dayNum = expandedDay > 0 ? expandedDay : 1;
+  const day = FUJIAN_ITINERARY.find(function(d) { return d.day === dayNum; });
+  if(!day) {
+    alert('请先打开行程面板并选择一天');
+    openItineraryPanel();
+    return;
+  }
+  
+  day.places.push(poi.name);
+  
+  // 确保行程面板打开
+  const panel = document.getElementById('itineraryPanel');
+  if(panel) panel.style.display = 'flex';
+  expandedDay = dayNum;
+  renderItineraryDays();
+  
+  // 关闭下拉
+  const dropdown = document.getElementById('poiDropdown');
+  if(dropdown) dropdown.style.display = 'none';
+  const input = document.getElementById('searchInput');
+  if(input) input.value = '';
+  
+  tipDom.innerHTML = '✅ 已加入Day' + dayNum + '：' + poi.name;
+}
+
+// 导出到高德地图
+function exportToAmap() {
+  if(routePoints.length < 2) {
+    tipDom.innerHTML = '⚠️ 请先加载一天的行程再导出';
+    return;
+  }
+  
+  // 一天内所有点：第一个=起点，最后一个=终点，中间全部=途经点
+  const start = routePoints[0].city;
+  const end = routePoints[routePoints.length - 1].city;
+  const viaPoints = routePoints.slice(1, -1);
+  
+  // 用高德Web版路线规划格式，只保留坐标，链接更短
+  let url = 'https://ditu.amap.com/dir?type=car';
+  url += '&from%5Blnglat%5D=' + start.lng + ',' + start.lat;
+  url += '&to%5Blnglat%5D=' + end.lng + ',' + end.lat;
+  
+  viaPoints.forEach(function(p, i) {
+    url += '&via%5B' + i + '%5D%5Blnglat%5D=' + p.city.lng + ',' + p.city.lat;
+  });
+  
+  showExportModal(url, routePoints.length, viaPoints.length);
+}
+
+// 复制文本到剪贴板
+function copyTextToClipboard(text, btn) {
+  if(navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() {
+      const oldText = btn.textContent;
+      btn.textContent = '✅ 已复制到剪贴板';
+      btn.style.background = '#16a34a';
+      setTimeout(function() { btn.textContent = oldText; btn.style.background = ''; }, 2000);
+    }).catch(function() {
+      fallbackCopy(text, btn);
+    });
+  } else {
+    fallbackCopy(text, btn);
+  }
+}
+
+function fallbackCopy(text, btn) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    const oldText = btn.textContent;
+    btn.textContent = '✅ 已复制到剪贴板';
+    btn.style.background = '#16a34a';
+    setTimeout(function() { btn.textContent = oldText; btn.style.background = ''; }, 2000);
+  } catch(e) {
+    alert('复制失败，请手动选择复制');
+  }
+  document.body.removeChild(ta);
+}
+
+function showExportModal(url, totalPoints, viaCount) {
+  let modal = document.getElementById('exportModal');
+  if(!modal) {
+    modal = document.createElement('div');
+    modal.id = 'exportModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    document.body.appendChild(modal);
+  }
+  
+  // 生成纯文本路线
+  let textRoute = '【当日行程路线（共' + totalPoints + '个点）】\n';
+  routePoints.forEach(function(p, i) {
+    const tag = i === 0 ? '【起点】' : (i === routePoints.length - 1 ? '【终点】' : '途经点' + i);
+    textRoute += (i+1) + '. ' + tag + ' ' + p.city.name + ' (' + p.city.lng.toFixed(5) + ',' + p.city.lat.toFixed(5) + ')\n';
+  });
+  
+  if(routeSegments.length > 0) {
+    textRoute += '\n【各段距离和时间】\n';
+    let totalDist = 0, totalTime = 0;
+    routeSegments.forEach(function(seg, i) {
+      if(!seg.route) return;
+      const distKm = (seg.route.distance || 0) / 1000;
+      const timeMin = Math.round((seg.route.time || 0) / 60);
+      totalDist += distKm;
+      totalTime += timeMin;
+      textRoute += (i+1) + '. ' + seg.startCity.name.substring(0,12) + ' → ' + seg.endCity.name.substring(0,12) + '：' + distKm.toFixed(1) + 'km，' + Math.floor(timeMin/60) + '时' + (timeMin%60>0 ? (timeMin%60)+'分' : '') + '\n';
+    });
+    textRoute += '\n合计：' + totalDist.toFixed(0) + 'km，约' + Math.floor(totalTime/60) + '时' + (totalTime%60>0 ? (totalTime%60)+'分' : '');
+  }
+  
+  modal.innerHTML = '<div style="background:#fff;border-radius:12px;padding:20px;max-width:480px;width:92%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);">' +
+    '<div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:8px;">🚗 导出到高德地图</div>' +
+    '<div style="font-size:12px;color:#64748b;margin-bottom:12px;line-height:1.5;">共' + totalPoints + '个点：起点1个 + 途经点' + viaCount + '个 + 终点1个，全部在一个链接里：</div>' +
+    
+    // 高德导航链接
+    '<div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;">📱 高德路线链接（复制发给别人）：</div>' +
+    '<a href="' + url + '" target="_blank" style="display:block;padding:12px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;text-align:center;margin-bottom:8px;">📍 点此在高德中打开完整路线</a>' +
+    '<button onclick="copyTextToClipboard(\'' + url.replace(/'/g, "\\'") + '\', this)" style="width:100%;padding:8px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:8px;">📋 一键复制链接</button>' +
+    '<textarea readonly style="width:100%;height:60px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:10px;color:#475569;box-sizing:border-box;resize:none;" onclick="this.select()">' + url + '</textarea>' +
+    '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">💡 手机点开直接唤起高德APP，电脑点开打开网页版路线</div>' +
+    
+    // 文本路线
+    '<div style="font-size:12px;font-weight:700;color:#334155;margin:16px 0 6px;">📋 路线详情（复制发给别人）：</div>' +
+    '<textarea readonly style="width:100%;height:180px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:11px;color:#475569;box-sizing:border-box;resize:none;line-height:1.6;" onclick="this.select()">' + textRoute + '</textarea>' +
+    
+    '<button onclick="document.getElementById(\'exportModal\').remove()" style="width:100%;padding:10px;margin-top:12px;background:#f1f5f9;color:#475569;border:none;border-radius:8px;font-size:12px;cursor:pointer;">关闭</button>' +
+  '</div>';
+  modal.onclick = function(e) { if(e.target === modal) modal.remove(); };
+}
+
+function openItineraryPanel() {
+  const panel = document.getElementById('itineraryPanel');
+  panel.style.display = 'flex';
+  renderItineraryDays();
+}
+
+function closeItineraryPanel() {
+  document.getElementById('itineraryPanel').style.display = 'none';
+}
+
+function renderItineraryDays() {
+  const container = document.getElementById('itineraryDays');
+  container.innerHTML = '';
+  FUJIAN_ITINERARY.forEach(function(day) {
+    const card = document.createElement('div');
+    card.style.cssText = 'margin-bottom:10px;border-radius:10px;background:rgba(255,255,255,.8);border:1px solid rgba(0,0,0,.06);transition:.2s;overflow:hidden;';
+    
+    // 卡片头部
+    const header = document.createElement('div');
+    header.style.cssText = 'padding:12px;cursor:pointer;transition:.2s;';
+    header.onmouseover = function() { header.style.background = 'rgba(59,130,246,.06)'; };
+    header.onmouseout = function() { header.style.background = 'transparent'; };
+    header.onclick = function() { toggleDayExpand(day.day); };
+    
+    const placesPreview = day.places.slice(0, 2).join(' → ') + (day.places.length > 2 ? ' → ...' : '');
+    header.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
+      '<span style="font-size:18px;">' + day.icon + '</span>' +
+      '<div><div style="font-size:13px;font-weight:700;color:#1e293b;">Day ' + day.day + ' · ' + day.date + '</div>' +
+      '<div style="font-size:11px;color:#64748b;">' + day.title + '</div></div>' +
+      '<span style="margin-left:auto;font-size:10px;color:#3b82f6;font-weight:600;background:rgba(59,130,246,.1);padding:3px 8px;border-radius:10px;">' + day.places.length + '点</span>' +
+      '<span style="font-size:12px;color:#94a3b8;">' + (expandedDay === day.day ? '▲' : '▼') + '</span></div>' +
+      '<div style="font-size:10px;color:#94a3b8;line-height:1.5;">' + placesPreview + '</div>';
+    
+    card.appendChild(header);
+    
+    // 展开内容：地点列表+编辑+出行信息
+    if(expandedDay === day.day) {
+      const detail = document.createElement('div');
+      detail.style.cssText = 'padding:0 12px 12px;border-top:1px solid rgba(0,0,0,.06);';
+      
+      // 地点列表
+      const listDiv = document.createElement('div');
+      listDiv.style.cssText = 'margin:8px 0;max-height:200px;overflow-y:auto;';
+      
+      day.places.forEach(function(place, idx) {
+        const item = document.createElement('div');
+        item.style.cssText = 'display:flex;align-items:center;gap:4px;padding:5px 0;font-size:11px;color:#475569;border-bottom:1px dashed rgba(0,0,0,.04);';
+        item.innerHTML = '<span style="width:18px;height:18px;border-radius:50%;background:#e0e7ff;color:#3b82f6;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + (idx+1) + '</span>' +
+          '<span style="flex:1;line-height:1.4;">' + place + '</span>' +
+          '<button onclick="moveItineraryPlace(' + day.day + ',' + idx + ',-1)" title="上移" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:11px;padding:0 2px;flex-shrink:0;">↑</button>' +
+          '<button onclick="moveItineraryPlace(' + day.day + ',' + idx + ',1)" title="下移" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:11px;padding:0 2px;flex-shrink:0;">↓</button>' +
+          '<button onclick="removeItineraryPlace(' + day.day + ',' + idx + ')" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;">×</button>';
+        listDiv.appendChild(item);
+      });
+      
+      detail.appendChild(listDiv);
+      
+      // 添加地点输入框（带搜索下拉）
+      const addDiv = document.createElement('div');
+      addDiv.style.cssText = 'position:relative;margin-top:6px;';
+      addDiv.innerHTML = '<input type="text" id="newPlaceInput_' + day.day + '" placeholder="搜索地点后选择..." style="width:100%;padding:7px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;box-sizing:border-box;outline:none;" oninput="onItinerarySearchInput(this.value,' + day.day + ')" autocomplete="off">' +
+        '<div id="itineraryDropdown_' + day.day + '" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:200px;overflow-y:auto;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:1000;margin-top:4px;"></div>';
+      detail.appendChild(addDiv);
+      
+      // 加载路线按钮
+      const loadBtn = document.createElement('button');
+      loadBtn.style.cssText = 'width:100%;margin-top:8px;padding:8px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;';
+      loadBtn.textContent = '📍 加载路线规划';
+      loadBtn.onclick = function(e) { e.stopPropagation(); loadItineraryDay(day.day); };
+      detail.appendChild(loadBtn);
+      
+      // 出行方式建议（规划完成后填充）
+      const transportDiv = document.createElement('div');
+      transportDiv.id = 'itineraryTransport_' + day.day;
+      transportDiv.style.cssText = 'margin-top:8px;padding:8px;background:rgba(248,250,252,.9);border-radius:8px;font-size:10px;color:#64748b;line-height:1.6;';
+      transportDiv.innerHTML = '<span style="color:#94a3b8;">规划路线后显示出行建议...</span>';
+      detail.appendChild(transportDiv);
+      
+      card.appendChild(detail);
+    }
+    
+    container.appendChild(card);
+  });
+}
+
+function toggleDayExpand(dayNum) {
+  expandedDay = (expandedDay === dayNum) ? 0 : dayNum;
+  renderItineraryDays();
+}
+
+function removeItineraryPlace(dayNum, idx) {
+  const day = FUJIAN_ITINERARY.find(function(d) { return d.day === dayNum; });
+  if(day) {
+    day.places.splice(idx, 1);
+    renderItineraryDays();
+  }
+}
+
+function moveItineraryPlace(dayNum, idx, dir) {
+  const day = FUJIAN_ITINERARY.find(function(d) { return d.day === dayNum; });
+  if(!day) return;
+  const newIdx = idx + dir;
+  if(newIdx < 0 || newIdx >= day.places.length) return;
+  const temp = day.places[idx];
+  day.places[idx] = day.places[newIdx];
+  day.places[newIdx] = temp;
+  renderItineraryDays();
+}
+
+function addItineraryPlace(dayNum) {
+  const input = document.getElementById('newPlaceInput_' + dayNum);
+  const val = input.value.trim();
+  if(!val) return;
+  const day = FUJIAN_ITINERARY.find(function(d) { return d.day === dayNum; });
+  if(day) {
+    day.places.push(val);
+    renderItineraryDays();
+  }
+}
+
+// 行程搜索输入
+let itinerarySearchTimer = null;
+let itinerarySearchResults = [];
+
+function onItinerarySearchInput(value, dayNum) {
+  const dropdown = document.getElementById('itineraryDropdown_' + dayNum);
+  if(itinerarySearchTimer) clearTimeout(itinerarySearchTimer);
+  
+  if(value.trim().length < 2) {
+    dropdown.style.display = 'none';
+    return;
+  }
+  
+  itinerarySearchTimer = setTimeout(function() {
+    searchItineraryPOI(value.trim(), dayNum);
+  }, 300);
+}
+
+function searchItineraryPOI(keyword, dayNum) {
+  const dropdown = document.getElementById('itineraryDropdown_' + dayNum);
+  dropdown.innerHTML = '<div style="padding:10px;font-size:11px;color:#94a3b8;text-align:center;">🔍 搜索中...</div>';
+  dropdown.style.display = 'block';
+  
+  if(typeof AMap.PlaceSearch === 'undefined') {
+    AMap.plugin('AMap.PlaceSearch', function() {
+      doItinerarySearch(keyword, dayNum);
+    });
+  } else {
+    doItinerarySearch(keyword, dayNum);
+  }
+}
+
+function doItinerarySearch(keyword, dayNum) {
+  const placeSearch = new AMap.PlaceSearch({
+    pageSize: 8,
+    pageIndex: 1,
+    city: '全国',
+    extensions: 'base'
+  });
+  
+  placeSearch.search(keyword, function(status, result) {
+    const dropdown = document.getElementById('itineraryDropdown_' + dayNum);
+    if(status === 'complete' && result.poiList && result.poiList.pois && result.poiList.pois.length > 0) {
+      itinerarySearchResults = result.poiList.pois;
+      let html = '';
+      result.poiList.pois.forEach(function(poi, i) {
+        const name = poi.name || '';
+        const addr = poi.address || (poi.pname + poi.cityname + poi.adname) || '';
+        html += '<div onclick="selectItineraryPOI(' + dayNum + ',' + i + ')" style="padding:8px 10px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:11px;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#fff\'">' +
+          '<div style="color:#1e293b;font-weight:600;">📍 ' + name + '</div>' +
+          '<div style="color:#94a3b8;margin-top:2px;">' + addr + '</div></div>';
+      });
+      dropdown.innerHTML = html;
+    } else {
+      itinerarySearchResults = [];
+      dropdown.innerHTML = '<div style="padding:10px;font-size:11px;color:#94a3b8;text-align:center;">未找到相关地点</div>';
+    }
+  });
+}
+
+function selectItineraryPOI(dayNum, idx) {
+  const poi = itinerarySearchResults[idx];
+  if(!poi) return;
+  const day = FUJIAN_ITINERARY.find(function(d) { return d.day === dayNum; });
+  if(day) {
+    day.places.push(poi.name);
+    renderItineraryDays();
+    tipDom.innerHTML = '✅ 已添加：' + poi.name;
+  }
+}
+
+// 规划完成后更新出行建议
+function updateItineraryTransport() {
+  if(expandedDay === 0) return;
+  const transportDiv = document.getElementById('itineraryTransport_' + expandedDay);
+  if(!transportDiv) return;
+  
+  if(routeSegments.length === 0) {
+    transportDiv.innerHTML = '<span style="color:#94a3b8;">暂无路线数据</span>';
+    return;
+  }
+  
+  let html = '<div style="font-weight:700;color:#334155;margin-bottom:4px;">🚗 出行建议</div>';
+  let totalDist = 0;
+  let totalTime = 0;
+  
+  routeSegments.forEach(function(seg, i) {
+    if(!seg.route) return;
+    const dist = seg.route.distance || 0; // 米
+    const time = seg.route.time || 0; // 秒
+    totalDist += dist;
+    totalTime += time;
+    
+    const distKm = dist / 1000;
+    const timeMin = Math.round(time / 60);
+    
+    // 根据距离推荐出行方式
+    let transport = '🚶 步行';
+    if(distKm >= 2 && distKm < 15) transport = '🚕 打车/公交';
+    else if(distKm >= 15 && distKm < 100) transport = '🚗 自驾/打车';
+    else if(distKm >= 100) transport = '🚄 高铁/自驾';
+    
+    html += '<div style="padding:2px 0;">' + (i+1) + '. ' + seg.startCity.name.substring(0,8) + ' → ' + seg.endCity.name.substring(0,8) + 
+      ' <span style="color:#3b82f6;font-weight:600;">' + distKm.toFixed(1) + 'km · ' + Math.floor(timeMin/60) + '时' + (timeMin%60>0 ? (timeMin%60)+'分' : '') + '</span> ' + transport + '</div>';
+  });
+  
+  // 总计
+  const totalKm = totalDist / 1000;
+  const totalMin = Math.round(totalTime / 60);
+  html += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,0,0,.08);font-weight:600;color:#1e293b;">' +
+    '📊 合计：' + totalKm.toFixed(0) + 'km · ' + Math.floor(totalMin/60) + '时' + (totalMin%60>0 ? (totalMin%60)+'分' : '') + '</div>';
+  
+  transportDiv.innerHTML = html;
+}
+
+function loadItineraryDay(dayNum) {
+  if(itineraryLoading) {
+    tipDom.innerHTML = '⚠️ 正在加载行程，请稍候...';
+    return;
+  }
+  const day = FUJIAN_ITINERARY.find(function(d) { return d.day === dayNum; });
+  if(!day) return;
+  
+  clearRoute();
+  
+  // 根据天数确定地理编码城市范围
+  let geoCity = '全国';
+  if(dayNum === 1) geoCity = '福州';
+  else if(dayNum === 2 || dayNum === 3) geoCity = '福州'; // 平潭属福州
+  else if(dayNum >= 4 && dayNum <= 6) geoCity = '泉州';
+  
+  itineraryLoading = true;
+  showLoading('正在加载Day ' + dayNum + '行程...', '定位地点中 0/' + day.places.length);
+  
+  // 加载地理编码器和POI搜索
+  const plugins = [];
+  if(typeof AMap.Geocoder === 'undefined') plugins.push('AMap.Geocoder');
+  if(typeof AMap.PlaceSearch === 'undefined') plugins.push('AMap.PlaceSearch');
+  
+  if(plugins.length > 0) {
+    AMap.plugin(plugins, function() {
+      if(!itineraryGeocoder) itineraryGeocoder = new AMap.Geocoder({ city: geoCity, radius: 1000 });
+      if(!itineraryPlaceSearch) itineraryPlaceSearch = new AMap.PlaceSearch({ pageSize: 3, pageIndex: 1, city: geoCity, extensions: 'base' });
+      geocodeItineraryPlaces(day, 0, [], geoCity, []);
+    });
+  } else {
+    if(!itineraryGeocoder) itineraryGeocoder = new AMap.Geocoder({ city: geoCity, radius: 1000 });
+    if(!itineraryPlaceSearch) itineraryPlaceSearch = new AMap.PlaceSearch({ pageSize: 3, pageIndex: 1, city: geoCity, extensions: 'base' });
+    geocodeItineraryPlaces(day, 0, [], geoCity, []);
+  }
+}
+
+function geocodeItineraryPlaces(day, index, results, geoCity, failedPlaces) {
+  if(index >= day.places.length) {
+    hideLoading();
+    itineraryLoading = false;
+    addItineraryToRoute(results, day, failedPlaces);
+    return;
+  }
+  
+  const place = day.places[index];
+  document.getElementById('loadingSubText').innerHTML = '定位地点中 ' + (index + 1) + '/' + day.places.length + '：' + place;
+  
+  if(itineraryGeocoder.setCity) itineraryGeocoder.setCity(geoCity);
+  
+  // 先用地理编码
+  itineraryGeocoder.getLocation(place, function(status, result) {
+    let lng = null, lat = null;
+    if(status === 'complete' && result.geocodes && result.geocodes.length > 0) {
+      const loc = result.geocodes[0].location;
+      lng = loc.lng;
+      lat = loc.lat;
+    }
+    
+    // 地理编码失败，用POI搜索
+    if(!lng || !lat) {
+      if(itineraryPlaceSearch.setCity) itineraryPlaceSearch.setCity(geoCity);
+      itineraryPlaceSearch.search(place, function(status, poiResult) {
+        if(status === 'complete' && poiResult.poiList && poiResult.poiList.pois && poiResult.poiList.pois.length > 0) {
+          const poi = poiResult.poiList.pois[0];
+          if(poi.location) {
+            lng = poi.location.lng;
+            lat = poi.location.lat;
+          }
+        }
+        
+        if(lng && lat) {
+          results.push({ name: place, lng: lng, lat: lat, isAddress: true });
+        } else {
+          failedPlaces.push(place);
+        }
+        
+        setTimeout(function() {
+          geocodeItineraryPlaces(day, index + 1, results, geoCity, failedPlaces);
+        }, 150);
+      });
+    } else {
+      results.push({ name: place, lng: lng, lat: lat, isAddress: true });
+      setTimeout(function() {
+        geocodeItineraryPlaces(day, index + 1, results, geoCity, failedPlaces);
+      }, 150);
+    }
+  });
+}
+
+function addItineraryToRoute(places, day, failedPlaces) {
+  let added = 0;
+  let failed = failedPlaces || [];
+  
+  // 按原始顺序添加地点，不做路径优化
+  places.forEach(function(place, idx) {
+    let lng = place.lng, lat = place.lat;
+    if(!lng || !lat) return; // 地理编码失败的地点跳过，不使用近似坐标
+    
+    // 连续相同坐标跳过
+    if(routePoints.length > 0) {
+      const last = routePoints[routePoints.length - 1].city;
+      if(Math.abs(last.lng - lng) < 0.0001 && Math.abs(last.lat - lat) < 0.0001) {
+        return;
+      }
+    }
+    
+    const displayName = place.name.length > 18 ? place.name.substring(0, 18) + '...' : place.name;
+    const virtualCity = {
+      name: displayName,
+      province: '',
+      region: '',
+      lng: lng,
+      lat: lat,
+      isCenter: false,
+      isAddress: true,
+      address: place.name
+    };
+    
+    const marker = new AMap.Marker({
+      position: [lng, lat],
+      content: '<div style="background:rgba(22,163,74,0.75);color:#fff;border:2px solid rgba(255,255,255,0.85);border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;">' + (routePoints.length + 1) + '</div>',
+      offset: new AMap.Pixel(-13, -13),
+      zIndex: 300 + routePoints.length
+    });
+    marker.on('click', function() {
+      const idx = routePoints.findIndex(function(p) { return p.marker === marker; });
+      if(idx >= 0) removePointAt(idx);
+    });
+    marker.setMap(map);
+    
+    const label = createCityLabel(virtualCity, [lng, lat]);
+    routePoints.push({ city: virtualCity, marker: marker, label: label });
+    added++;
+  });
+  
+  renumberMarkers();
+  renderRouteBar();
+  renderCityList();
+  
+  if(routePoints.length >= 2) {
+    let msg = '✅ Day ' + day.day + ' 行程已加载（' + added + '个地点，按原顺序）';
+    if(failed.length > 0) msg += '，' + failed.length + '个地点未定位';
+    msg += '，正在规划路线...';
+    tipDom.innerHTML = msg;
+    planFullRoute();
+  } else {
+    tipDom.innerHTML = '⚠️ Day ' + day.day + ' 行程地点地理编码失败较多，请检查网络';
+  }
+  
+  if(routePoints.length > 0) {
+    setTimeout(function() {
+      map.setFitView(null, false, [60, 60, 60, 360]);
+    }, 500);
   }
 }
 
