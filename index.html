@@ -4290,9 +4290,11 @@ function renderItineraryDays() {
       
       day.places.forEach(function(place, idx) {
         const item = document.createElement('div');
-        item.style.cssText = 'display:flex;align-items:center;gap:6px;padding:5px 0;font-size:11px;color:#475569;border-bottom:1px dashed rgba(0,0,0,.04);';
+        item.style.cssText = 'display:flex;align-items:center;gap:4px;padding:5px 0;font-size:11px;color:#475569;border-bottom:1px dashed rgba(0,0,0,.04);';
         item.innerHTML = '<span style="width:18px;height:18px;border-radius:50%;background:#e0e7ff;color:#3b82f6;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + (idx+1) + '</span>' +
           '<span style="flex:1;line-height:1.4;">' + place + '</span>' +
+          '<button onclick="moveItineraryPlace(' + day.day + ',' + idx + ',-1)" title="上移" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:11px;padding:0 2px;flex-shrink:0;">↑</button>' +
+          '<button onclick="moveItineraryPlace(' + day.day + ',' + idx + ',1)" title="下移" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:11px;padding:0 2px;flex-shrink:0;">↓</button>' +
           '<button onclick="removeItineraryPlace(' + day.day + ',' + idx + ')" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;">×</button>';
         listDiv.appendChild(item);
       });
@@ -4338,6 +4340,17 @@ function removeItineraryPlace(dayNum, idx) {
     day.places.splice(idx, 1);
     renderItineraryDays();
   }
+}
+
+function moveItineraryPlace(dayNum, idx, dir) {
+  const day = FUJIAN_ITINERARY.find(function(d) { return d.day === dayNum; });
+  if(!day) return;
+  const newIdx = idx + dir;
+  if(newIdx < 0 || newIdx >= day.places.length) return;
+  const temp = day.places[idx];
+  day.places[idx] = day.places[newIdx];
+  day.places[newIdx] = temp;
+  renderItineraryDays();
 }
 
 function addItineraryPlace(dayNum) {
