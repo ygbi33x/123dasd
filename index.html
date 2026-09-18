@@ -4412,7 +4412,8 @@ function exportToAmap() {
   const viaPoints = routePoints.slice(1, -1);
   
   // 用高德Web版路线规划格式，只保留坐标，链接更短
-  let url = 'https://ditu.amap.com/dir?type=car';
+  // callnative=1：手机端打开自动唤起高德APP
+  let url = 'https://ditu.amap.com/dir?type=car&callnative=1';
   url += '&from%5Blnglat%5D=' + start.lng + ',' + start.lat;
   url += '&to%5Blnglat%5D=' + end.lng + ',' + end.lat;
   
@@ -4511,7 +4512,7 @@ function showExportModal(url, totalPoints, viaCount) {
     '<a href="' + url + '" target="_blank" style="display:block;padding:12px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;text-align:center;margin-bottom:8px;">📍 点此在高德中打开完整路线</a>' +
     '<button onclick="copyCurrentExportUrl(this)" style="width:100%;padding:8px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:8px;">📋 一键复制链接</button>' +
     '<textarea readonly style="width:100%;height:60px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:10px;color:#475569;box-sizing:border-box;resize:none;" onclick="this.select()">' + url + '</textarea>' +
-    '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">💡 手机点开直接唤起高德APP，电脑点开打开网页版路线</div>' +
+    '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">💡 手机点击自动唤起高德APP导航，电脑打开显示网页版路线</div>' +
     
     // 文本路线
     '<div style="font-size:12px;font-weight:700;color:#334155;margin:16px 0 6px;">📋 路线详情（复制发给别人）：</div>' +
