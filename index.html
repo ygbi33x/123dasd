@@ -4396,6 +4396,7 @@ function addPoiToItinerary(poiIdx) {
 }
 
 // 导出到高德地图
+let currentExportUrl = ''; // 全局保存链接，避免onclick截断
 function exportToAmap() {
   if(routePoints.length < 2) {
     tipDom.innerHTML = '⚠️ 请先加载一天的行程再导出';
@@ -4407,7 +4408,7 @@ function exportToAmap() {
   const end = routePoints[routePoints.length - 1].city;
   const viaPoints = routePoints.slice(1, -1);
   
-  // 用高德Web版路线规划格式，只保留坐标，链接更短
+  // 用高德Web版路线规划格式
   let url = 'https://ditu.amap.com/dir?type=car';
   url += '&from%5Blnglat%5D=' + start.lng + ',' + start.lat;
   url += '&to%5Blnglat%5D=' + end.lng + ',' + end.lat;
@@ -4416,41 +4417,41 @@ function exportToAmap() {
     url += '&via%5B' + i + '%5D%5Blnglat%5D=' + p.city.lng + ',' + p.city.lat;
   });
   
+  currentExportUrl = url;
   showExportModal(url, routePoints.length, viaPoints.length);
 }
 
-// 复制文本到剪贴板
-function copyTextToClipboard(text, btn) {
-  if(navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(function() {
-      const oldText = btn.textContent;
-      btn.textContent = '✅ 已复制到剪贴板';
-      btn.style.background = '#16a34a';
-      setTimeout(function() { btn.textContent = oldText; btn.style.background = ''; }, 2000);
-    }).catch(function() {
-      fallbackCopy(text, btn);
-    });
-  } else {
-    fallbackCopy(text, btn);
-  }
+// 从全局变量打开链接
+function openExportUrl() {
+  window.open(currentExportUrl, '_blank');
 }
 
-function fallbackCopy(text, btn) {
+// 从全局变量复制链接
+function copyExportUrl(btn) {
+  const url = currentExportUrl;
+  if(navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function() {
+      btn.textContent = '✅ 已复制到剪贴板';
+      btn.style.background = '#16a34a';
+      setTimeout(function() { btn.textContent = '📋 一键复制链接'; btn.style.background = ''; }, 2000);
+    }).catch(function() { fallbackExportCopy(btn); });
+  } else {
+    fallbackExportCopy(btn);
+  }
+}
+function fallbackExportCopy(btn) {
   const ta = document.createElement('textarea');
-  ta.value = text;
+  ta.value = currentExportUrl;
   ta.style.position = 'fixed';
   ta.style.opacity = '0';
   document.body.appendChild(ta);
   ta.select();
   try {
     document.execCommand('copy');
-    const oldText = btn.textContent;
     btn.textContent = '✅ 已复制到剪贴板';
     btn.style.background = '#16a34a';
-    setTimeout(function() { btn.textContent = oldText; btn.style.background = ''; }, 2000);
-  } catch(e) {
-    alert('复制失败，请手动选择复制');
-  }
+    setTimeout(function() { btn.textContent = '📋 一键复制链接'; btn.style.background = ''; }, 2000);
+  } catch(e) { alert('复制失败，请手动选择textarea里的链接复制'); }
   document.body.removeChild(ta);
 }
 
@@ -4490,8 +4491,8 @@ function showExportModal(url, totalPoints, viaCount) {
     
     // 高德导航链接
     '<div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;">📱 高德路线链接（复制发给别人）：</div>' +
-    '<a href="' + url + '" target="_blank" style="display:block;padding:12px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;text-align:center;margin-bottom:8px;">📍 点此在高德中打开完整路线</a>' +
-    '<button onclick="copyTextToClipboard(\'' + url.replace(/'/g, "\\'") + '\', this)" style="width:100%;padding:8px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:8px;">📋 一键复制链接</button>' +
+    '<button onclick="openExportUrl()" style="display:block;width:100%;padding:12px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;text-align:center;margin-bottom:8px;cursor:pointer;">📍 点此在高德中打开完整路线</button>' +
+    '<button onclick="copyExportUrl(this)" style="width:100%;padding:8px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:8px;">📋 一键复制链接</button>' +
     '<textarea readonly style="width:100%;height:60px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:10px;color:#475569;box-sizing:border-box;resize:none;" onclick="this.select()">' + url + '</textarea>' +
     '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">💡 手机点开直接唤起高德APP，电脑点开打开网页版路线</div>' +
     
