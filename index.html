@@ -2558,6 +2558,12 @@ function planNextSegment(version) {
     updateRouteSelectorBtn();
     // 更新行程出行建议
     if(typeof updateItineraryTransport === 'function') updateItineraryTransport();
+    // 自动导出：用户点了导出但行程还没加载，加载规划完成后自动弹出导出窗口
+    if(pendingExportDay > 0 && routePoints.length >= 2) {
+      const d = pendingExportDay;
+      pendingExportDay = 0;
+      setTimeout(function() { exportToAmap(); }, 800);
+    }
     // 两点之间有多条备选路线时，自动弹出路线选择器
     const normalPoints = routePoints.filter(p => !p.isVia);
     if(normalPoints.length === 2 && routeSegments.length > 0 && routeSegments[0].allRoutes && routeSegments[0].allRoutes.length > 1) {
@@ -4407,9 +4413,18 @@ function addPoiToItinerary(poiIdx) {
 }
 
 // 导出到高德地图
+let pendingExportDay = 0; // 标记加载完成后自动导出的天数
 function exportToAmap() {
   if(routePoints.length < 2) {
-    tipDom.innerHTML = '⚠️ 请先加载一天的行程再导出';
+    // 没有加载行程时，自动加载当前展开天的行程，完成后自动弹出导出
+    if(expandedDay > 0) {
+      pendingExportDay = expandedDay;
+      tipDom.innerHTML = '⏳ 正在自动加载Day ' + expandedDay + '行程，加载完后自动弹出导出...';
+      loadItineraryDay(expandedDay);
+      return;
+    }
+    tipDom.innerHTML = '⚠️ 请先在行程规划中展开某一天，再点导出到高德';
+    alert('请先点右上角菜单 → 行程规划 → 展开某一天 → 加载路线规划，然后再点导出到高德');
     return;
   }
   
