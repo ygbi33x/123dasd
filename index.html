@@ -4407,13 +4407,17 @@ function exportToAmap() {
   const end = routePoints[routePoints.length - 1].city;
   const viaPoints = routePoints.slice(1, -1);
   
-  // 电脑网页版链接（ditu.amap.com，支持多途经点）
-  let webUrl = 'https://ditu.amap.com/dir?type=car';
-  webUrl += '&from%5Blnglat%5D=' + start.lng + ',' + start.lat;
-  webUrl += '&to%5Blnglat%5D=' + end.lng + ',' + end.lat;
-  viaPoints.forEach(function(p, i) {
-    webUrl += '&via%5B' + i + '%5D%5Blnglat%5D=' + p.city.lng + ',' + p.city.lat;
-  });
+  // 电脑网页版链接（高德新版ssr/dir，带地图，支持多途经点）
+  var webUrl = 'https://ditu.amap.com/ssr/dir?type=0';
+  webUrl += '&fname=' + encodeURIComponent(start.name || '起点');
+  webUrl += '&flat=' + start.lat + '&flon=' + start.lng;
+  webUrl += '&dname=' + encodeURIComponent(end.name || '终点');
+  webUrl += '&dlat=' + end.lat + '&dlon=' + end.lng;
+  if(viaPoints.length > 0) {
+    webUrl += '&vname=' + encodeURIComponent(viaPoints.map(function(p){ return p.city.name || ''; }).join('|'));
+    webUrl += '&vlat=' + viaPoints.map(function(p){ return p.city.lat; }).join('|');
+    webUrl += '&vlon=' + viaPoints.map(function(p){ return p.city.lng; }).join('|');
+  }
   currentExportUrl = webUrl;
   
   // 手机APP链接（amapuri://，支持多途经点，vialons/vialats用|分隔）
