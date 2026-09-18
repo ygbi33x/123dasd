@@ -329,7 +329,11 @@ button{font-family:inherit;}
   
   /* 行程面板移动端适配 */
   #itineraryPanel{right:8px;left:8px;top:60px;width:auto;max-width:none;max-height:calc(100vh - 80px);border-radius:12px;}
-  #exportModal > div{width:94% !important;padding:14px !important;max-height:85vh;}
+  /* 导出弹窗移动端全屏适配 */
+  #exportModal > div{width:96% !important;max-width:96% !important;padding:16px !important;max-height:90vh !important;border-radius:12px !important;}
+  #exportModal button{padding:12px !important;font-size:14px !important;min-height:44px;}
+  #exportModal textarea{font-size:12px !important;}
+  #exportModal > div > div:first-child{font-size:18px !important;}
   
   .city-item{padding:6px 10px;font-size:11px;}
   .city-province{font-size:9px;}
@@ -4430,7 +4434,14 @@ function openInAmap() {
     alert('没有可打开的链接');
     return;
   }
-  window.open(currentExportUrl, '_blank');
+  // 用a标签程序化点击，避免手机浏览器拦截window.open
+  var a = document.createElement('a');
+  a.href = currentExportUrl;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 // 复制当前导出的链接
@@ -4459,6 +4470,11 @@ function copyTextToClipboard(text, btn) {
 }
 
 function fallbackCopy(text, btn) {
+  // 手机端优先用prompt显示链接，让用户长按复制
+  if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    window.prompt('长按选择并复制链接：', text);
+    return;
+  }
   const ta = document.createElement('textarea');
   ta.value = text;
   ta.style.position = 'fixed';
@@ -4472,7 +4488,7 @@ function fallbackCopy(text, btn) {
     btn.style.background = '#16a34a';
     setTimeout(function() { btn.textContent = oldText; btn.style.background = ''; }, 2000);
   } catch(e) {
-    alert('复制失败，请手动选择复制');
+    window.prompt('复制失败，请手动选择复制：', text);
   }
   document.body.removeChild(ta);
 }
