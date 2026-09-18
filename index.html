@@ -4324,20 +4324,34 @@ function addCurrentPoiToItinerary(poiIdx) {
 
 // 从搜索结果下拉中直接加POI到行程
 function addPoiToItinerary(poiIdx) {
-  if(typeof currentPoiResults === 'undefined' || !currentPoiResults[poiIdx]) return;
+  if(typeof currentPoiResults === 'undefined' || !currentPoiResults[poiIdx]) {
+    alert('未找到该地点，请重新搜索');
+    return;
+  }
   const poi = currentPoiResults[poiIdx];
   
   // 取当前展开的天，没展开就加到Day1
   const dayNum = expandedDay > 0 ? expandedDay : 1;
   const day = FUJIAN_ITINERARY.find(function(d) { return d.day === dayNum; });
-  if(!day) return;
+  if(!day) {
+    alert('请先打开行程面板并选择一天');
+    openItineraryPanel();
+    return;
+  }
   
   day.places.push(poi.name);
+  
+  // 确保行程面板打开
+  const panel = document.getElementById('itineraryPanel');
+  if(panel) panel.style.display = 'flex';
+  expandedDay = dayNum;
   renderItineraryDays();
   
   // 关闭下拉
-  document.getElementById('poiDropdown').style.display = 'none';
-  document.getElementById('searchInput').value = '';
+  const dropdown = document.getElementById('poiDropdown');
+  if(dropdown) dropdown.style.display = 'none';
+  const input = document.getElementById('searchInput');
+  if(input) input.value = '';
   
   tipDom.innerHTML = '✅ 已加入Day' + dayNum + '：' + poi.name;
 }
@@ -4381,13 +4395,43 @@ function showExportModal(links) {
     modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
     document.body.appendChild(modal);
   }
-  modal.innerHTML = '<div style="background:#fff;border-radius:12px;padding:20px;max-width:400px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);">' +
-    '<div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:12px;">🚗 导出到高德地图</div>' +
-    '<div style="font-size:12px;color:#64748b;margin-bottom:12px;line-height:1.5;">点击下方链接直接在高德APP中打开导航（手机端），或在浏览器中打开网页版路线。共' + routePoints.length + '个地点，分' + links.length + '段：</div>' +
+  
+  // 生成纯文本路线（可以复制发给别人）
+  let textRoute = '【福建行程路线】\n';
+  routePoints.forEach(function(p, i) {
+    textRoute += (i+1) + '. ' + p.city.name + ' (' + p.city.lng.toFixed(5) + ',' + p.city.lat.toFixed(5) + ')\n';
+  });
+  if(routeSegments.length > 0) {
+    textRoute += '\n【各段距离】\n';
+    let totalDist = 0;
+    routeSegments.forEach(function(seg, i) {
+      if(!seg.route) return;
+      const distKm = (seg.route.distance || 0) / 1000;
+      totalDist += distKm;
+      const timeMin = Math.round((seg.route.time || 0) / 60);
+      textRoute += (i+1) + '. ' + seg.startCity.name.substring(0,10) + ' → ' + seg.endCity.name.substring(0,10) + '：' + distKm.toFixed(1) + 'km，' + Math.floor(timeMin/60) + '时' + (timeMin%60>0 ? (timeMin%60)+'分' : '') + '\n';
+    });
+    textRoute += '合计：' + totalDist.toFixed(0) + 'km\n';
+  }
+  
+  modal.innerHTML = '<div style="background:#fff;border-radius:12px;padding:20px;max-width:450px;width:90%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);">' +
+    '<div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:12px;">🚗 导出路线到高德</div>' +
+    '<div style="font-size:12px;color:#64748b;margin-bottom:12px;line-height:1.5;">以下链接可以直接发给别人，点开就在高德中打开路线导航：</div>' +
+    
+    // 分段导航链接
+    '<div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;">📱 高德导航链接（手机点开直接导航）：</div>' +
     links.map(function(l, i) {
-      return '<a href="' + l.url + '" target="_blank" style="display:block;padding:10px 12px;margin-bottom:8px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;color:#16a34a;text-decoration:none;font-size:12px;font-weight:600;">📍 第' + (i+1) + '段（地点' + (l.start+1) + '-' + (l.end+1) + '）→ 打开高德导航</a>';
+      return '<div style="margin-bottom:6px;">' +
+        '<a href="' + l.url + '" target="_blank" style="display:block;padding:8px 10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;color:#16a34a;text-decoration:none;font-size:11px;font-weight:600;margin-bottom:4px;">📍 第' + (i+1) + '段（地点' + (l.start+1) + '-' + (l.end+1) + '）→ 点此打开高德导航</a>' +
+        '<input readonly value="' + l.url + '" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;font-size:10px;color:#94a3b8;box-sizing:border-box;" onclick="this.select()">' +
+      '</div>';
     }).join('') +
-    '<button onclick="document.getElementById(\'exportModal\').remove()" style="width:100%;padding:10px;margin-top:8px;background:#f1f5f9;color:#475569;border:none;border-radius:8px;font-size:12px;cursor:pointer;">关闭</button>' +
+    
+    // 文本路线
+    '<div style="font-size:12px;font-weight:700;color:#334155;margin:12px 0 6px;">📋 路线文本（复制发给别人）：</div>' +
+    '<textarea readonly style="width:100%;height:150px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:11px;color:#475569;box-sizing:border-box;resize:none;" onclick="this.select()">' + textRoute + '</textarea>' +
+    
+    '<button onclick="document.getElementById(\'exportModal\').remove()" style="width:100%;padding:10px;margin-top:12px;background:#f1f5f9;color:#475569;border:none;border-radius:8px;font-size:12px;cursor:pointer;">关闭</button>' +
   '</div>';
   modal.onclick = function(e) { if(e.target === modal) modal.remove(); };
 }
