@@ -4408,15 +4408,16 @@ function exportToAmap() {
   const viaPoints = routePoints.slice(1, -1);
   
   // 用高德Web版路线规划格式（支持多个途经点）
+  // 方括号编码为%5B %5D，防止在微信/短信里被截断
   let url = 'https://ditu.amap.com/dir?type=car';
-  url += '&from[lnglat]=' + start.lng + ',' + start.lat;
-  url += '&from[name]=' + encodeURIComponent(start.name);
-  url += '&to[lnglat]=' + end.lng + ',' + end.lat;
-  url += '&to[name]=' + encodeURIComponent(end.name);
+  url += '&from%5Blnglat%5D=' + start.lng + ',' + start.lat;
+  url += '&from%5Bname%5D=' + encodeURIComponent(start.name);
+  url += '&to%5Blnglat%5D=' + end.lng + ',' + end.lat;
+  url += '&to%5Bname%5D=' + encodeURIComponent(end.name);
   
   viaPoints.forEach(function(p, i) {
-    url += '&via[' + i + '][lnglat]=' + p.city.lng + ',' + p.city.lat;
-    url += '&via[' + i + '][name]=' + encodeURIComponent(p.city.name);
+    url += '&via%5B' + i + '%5D%5Blnglat%5D=' + p.city.lng + ',' + p.city.lat;
+    url += '&via%5B' + i + '%5D%5Bname%5D=' + encodeURIComponent(p.city.name);
   });
   
   showExportModal(url, routePoints.length, viaPoints.length);
