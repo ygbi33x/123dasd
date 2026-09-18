@@ -4416,7 +4416,6 @@ function addPoiToItinerary(poiIdx) {
 let pendingExportDay = 0; // 标记加载完成后自动导出的天数
 function exportToAmap() {
   if(routePoints.length < 2) {
-    // 没有加载行程时，自动加载当前展开天的行程，完成后自动弹出导出
     if(expandedDay > 0) {
       pendingExportDay = expandedDay;
       tipDom.innerHTML = '⏳ 正在自动加载Day ' + expandedDay + '行程，加载完后自动弹出导出...';
@@ -4424,7 +4423,7 @@ function exportToAmap() {
       return;
     }
     tipDom.innerHTML = '⚠️ 请先在行程规划中展开某一天，再点导出到高德';
-    alert('请先点右上角菜单 → 行程规划 → 展开某一天 → 加载路线规划，然后再点导出到高德');
+    alert('请先点右上角菜单 → 行程规划 → 展开某一天，然后再点导出到高德');
     return;
   }
   
@@ -4433,15 +4432,13 @@ function exportToAmap() {
   const end = routePoints[routePoints.length - 1].city;
   const viaPoints = routePoints.slice(1, -1);
   
-  // 用高德官方URI API（uri.amap.com/navigation），手机/电脑都能正确解析并唤起APP
-  // 注意：ditu.amap.com/dir 的 from[lnglat] 格式手机版不认，会跳转成 undefined 空路线
-  // callnative=1：手机端打开自动唤起高德APP；via 多个途经点用分号分隔
-  let url = 'https://uri.amap.com/navigation?coordinate=gaode&mode=car&callnative=1&src=routetool';
-  url += '&from=' + start.lng + ',' + start.lat + ',' + encodeURIComponent(start.name);
-  url += '&to=' + end.lng + ',' + end.lat + ',' + encodeURIComponent(end.name);
-  if(viaPoints.length > 0) {
-    url += '&via=' + viaPoints.map(function(p) { return p.city.lng + ',' + p.city.lat; }).join(';');
-  }
+  // 用高德网页版路线格式，多途经点用via[i][lnglat]数组参数
+  let url = 'https://ditu.amap.com/dir?type=car';
+  url += '&from%5Blnglat%5D=' + start.lng + ',' + start.lat;
+  url += '&to%5Blnglat%5D=' + end.lng + ',' + end.lat;
+  viaPoints.forEach(function(p, i) {
+    url += '&via%5B' + i + '%5D%5Blnglat%5D=' + p.city.lng + ',' + p.city.lat;
+  });
   
   showExportModal(url, routePoints.length, viaPoints.length);
 }
