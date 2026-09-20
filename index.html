@@ -509,6 +509,22 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         <button class="search-add-btn" onclick="addManualCity()" title="将搜索的城市添加到路线（Shift+回车）">+</button>
         <div id="poiDropdown" class="poi-dropdown" style="display:none;"></div>
       </div>
+      <!-- 行程地点添加（左侧栏） -->
+      <div onclick="toggleSidebarItinerary()" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px 6px;cursor:pointer;user-select:none;">
+        <span style="font-size:11px;font-weight:700;color:#374151;letter-spacing:.3px;">🗺️ 添加行程地点</span>
+        <span id="sidebarItineraryArrow" style="font-size:11px;color:#6b7280;">▲ 收起</span>
+      </div>
+      <div id="sidebarItineraryContent" style="padding:0 14px 10px;background:rgba(255,255,255,.4);border-bottom:1px solid rgba(0,0,0,.04);">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;">
+          <span style="font-size:11px;color:#64748b;font-weight:600;white-space:nowrap;">加入到</span>
+          <select id="iabDaySelect" onchange="onIabDayChange()" style="flex:1;min-width:0;padding:6px 8px;border:1px solid rgba(0,0,0,.1);border-radius:8px;font-size:11px;background:#fff;color:#334155;outline:none;cursor:pointer;"></select>
+        </div>
+        <div style="position:relative;">
+          <input type="text" id="iabInput" placeholder="搜索地点，点结果加入该天…" oninput="onIabInput(this.value)" onkeydown="onIabKeyDown(event)" autocomplete="off" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid rgba(0,0,0,.08);border-radius:10px;font-size:12px;outline:none;background:rgba(255,255,255,.7);transition:.2s;font-weight:500;" onfocus="this.style.borderColor='#3b82f6';this.style.background='#fff';" onblur="this.style.borderColor='rgba(0,0,0,.08)';this.style.background='rgba(255,255,255,.7)';" />
+          <div id="iabDropdown" class="poi-dropdown" style="display:none;border-radius:12px;max-height:280px;"></div>
+        </div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:6px;line-height:1.5;">输入「复旦大学」「三坊七巷」等，点击下拉结果即加入所选天并自动保存</div>
+      </div>
       <div class="display-settings">
         <button class="display-settings-btn" onclick="toggleDisplaySettings()" title="显示设置">
           <span>⚙️ 显示设置</span>
@@ -1167,6 +1183,7 @@ window.onload = function() {
   updateTrafficIndicator();
   CAPITALS = CITIES.filter(function(c) { return CAPITAL_NAMES.indexOf(c.name) >= 0; });
   renderCityList();
+  buildIabDaySelect();
   loadRouteFromURL();
   // 无分享链接时，从本地存储恢复上次未完成的路线
   if(!window.location.hash || window.location.hash.indexOf('#route=') < 0) {
@@ -1179,6 +1196,12 @@ window.onload = function() {
     const dropdown = document.getElementById('poiDropdown');
     if(searchBox && !searchBox.contains(e.target) && dropdown) {
       dropdown.style.display = 'none';
+    }
+    // 点击外部关闭左侧"添加行程地点"下拉
+    const iabBox = document.getElementById('sidebarItineraryContent');
+    const iabDd = document.getElementById('iabDropdown');
+    if(iabBox && iabDd && !iabBox.contains(e.target)) {
+      iabDd.style.display = 'none';
     }
   });
 };
@@ -4285,16 +4308,130 @@ function saveItineraryToStorage() {
 function resetItinerary() {
   FUJIAN_ITINERARY = JSON.parse(JSON.stringify(DEFAULT_FUJIAN_ITINERARY));
   localStorage.removeItem('fujianItinerary');
+  expandedDay = 0;
+  buildIabDaySelect();
   renderItineraryDays();
   tipDom.innerHTML = '🔄 已恢复默认行程';
 }
 
-// 左侧栏行程区块展开/收起
-let sidebarItineraryOpen = false;
+// ========== 左侧栏：行程地点添加 ==========
+let sidebarItineraryOpen = true;
 function toggleSidebarItinerary() {
   sidebarItineraryOpen = !sidebarItineraryOpen;
-  document.getElementById('sidebarItineraryContent').style.display = sidebarItineraryOpen ? 'block' : 'none';
-  document.getElementById('sidebarItineraryArrow').textContent = sidebarItineraryOpen ? '▲' : '▼';
+  const c = document.getElementById('sidebarItineraryContent');
+  const a = document.getElementById('sidebarItineraryArrow');
+  if(c) c.style.display = sidebarItineraryOpen ? 'block' : 'none';
+  if(a) a.textContent = sidebarItineraryOpen ? '▲ 收起' : '▼ 展开';
+}
+
+let iabResults = [];
+let iabTimer = null;
+let iabSelectedDay = 1;
+
+function iabEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// 根据当前行程构建"目标天"下拉
+function buildIabDaySelect() {
+  const sel = document.getElementById('iabDaySelect');
+  if(!sel || !FUJIAN_ITINERARY || !FUJIAN_ITINERARY.length) return;
+  const prev = parseInt(sel.value) || iabSelectedDay;
+  sel.innerHTML = '';
+  FUJIAN_ITINERARY.forEach(function(d) {
+    const opt = document.createElement('option');
+    opt.value = d.day;
+    opt.textContent = 'Day' + d.day + (d.date ? ' · ' + d.date : '') + (d.title ? ' ' + d.title : '');
+    sel.appendChild(opt);
+  });
+  let target;
+  if(expandedDay > 0 && FUJIAN_ITINERARY.some(function(d){ return d.day === expandedDay; })) {
+    target = expandedDay;
+  } else if(FUJIAN_ITINERARY.some(function(d){ return d.day === prev; })) {
+    target = prev;
+  } else {
+    target = FUJIAN_ITINERARY[0].day;
+  }
+  sel.value = target;
+  iabSelectedDay = target;
+}
+
+// 右侧展开天变化时，同步左侧下拉选中值
+function syncIabDaySelect() {
+  const sel = document.getElementById('iabDaySelect');
+  if(!sel) return;
+  if(expandedDay > 0) {
+    sel.value = expandedDay;
+    iabSelectedDay = expandedDay;
+  }
+}
+
+function onIabDayChange() {
+  const sel = document.getElementById('iabDaySelect');
+  iabSelectedDay = parseInt(sel.value) || 1;
+  expandedDay = iabSelectedDay;
+  const panel = document.getElementById('itineraryPanel');
+  if(panel && panel.style.display === 'flex') renderItineraryDays();
+}
+
+function onIabInput(value) {
+  value = (value || '').trim();
+  const dd = document.getElementById('iabDropdown');
+  if(iabTimer) clearTimeout(iabTimer);
+  if(value.length < 2) { dd.style.display = 'none'; iabResults = []; return; }
+  dd.innerHTML = '<div class="poi-loading">🔍 搜索中...</div>';
+  dd.style.display = 'block';
+  iabTimer = setTimeout(function(){ doIabSearch(value); }, 300);
+}
+
+function doIabSearch(keyword) {
+  const run = function() {
+    const ps = new AMap.PlaceSearch({ pageSize: 10, pageIndex: 1, city: '全国', extensions: 'base' });
+    ps.search(keyword, function(status, result) {
+      const dd = document.getElementById('iabDropdown');
+      if(status === 'complete' && result.poiList && result.poiList.pois && result.poiList.pois.length) {
+        iabResults = result.poiList.pois;
+        let html = '';
+        iabResults.forEach(function(p, i) {
+          const name = p.name || '';
+          const addr = p.address || ((p.pname||'') + (p.cityname||'') + (p.adname||'')) || '';
+          html += '<div class="poi-item" onclick="selectIabPOI(' + i + ')">' +
+            '<div class="poi-icon" style="background:#dcfce7;color:#16a34a;">📍</div>' +
+            '<div class="poi-content"><div class="poi-name">' + iabEsc(name) + '</div>' +
+            '<div class="poi-addr">' + iabEsc(addr) + '</div></div></div>';
+        });
+        dd.innerHTML = html;
+      } else {
+        iabResults = [];
+        dd.innerHTML = '<div class="poi-empty">未找到相关地点</div>';
+      }
+      dd.style.display = 'block';
+    });
+  };
+  if(typeof AMap.PlaceSearch === 'undefined') AMap.plugin('AMap.PlaceSearch', run);
+  else run();
+}
+
+function selectIabPOI(i) {
+  const p = iabResults[i];
+  if(!p) return;
+  const day = FUJIAN_ITINERARY.find(function(d){ return d.day === iabSelectedDay; });
+  if(!day) { tipDom.innerHTML = '⚠️ 请先选择要加入的天'; return; }
+  day.places.push(p.name);
+  try { localStorage.setItem('fujianItinerary', JSON.stringify(FUJIAN_ITINERARY)); } catch(e) {}
+  const panel = document.getElementById('itineraryPanel');
+  if(panel && panel.style.display === 'flex') renderItineraryDays();
+  const dd = document.getElementById('iabDropdown');
+  const inp = document.getElementById('iabInput');
+  if(dd) dd.style.display = 'none';
+  if(inp) inp.value = '';
+  iabResults = [];
+  tipDom.innerHTML = '✅ 已加入 Day' + iabSelectedDay + '：' + p.name;
+}
+
+function onIabKeyDown(e) {
+  if(e.key === 'Enter' && iabResults.length) { e.preventDefault(); selectIabPOI(0); }
+  if(e.key === 'Escape') { const dd = document.getElementById('iabDropdown'); if(dd) dd.style.display = 'none'; }
 }
 
 // 当前行程方案
@@ -4307,11 +4444,15 @@ let customItinerary = {
 function switchItinerary(key) {
   currentItineraryKey = key;
   if(key === 'fujian') {
+    FUJIAN_ITINERARY = loadItineraryFromStorage();
+    expandedDay = 0;
+    buildIabDaySelect();
     renderItineraryDays();
   } else if(key === 'custom') {
     // 自定义行程：只显示一天，用户自己加地点
     FUJIAN_ITINERARY = [customItinerary];
     expandedDay = 1;
+    buildIabDaySelect();
     renderItineraryDays();
   }
 }
@@ -4337,6 +4478,7 @@ function newItinerary() {
   sel.appendChild(opt);
   sel.value = 'custom';
   
+  buildIabDaySelect();
   renderItineraryDays();
   tipDom.innerHTML = '✅ 新行程已创建：' + name.trim();
 }
@@ -4494,6 +4636,7 @@ function showExportModal(totalPoints, viaCount) {
 function openItineraryPanel() {
   const panel = document.getElementById('itineraryPanel');
   panel.style.display = 'flex';
+  buildIabDaySelect();
   renderItineraryDays();
 }
 
@@ -4578,6 +4721,7 @@ function renderItineraryDays() {
 
 function toggleDayExpand(dayNum) {
   expandedDay = (expandedDay === dayNum) ? 0 : dayNum;
+  syncIabDaySelect();
   renderItineraryDays();
 }
 
