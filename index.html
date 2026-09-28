@@ -2955,7 +2955,7 @@ function calcTransportCost() {
   });
   html += '<tr class="total"><td class="seg-name">合计</td><td>' + totalKm.toFixed(1) + '</td><td>' + fmtMoney(totalEnergy) + '</td><td>' + fmtMoney(totalTolls) + '</td><td>' + fmtMoney(totalCost) + '</td></tr>';
   tb.innerHTML = html;
-  document.getElementById('costNote').textContent = '合计已含单趟固定成本 ' + fmtMoney(fixed) + ' 元；过路费来自高德驾车规划，直线兜底段过路费按 0 计。';
+  document.getElementById('costNote').textContent = '合计已含单趟固定成本 ' + fmtMoney(fixed) + ' 元。过路费为高德小客车口径（货车实际以收费站为准），直线兜底段按 0 计。';
 }
 
 // 切换路线选择器显示/隐藏
