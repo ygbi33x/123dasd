@@ -280,7 +280,7 @@ button{font-family:inherit;}
 .cost-total{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;}
 .cost-total-label{font-size:12px;color:#92400e;font-weight:700;}
 .cost-total-value{font-size:22px;font-weight:800;color:#b45309;}
-.cost-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.cost-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
 .cost-metric{text-align:center;}
 .cost-metric-v{font-size:13px;font-weight:700;color:#334155;}
 .cost-metric-l{font-size:9px;color:#94a3b8;margin-top:2px;}
@@ -785,6 +785,10 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         <input type="number" id="costLoad" value="2.5" step="0.5" oninput="calcTransportCost()">
       </div>
       <div class="cost-field">
+        <label>装载 方(m³)</label>
+        <input type="number" id="costVolume" value="16" step="1" oninput="calcTransportCost()">
+      </div>
+      <div class="cost-field" style="grid-column:1/3;">
         <label>单趟固定成本 元</label>
         <input type="number" id="costFixed" value="0" step="50" oninput="calcTransportCost()">
       </div>
@@ -795,12 +799,14 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         <span class="cost-total-value" id="costTotalValue">-</span>
       </div>
       <div class="cost-metrics">
-        <div class="cost-metric"><div class="cost-metric-v" id="costKm">-</div><div class="cost-metric-l">总里程km</div></div>
+        <div class="cost-metric"><div class="cost-metric-v" id="costKm">-</div><div class="cost-metric-l">总里程</div></div>
         <div class="cost-metric"><div class="cost-metric-v" id="costEnergy">-</div><div class="cost-metric-l" id="costEnergyLabel">油费</div></div>
         <div class="cost-metric"><div class="cost-metric-v" id="costTolls">-</div><div class="cost-metric-l">过路费</div></div>
-        <div class="cost-metric"><div class="cost-metric-v" id="costPerTon">-</div><div class="cost-metric-l">元/吨</div></div>
-        <div class="cost-metric"><div class="cost-metric-v" id="costPerTonKm">-</div><div class="cost-metric-l">元/吨·公里</div></div>
         <div class="cost-metric"><div class="cost-metric-v" id="costSegCount">-</div><div class="cost-metric-l">路段数</div></div>
+        <div class="cost-metric"><div class="cost-metric-v" id="costPerTon">-</div><div class="cost-metric-l">元/吨</div></div>
+        <div class="cost-metric"><div class="cost-metric-v" id="costPerM3">-</div><div class="cost-metric-l">元/方</div></div>
+        <div class="cost-metric"><div class="cost-metric-v" id="costPerTonKm">-</div><div class="cost-metric-l">元/吨km</div></div>
+        <div class="cost-metric"><div class="cost-metric-v" id="costPerM3Km">-</div><div class="cost-metric-l">元/方km</div></div>
       </div>
     </div>
     <div>
@@ -2860,11 +2866,11 @@ function closeRouteSelector() {
 
 /* ===== 运输成本测算 ===== */
 const VEHICLE_TYPES = [
-  {key:'4.2m', label:'4.2米 轻卡', fuel:12, elec:30, load:2.5},
-  {key:'6.8m', label:'6.8米 中卡', fuel:18, elec:55, load:8},
-  {key:'9.6m', label:'9.6米 货车', fuel:25, elec:80, load:15},
-  {key:'13m', label:'13米 半挂', fuel:30, elec:0, load:30},
-  {key:'17.5m', label:'17.5米 大板', fuel:33, elec:0, load:30}
+  {key:'4.2m', label:'4.2米轻卡 · 16方', fuel:12, elec:30, load:2.5, volume:16},
+  {key:'6.8m', label:'6.8米中卡 · 38方', fuel:18, elec:55, load:8, volume:38},
+  {key:'9.6m', label:'9.6米货车 · 55方', fuel:25, elec:80, load:15, volume:55},
+  {key:'13m', label:'13米半挂 · 75方', fuel:30, elec:0, load:30, volume:75},
+  {key:'17.5m', label:'17.5米大板 · 120方', fuel:33, elec:0, load:30, volume:120}
 ];
 let costPower = 'fuel';
 
@@ -2885,6 +2891,7 @@ function onCostVehicleChange() {
   if(!v) return;
   document.getElementById('costConsume').value = (costPower === 'fuel' ? v.fuel : (v.elec || v.fuel));
   document.getElementById('costLoad').value = v.load;
+  document.getElementById('costVolume').value = v.volume;
   calcTransportCost();
 }
 
@@ -2925,6 +2932,7 @@ function calcTransportCost() {
   const consume = parseFloat(document.getElementById('costConsume').value) || 0;
   const price = parseFloat(document.getElementById('costPrice').value) || 0;
   const load = parseFloat(document.getElementById('costLoad').value) || 0;
+  const volume = parseFloat(document.getElementById('costVolume').value) || 0;
   const fixed = parseFloat(document.getElementById('costFixed').value) || 0;
   let totalKm = 0, totalEnergy = 0, totalTolls = 0;
   const rows = [];
@@ -2942,7 +2950,9 @@ function calcTransportCost() {
   document.getElementById('costTotalValue').textContent = fmtMoney(totalCost) + ' 元';
   document.getElementById('costSegCount').textContent = routeSegments.length;
   document.getElementById('costPerTon').textContent = load > 0 ? fmtMoney(totalCost / load) : '-';
+  document.getElementById('costPerM3').textContent = volume > 0 ? fmtMoney(totalCost / volume) : '-';
   document.getElementById('costPerTonKm').textContent = (load > 0 && totalKm > 0) ? (totalCost / (load * totalKm)).toFixed(3) : '-';
+  document.getElementById('costPerM3Km').textContent = (volume > 0 && totalKm > 0) ? (totalCost / (volume * totalKm)).toFixed(3) : '-';
   const tb = document.getElementById('costTableBody');
   if(rows.length === 0) {
     tb.innerHTML = '<tr><td colspan="5" class="cost-empty">请先规划路线</td></tr>';
