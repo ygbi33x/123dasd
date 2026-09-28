@@ -1093,16 +1093,21 @@ function doGeocodeAddress(address, addToRoute) {
       } else {
         // 仅定位
         map.setZoomAndCenter(15, [lng, lat]);
-        // 临时标记
+        // 临时标记（替换旧标记，同时关闭其信息窗）
         if(window._tempAddrMarker) map.remove(window._tempAddrMarker);
+        if(tempInfoWindow) { tempInfoWindow.close(); tempInfoWindow = null; }
         window._tempAddrMarker = new AMap.Marker({
           position: [lng, lat],
-          content: '<div style="background:rgba(239,68,68,0.8);color:#fff;border:2px solid #fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3);">📍</div>',
+          content: '<div style="background:rgba(239,68,68,0.8);color:#fff;border:2px solid #fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer;">📍</div>',
           offset: new AMap.Pixel(-12, -12),
           zIndex: 500
         });
         window._tempAddrMarker.setMap(map);
-        tipDom.innerHTML = "📍 已定位到：<b>" + addrName + "</b>（点击+添加到路线）";
+        // 点击定位点：弹窗可"添加到路线"或"删除该点"
+        window._tempAddrMarker.on('click', (function(lng, lat, addrName, province, fullAddr) {
+          return function() { showTempAddrInfo(lng, lat, addrName, province, fullAddr); };
+        })(lng, lat, addrName, province, loc.formattedAddress || address));
+        tipDom.innerHTML = "📍 已定位到：<b>" + addrName + "</b>（点击标记可添加到路线或删除）";
       }
       searchKeyword = '';
       document.getElementById('searchInput').value = '';
@@ -1655,6 +1660,44 @@ function addClickedPointToRoute(lng, lat, name, province) {
 function closeTempClick() {
   if(tempClickMarker) { map.remove(tempClickMarker); tempClickMarker = null; }
   if(tempInfoWindow) { tempInfoWindow.close(); tempInfoWindow = null; }
+}
+
+// ===== 筛选/搜索"仅定位"产生的临时点：可添加到路线或删除 =====
+function showTempAddrInfo(lng, lat, name, province, addr) {
+  if(tempInfoWindow) tempInfoWindow.close();
+  const safeName = String(name).replace(/'/g, "\\'");
+  const safeProv = String(province || '').replace(/'/g, "\\'");
+  const safeAddr = String(addr || '').replace(/'/g, "\\'");
+  const content = '<div style="padding:10px;min-width:220px;max-width:300px;">' +
+    '<div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:4px;">📍 ' + name + '</div>' +
+    '<div style="font-size:12px;color:#475569;line-height:1.5;margin-bottom:10px;">' + (addr || province || '') + '</div>' +
+    '<div style="display:flex;gap:6px;">' +
+    '<button onclick="addTempAddrToRoute(' + lng + ',' + lat + ',\'' + safeName + '\',\'' + safeProv + '\',\'' + safeAddr + '\')" style="flex:1;padding:7px 10px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">添加到路线</button>' +
+    '<button onclick="removeTempAddrMarker()" style="padding:7px 10px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">删除该点</button>' +
+    '</div></div>';
+  tempInfoWindow = new AMap.InfoWindow({ content: content, offset: new AMap.Pixel(0, -20) });
+  tempInfoWindow.open(map, [lng, lat]);
+}
+
+function removeTempAddrMarker() {
+  if(window._tempAddrMarker) { map.remove(window._tempAddrMarker); window._tempAddrMarker = null; }
+  if(tempInfoWindow) { tempInfoWindow.close(); tempInfoWindow = null; }
+  tipDom.innerHTML = "🗑️ 已删除定位点";
+}
+
+function addTempAddrToRoute(lng, lat, name, province, addr) {
+  const virtualCity = {
+    name: name.length > 25 ? name.substring(0, 25) + '...' : name,
+    province: province || '',
+    region: '',
+    lng: lng,
+    lat: lat,
+    isCenter: false,
+    isAddress: true,
+    address: addr
+  };
+  addPoint(virtualCity);
+  removeTempAddrMarker();
 }
 
 // Panel拖动
@@ -5055,6 +5098,10 @@ function clearRoute() {
   isPlanningRoute = false;
   needsReplan = false;
   if(planDebounceTimer) { clearTimeout(planDebounceTimer); planDebounceTimer = null; }
+  // 同时清理"仅定位"产生的临时点
+  if(window._tempAddrMarker) { map.remove(window._tempAddrMarker); window._tempAddrMarker = null; }
+  if(tempClickMarker) { map.remove(tempClickMarker); tempClickMarker = null; }
+  if(tempInfoWindow) { tempInfoWindow.close(); tempInfoWindow = null; }
   routePoints.forEach(function(p) {
     if(p.marker) map.remove(p.marker);
     if(p.label) map.remove(p.label);
