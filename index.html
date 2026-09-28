@@ -38,6 +38,13 @@ button{font-family:inherit;}
 .route-collapse-btn{font-size:11px;color:#64748b;cursor:pointer;padding:2px 6px;border-radius:4px;transition:.15s;font-weight:600;}
 .route-collapse-btn:hover{color:#334155;background:rgba(0,0,0,.05);}
 .route-points.collapsed{display:none;}
+.route-more-wrap{position:relative;}
+.route-more-btn{font-size:15px;line-height:1;color:#64748b;cursor:pointer;padding:0 7px;border-radius:4px;transition:.15s;font-weight:700;}
+.route-more-btn:hover{color:#334155;background:rgba(0,0,0,.05);}
+.route-more-menu{display:none;position:absolute;top:calc(100% + 6px);right:0;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(0,0,0,.08);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.14);z-index:300;min-width:132px;overflow:hidden;animation:menuFadeIn .2s ease;}
+.route-more-menu.open{display:block;}
+.route-more-item{padding:8px 14px;font-size:11px;color:#334155;cursor:pointer;font-weight:600;white-space:nowrap;}
+.route-more-item:hover{background:rgba(59,130,246,.08);color:#2563eb;}
 .province-tabs-collapsed{max-height:48px;overflow:hidden;}
 .route-optimize{font-size:10px;color:#3b82f6;cursor:pointer;font-weight:600;padding:3px 8px;border:1px solid rgba(59,130,246,.3);border-radius:6px;background:rgba(59,130,246,.05);transition:.15s;}
 .route-optimize:hover{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.5);}
@@ -442,9 +449,14 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
         <span>已选路线（<span id="routeCount">0</span>个点）</span>
         <div class="route-bar-actions">
           <span class="route-collapse-btn" id="routeCollapseBtn" onclick="toggleRouteBar()">▼</span>
-          <span class="route-optimize" id="addAllCentersBtn" onclick="addAllCentersAsRoutePoints()" title="一键添加全部77个中心城市为路线点（将触发批量规划，耗时较长）">⭐ 全选中心</span>
-          <span class="route-optimize" id="optimizeBtn" onclick="optimizeRouteOrder()" title="自动优化访问顺序">🔄 优化</span>
-          <span class="route-optimize" id="schemeBtn" onclick="toggleSchemePanel()" title="保存当前路线为方案，多方案对比">💾 方案</span>
+          <div class="route-more-wrap">
+            <span class="route-more-btn" id="routeMoreBtn" onclick="toggleRouteMore(event)" title="更多操作">⋯</span>
+            <div class="route-more-menu" id="routeMoreMenu">
+              <div class="route-more-item" onclick="addAllCentersAsRoutePoints()">⭐ 全选中心</div>
+              <div class="route-more-item" id="optimizeBtn">🔄 优化顺序</div>
+              <div class="route-more-item" onclick="toggleSchemePanel()">💾 路线方案</div>
+            </div>
+          </div>
           <span class="route-bar-clear" id="clearRouteBtn">清空</span>
         </div>
       </div>
@@ -512,9 +524,9 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
       <!-- 行程地点添加（左侧栏） -->
       <div onclick="toggleSidebarItinerary()" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px 6px;cursor:pointer;user-select:none;">
         <span style="font-size:11px;font-weight:700;color:#374151;letter-spacing:.3px;">🗺️ 添加行程地点</span>
-        <span id="sidebarItineraryArrow" style="font-size:11px;color:#6b7280;">▲ 收起</span>
+        <span id="sidebarItineraryArrow" style="font-size:11px;color:#6b7280;">▼ 展开</span>
       </div>
-      <div id="sidebarItineraryContent" style="padding:0 14px 10px;background:rgba(255,255,255,.4);border-bottom:1px solid rgba(0,0,0,.04);">
+      <div id="sidebarItineraryContent" style="display:none;padding:0 14px 10px;background:rgba(255,255,255,.4);border-bottom:1px solid rgba(0,0,0,.04);">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;">
           <span style="font-size:11px;color:#64748b;font-weight:600;white-space:nowrap;">加入到</span>
           <select id="iabDaySelect" onchange="onIabDayChange()" style="flex:1;min-width:0;padding:6px 8px;border:1px solid rgba(0,0,0,.1);border-radius:8px;font-size:11px;background:#fff;color:#334155;outline:none;cursor:pointer;"></select>
@@ -565,9 +577,9 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
       <div class="filter-section">
         <div class="filter-label" style="display:flex;justify-content:space-between;align-items:center;">
           <span>省区</span>
-          <span class="province-collapse-btn" id="provinceCollapseBtn" onclick="toggleProvinceFilter()" style="cursor:pointer;font-size:12px;color:#6b7280;">▼ 收起</span>
+          <span class="province-collapse-btn" id="provinceCollapseBtn" onclick="toggleProvinceFilter()" style="cursor:pointer;font-size:12px;color:#6b7280;">▶ 展开</span>
         </div>
-        <div class="filter-tabs" id="provinceTabs"></div>
+        <div class="filter-tabs province-tabs-collapsed" id="provinceTabs"></div>
       </div>
     </div>
     <div class="city-list" id="cityList"></div>
@@ -585,7 +597,6 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <span id="trafficIndicator" onclick="toggleTraffic()" style="padding:4px 12px;border-radius:20px;color:#fff;font-size:11px;font-weight:700;background:linear-gradient(135deg,#64748b 0%,#475569 100%);box-shadow:0 2px 8px rgba(100,116,139,.3);cursor:pointer;transition:.2s;user-select:none;" title="点击切换实时路况">🚦 路况关</span>
         </div>
         <div style="display:flex;gap:6px;align-items:center;">
-          <button class="refresh-route-btn" onclick="refreshRouteTraffic()" title="刷新路线路况">🔄</button>
           <button class="reset-icon-btn" onclick="resetAll()" title="全部重置">🗑️</button>
           <button class="fullscreen-icon-btn" onclick="toggleBrowserFullscreen()" title="一键全屏">⛶</button>
           <button class="route-selector-btn" id="routeSelectorBtn" onclick="toggleRouteSelector()" title="路线选择器" style="display:none;">🛣️</button>
@@ -604,6 +615,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
               <div class="more-item" onclick="openItineraryPanel();toggleMoreMenu()">🗺️ 行程规划</div>
               <div class="more-item" onclick="toggleAvoidTraffic();toggleMoreMenu()" id="avoidTrafficMenuItem">🚗 避开拥堵：关</div>
               <div class="more-item" onclick="toggleCenterViaCapital();toggleMoreMenu()" id="centerViaCapitalMenuItem">🔄 中心中转省会：关</div>
+              <div class="more-item" onclick="refreshRouteTraffic();toggleMoreMenu()">🔄 刷新路线路况</div>
               <div class="more-item" onclick="exportRouteCSV();toggleMoreMenu()">📊 导出路线数据</div>
               <div class="more-item" onclick="shareRouteLink();toggleMoreMenu()">🔗 复制分享链接</div>
               <div class="more-item" onclick="exportMapImage();toggleMoreMenu()">📷 导出图片</div>
@@ -1788,6 +1800,29 @@ function toggleRouteBar() {
     btn.title = '收起';
   }
 }
+
+// 已选路线"更多操作"小菜单
+function toggleRouteMore(e) {
+  if(e) e.stopPropagation();
+  const menu = document.getElementById('routeMoreMenu');
+  if(menu) menu.classList.toggle('open');
+}
+function closeRouteMore() {
+  const menu = document.getElementById('routeMoreMenu');
+  if(menu) menu.classList.remove('open');
+}
+document.addEventListener('click', function(e) {
+  const wrap = document.querySelector('.route-more-wrap');
+  const menu = document.getElementById('routeMoreMenu');
+  if(menu && menu.classList.contains('open') && wrap && !wrap.contains(e.target)) {
+    menu.classList.remove('open');
+  }
+});
+// 点选菜单内任意项后自动收起
+(function() {
+  const menu = document.getElementById('routeMoreMenu');
+  if(menu) menu.addEventListener('click', function() { closeRouteMore(); });
+})();
 
 // 收起/展开省区筛选（收起后只留两行）
 function toggleProvinceFilter() {
@@ -4358,7 +4393,7 @@ function resetItinerary() {
 }
 
 // ========== 左侧栏：行程地点添加 ==========
-let sidebarItineraryOpen = true;
+let sidebarItineraryOpen = false;
 function toggleSidebarItinerary() {
   sidebarItineraryOpen = !sidebarItineraryOpen;
   const c = document.getElementById('sidebarItineraryContent');
