@@ -258,6 +258,39 @@ button{font-family:inherit;}
 .route-compare-btn:hover{background:rgba(59,130,246,.12);}
 .route-compare-btn.active{background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);color:#fff;border-color:transparent;box-shadow:0 2px 8px rgba(59,130,246,.3);}
 #routeSelectorList{display:flex;flex-direction:column;gap:8px;}
+/* ===== 运输成本测算弹窗 ===== */
+#costModal{position:absolute;right:16px;top:90px;width:340px;max-width:90vw;max-height:80vh;background:rgba(255,255,255,.97);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid rgba(0,0,0,.08);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.15);z-index:230;display:none;overflow:hidden;flex-direction:column;animation:panelFadeIn .25s cubic-bezier(.4,0,.2,1);}
+#costModal.open{display:flex;}
+.cost-head{padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(59,130,246,.08));}
+.cost-title{font-size:14px;font-weight:800;flex:1;letter-spacing:.5px;color:#b45309;}
+.cost-close{cursor:pointer;color:#64748b;font-size:18px;padding:3px 8px;border-radius:6px;transition:.15s;font-weight:700;}
+.cost-close:hover{color:#1e293b;background:rgba(0,0,0,.06);}
+.cost-body{overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px;}
+.cost-body::-webkit-scrollbar{width:5px;}
+.cost-body::-webkit-scrollbar-thumb{background:rgba(245,158,11,.35);border-radius:3px;}
+.cost-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.cost-field{display:flex;flex-direction:column;gap:3px;}
+.cost-field > label{font-size:10px;color:#94a3b8;font-weight:600;}
+.cost-field input,.cost-field select{padding:6px 8px;border:1px solid rgba(0,0,0,.12);border-radius:8px;font-size:12px;outline:none;background:#fff;color:#334155;}
+.cost-field input:focus,.cost-field select:focus{border-color:#f59e0b;}
+.cost-seg-tabs{display:flex;gap:4px;background:#f1f5f9;padding:3px;border-radius:8px;}
+.cost-seg-tab{flex:1;text-align:center;font-size:11px;padding:5px;border-radius:6px;cursor:pointer;font-weight:600;color:#64748b;transition:.15s;}
+.cost-seg-tab.active{background:#fff;color:#b45309;box-shadow:0 1px 3px rgba(0,0,0,.12);}
+.cost-summary{background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a;border-radius:12px;padding:12px;}
+.cost-total{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;}
+.cost-total-label{font-size:12px;color:#92400e;font-weight:700;}
+.cost-total-value{font-size:22px;font-weight:800;color:#b45309;}
+.cost-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.cost-metric{text-align:center;}
+.cost-metric-v{font-size:13px;font-weight:700;color:#334155;}
+.cost-metric-l{font-size:9px;color:#94a3b8;margin-top:2px;}
+.cost-table{width:100%;border-collapse:collapse;font-size:10px;}
+.cost-table th{background:#f8fafc;color:#64748b;font-weight:600;padding:5px 4px;text-align:right;position:sticky;top:0;}
+.cost-table td{padding:5px 4px;border-top:1px solid rgba(0,0,0,.05);text-align:right;color:#334155;}
+.cost-table td.seg-name{text-align:left;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;}
+.cost-table tr.total td{font-weight:800;background:#fefce8;color:#713f12;}
+.cost-note{font-size:9px;color:#a16207;line-height:1.5;margin-top:5px;}
+.cost-empty{text-align:center;color:#94a3b8;font-size:12px;padding:20px;}
 .route-option-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid rgba(0,0,0,.08);border-radius:10px;cursor:pointer;transition:.15s;background:rgba(255,255,255,.6);}
 .route-option-item:hover{border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.04);transform:translateX(2px);}
 .route-option-item.selected{border-color:#3b82f6;background:linear-gradient(135deg,rgba(59,130,246,.08) 0%,rgba(14,165,233,.08) 100%);box-shadow:0 2px 10px rgba(59,130,246,.15);}
@@ -333,6 +366,7 @@ button{font-family:inherit;}
   #panel{right:8px;left:8px;bottom:8px;top:auto;width:auto;max-width:none;max-height:50vh;border-radius:12px;}
   #distPanel{right:8px;left:8px;bottom:8px;top:auto;width:auto;max-width:none;max-height:55vh;border-radius:12px;}
   #routeSelectorModal{right:8px;left:8px;bottom:8px;top:auto;width:auto;max-width:none;max-height:55vh;border-radius:12px;}
+  #costModal{right:8px;left:8px;width:auto;max-width:none;top:70px;max-height:70vh;}
   
   .city-item{padding:6px 10px;font-size:11px;}
   .city-province{font-size:9px;}
@@ -616,6 +650,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
               <div class="more-item" onclick="toggleAvoidTraffic();toggleMoreMenu()" id="avoidTrafficMenuItem">🚗 避开拥堵：关</div>
               <div class="more-item" onclick="toggleCenterViaCapital();toggleMoreMenu()" id="centerViaCapitalMenuItem">🔄 中心中转省会：关</div>
               <div class="more-item" onclick="refreshRouteTraffic();toggleMoreMenu()">🔄 刷新路线路况</div>
+              <div class="more-item" onclick="openCostModal();toggleMoreMenu()">⛽ 运输成本测算</div>
               <div class="more-item" onclick="exportRouteCSV();toggleMoreMenu()">📊 导出路线数据</div>
               <div class="more-item" onclick="shareRouteLink();toggleMoreMenu()">🔗 复制分享链接</div>
               <div class="more-item" onclick="exportMapImage();toggleMoreMenu()">📷 导出图片</div>
@@ -715,6 +750,67 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
       <span class="route-compare-btn" id="compareBtn" onclick="toggleShowAllRoutes()">📊 对比：关</span>
     </div>
     <div id="routeSelectorList"></div>
+  </div>
+</div>
+
+<!-- 运输成本测算弹窗 -->
+<div id="costModal">
+  <div class="cost-head">
+    <span class="cost-title">⛽ 运输成本测算</span>
+    <span class="cost-close" onclick="closeCostModal()" title="关闭">&#10005;</span>
+  </div>
+  <div class="cost-body">
+    <div class="cost-grid">
+      <div class="cost-field" style="grid-column:1/3;">
+        <label>车型</label>
+        <select id="costVehicle" onchange="onCostVehicleChange()"></select>
+      </div>
+      <div class="cost-field" style="grid-column:1/3;">
+        <label>动力类型</label>
+        <div class="cost-seg-tabs">
+          <div class="cost-seg-tab active" id="costPowerFuel" onclick="setCostPower('fuel')">燃油</div>
+          <div class="cost-seg-tab" id="costPowerElec" onclick="setCostPower('elec')">电动</div>
+        </div>
+      </div>
+      <div class="cost-field">
+        <label id="costConsumeLabel">油耗 L/100km</label>
+        <input type="number" id="costConsume" value="12" step="0.5" oninput="calcTransportCost()">
+      </div>
+      <div class="cost-field">
+        <label id="costPriceLabel">油价 元/L</label>
+        <input type="number" id="costPrice" value="7.5" step="0.1" oninput="calcTransportCost()">
+      </div>
+      <div class="cost-field">
+        <label>载重 吨</label>
+        <input type="number" id="costLoad" value="2.5" step="0.5" oninput="calcTransportCost()">
+      </div>
+      <div class="cost-field">
+        <label>单趟固定成本 元</label>
+        <input type="number" id="costFixed" value="0" step="50" oninput="calcTransportCost()">
+      </div>
+    </div>
+    <div class="cost-summary">
+      <div class="cost-total">
+        <span class="cost-total-label">总运输成本</span>
+        <span class="cost-total-value" id="costTotalValue">-</span>
+      </div>
+      <div class="cost-metrics">
+        <div class="cost-metric"><div class="cost-metric-v" id="costKm">-</div><div class="cost-metric-l">总里程km</div></div>
+        <div class="cost-metric"><div class="cost-metric-v" id="costEnergy">-</div><div class="cost-metric-l" id="costEnergyLabel">油费</div></div>
+        <div class="cost-metric"><div class="cost-metric-v" id="costTolls">-</div><div class="cost-metric-l">过路费</div></div>
+        <div class="cost-metric"><div class="cost-metric-v" id="costPerTon">-</div><div class="cost-metric-l">元/吨</div></div>
+        <div class="cost-metric"><div class="cost-metric-v" id="costPerTonKm">-</div><div class="cost-metric-l">元/吨·公里</div></div>
+        <div class="cost-metric"><div class="cost-metric-v" id="costSegCount">-</div><div class="cost-metric-l">路段数</div></div>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#334155;margin-bottom:6px;">分段成本明细</div>
+      <table class="cost-table">
+        <thead><tr><th style="text-align:left;">路段</th><th>里程</th><th id="costThEnergy">油费</th><th>过路费</th><th>合计</th></tr></thead>
+        <tbody id="costTableBody"></tbody>
+      </table>
+      <div class="cost-note" id="costNote"></div>
+    </div>
   </div>
 </div>
 
@@ -1201,6 +1297,7 @@ window.onload = function() {
   CAPITALS = CITIES.filter(function(c) { return CAPITAL_NAMES.indexOf(c.name) >= 0; });
   renderCityList();
   buildIabDaySelect();
+  initCostModal();
   loadRouteFromURL();
   // 无分享链接时，从本地存储恢复上次未完成的路线
   if(!window.location.hash || window.location.hash.indexOf('#route=') < 0) {
@@ -2759,6 +2856,106 @@ function closeRouteSelector() {
   if(modal) modal.classList.remove('open');
   const btn = document.getElementById('routeSelectorBtn');
   if(btn) btn.classList.remove('active');
+}
+
+/* ===== 运输成本测算 ===== */
+const VEHICLE_TYPES = [
+  {key:'4.2m', label:'4.2米 轻卡', fuel:12, elec:30, load:2.5},
+  {key:'6.8m', label:'6.8米 中卡', fuel:18, elec:55, load:8},
+  {key:'9.6m', label:'9.6米 货车', fuel:25, elec:80, load:15},
+  {key:'13m', label:'13米 半挂', fuel:30, elec:0, load:30},
+  {key:'17.5m', label:'17.5米 大板', fuel:33, elec:0, load:30}
+];
+let costPower = 'fuel';
+
+function initCostModal() {
+  const sel = document.getElementById('costVehicle');
+  if(!sel) return;
+  sel.innerHTML = '';
+  VEHICLE_TYPES.forEach(function(v) {
+    const o = document.createElement('option');
+    o.value = v.key; o.textContent = v.label;
+    sel.appendChild(o);
+  });
+}
+
+function onCostVehicleChange() {
+  const key = document.getElementById('costVehicle').value;
+  const v = VEHICLE_TYPES.find(function(x){ return x.key === key; });
+  if(!v) return;
+  document.getElementById('costConsume').value = (costPower === 'fuel' ? v.fuel : (v.elec || v.fuel));
+  document.getElementById('costLoad').value = v.load;
+  calcTransportCost();
+}
+
+function setCostPower(p) {
+  costPower = p;
+  document.getElementById('costPowerFuel').classList.toggle('active', p === 'fuel');
+  document.getElementById('costPowerElec').classList.toggle('active', p === 'elec');
+  document.getElementById('costConsumeLabel').textContent = p === 'fuel' ? '油耗 L/100km' : '电耗 kWh/100km';
+  document.getElementById('costPriceLabel').textContent = p === 'fuel' ? '油价 元/L' : '电价 元/kWh';
+  document.getElementById('costEnergyLabel').textContent = p === 'fuel' ? '油费' : '电费';
+  document.getElementById('costThEnergy').textContent = p === 'fuel' ? '油费' : '电费';
+  document.getElementById('costPrice').value = p === 'fuel' ? 7.5 : 1.2;
+  const v = VEHICLE_TYPES.find(function(x){ return x.key === document.getElementById('costVehicle').value; });
+  if(v) document.getElementById('costConsume').value = (p === 'fuel' ? v.fuel : (v.elec || v.fuel));
+  calcTransportCost();
+}
+
+function openCostModal() {
+  if(!routeSegments || routeSegments.length === 0) {
+    tipDom.innerHTML = '⚠️ 请先规划路线，再测算运输成本';
+    return;
+  }
+  document.getElementById('costModal').classList.add('open');
+  calcTransportCost();
+}
+
+function closeCostModal() {
+  document.getElementById('costModal').classList.remove('open');
+}
+
+function fmtMoney(n) {
+  if(!isFinite(n)) return '-';
+  return Math.round(n).toLocaleString('zh-CN');
+}
+
+function calcTransportCost() {
+  if(!document.getElementById('costModal')) return;
+  const consume = parseFloat(document.getElementById('costConsume').value) || 0;
+  const price = parseFloat(document.getElementById('costPrice').value) || 0;
+  const load = parseFloat(document.getElementById('costLoad').value) || 0;
+  const fixed = parseFloat(document.getElementById('costFixed').value) || 0;
+  let totalKm = 0, totalEnergy = 0, totalTolls = 0;
+  const rows = [];
+  routeSegments.forEach(function(seg) {
+    const km = (seg.route && seg.route.distance ? seg.route.distance : 0) / 1000;
+    const tolls = (seg.route && typeof seg.route.tolls === 'number') ? seg.route.tolls : 0;
+    const energy = km * consume / 100 * price;
+    totalKm += km; totalEnergy += energy; totalTolls += tolls;
+    rows.push({name: seg.startCity.name + '→' + seg.endCity.name, km: km, energy: energy, tolls: tolls, segTotal: energy + tolls});
+  });
+  const totalCost = totalEnergy + totalTolls + fixed;
+  document.getElementById('costKm').textContent = totalKm.toFixed(0);
+  document.getElementById('costEnergy').textContent = fmtMoney(totalEnergy);
+  document.getElementById('costTolls').textContent = fmtMoney(totalTolls);
+  document.getElementById('costTotalValue').textContent = fmtMoney(totalCost) + ' 元';
+  document.getElementById('costSegCount').textContent = routeSegments.length;
+  document.getElementById('costPerTon').textContent = load > 0 ? fmtMoney(totalCost / load) : '-';
+  document.getElementById('costPerTonKm').textContent = (load > 0 && totalKm > 0) ? (totalCost / (load * totalKm)).toFixed(3) : '-';
+  const tb = document.getElementById('costTableBody');
+  if(rows.length === 0) {
+    tb.innerHTML = '<tr><td colspan="5" class="cost-empty">请先规划路线</td></tr>';
+    document.getElementById('costNote').textContent = '';
+    return;
+  }
+  let html = '';
+  rows.forEach(function(r) {
+    html += '<tr><td class="seg-name" title="' + r.name + '">' + r.name + '</td><td>' + r.km.toFixed(1) + '</td><td>' + fmtMoney(r.energy) + '</td><td>' + fmtMoney(r.tolls) + '</td><td>' + fmtMoney(r.segTotal) + '</td></tr>';
+  });
+  html += '<tr class="total"><td class="seg-name">合计</td><td>' + totalKm.toFixed(1) + '</td><td>' + fmtMoney(totalEnergy) + '</td><td>' + fmtMoney(totalTolls) + '</td><td>' + fmtMoney(totalCost) + '</td></tr>';
+  tb.innerHTML = html;
+  document.getElementById('costNote').textContent = '合计已含单趟固定成本 ' + fmtMoney(fixed) + ' 元；过路费来自高德驾车规划，直线兜底段过路费按 0 计。';
 }
 
 // 切换路线选择器显示/隐藏
