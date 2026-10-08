@@ -2001,35 +2001,7 @@ function toggleZoneMode(){
   }
 }
 
-function buildZoneLayer(){
-  if(!map){ tipDom.innerHTML='地图尚未加载完成'; return; }
-  cityMarkers.forEach(function(m){ m.hide(); });
-  zoneInfoWindow = zoneInfoWindow || new AMap.InfoWindow({offset:new AMap.Pixel(0,-14),autoMove:true});
-  Object.keys(REAL_ZONE).forEach(function(name){
-    var z=REAL_ZONE[name];
-    var col=z.sp?'#cbd5e1':zoneColorFor(name);
-    var arr=[];
-    z.rings.forEach(function(ringset){
-      var poly=new AMap.Polygon({
-        path:ringset, fillColor:col, fillOpacity:z.sp?0.12:0.22,
-        strokeColor:'#94a3b8', strokeWeight:z.sp?0.3:0.4, strokeOpacity:0.3,
-        cursor:'pointer', zIndex:40
-      });
-      poly.on('click', function(){ onSelectCenter(name); });
-      poly.setMap(map); arr.push(poly);
-    });
-    zonePolygons[name]=arr;
-    var cm=new AMap.CircleMarker({
-      center:[z.lng,z.lat], radius:z.sp?3:5,
-      fillColor:z.sp?'#94a3b8':'#1e3a8a', fillOpacity:0.95,
-      strokeColor:'#ffffff', strokeWeight:z.sp?1:2, strokeOpacity:1,
-      cursor:'pointer', zIndex:200
-    });
-    cm.on('click', function(){ onSelectCenter(name); });
-    cm.setMap(map); zoneCenterMarkers[name]=cm;
-  });
-  tipDom.innerHTML='已按 '+Object.keys(REAL_ZONE).length+' 个中心划分（真实行政边界），点击中心区块查看其分公司';
-}
+
 
 function setZoneHighlight(name){
   Object.keys(zonePolygons).forEach(function(k){
