@@ -1739,7 +1739,8 @@ function zoneEscapeHtml(s){
 // ===== 真实中心服务区（真实坐标 + 真实行政边界，按中心 dissolve 归并）=====
 var REAL_ZONE=null;
 function loadRealZone(cb){
-  fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/real_zone_int.json',{cache:'no-store'})
+  fetch('https://ygbi33x.github.io/123dasd/real_zone_int.json',{cache:'no-store'})
+  .catch(function(){ return fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/real_zone_int.json',{cache:'no-store'}); })
   .then(function(r){ return r.json(); })
   .then(function(j){
     Object.keys(j).forEach(function(c){
@@ -1758,7 +1759,8 @@ function loadRealZone(cb){
 
 var DISTRICT_DATA=null;
 function loadDistrictData(){
-  fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/districts_int.json',{cache:'no-store'})
+  fetch('https://ygbi33x.github.io/123dasd/districts_int.json',{cache:'no-store'})
+  .catch(function(){ return fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/districts_int.json',{cache:'no-store'}); })
   .then(function(r){ return r.json(); })
   .then(function(j){ DISTRICT_DATA=j; if(window.zeName){ zeFill(); } if(window.zePanel && zePanel.style.display!=='none') zeFill(); })
   .catch(function(e){ DISTRICT_DATA=null; console.error('districts load fail', e); });
