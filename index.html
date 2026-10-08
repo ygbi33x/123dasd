@@ -245,7 +245,7 @@ button{font-family:inherit;}
 /* ===== 路线选择器浮动弹窗 ===== */
 #routeSelectorModal{position:absolute;right:16px;top:110px;width:300px;max-width:88vw;max-height:55vh;background:rgba(255,255,255,.95);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid rgba(0,0,0,.08);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.15);z-index:220;display:none;overflow:hidden;flex-direction:column;animation:panelFadeIn .25s cubic-bezier(.4,0,.2,1);}
 #routeSelectorModal.open{display:flex;}
-#routeSelectorHead{padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,rgba(14,165,233,.08) 0%,rgba(59,130,246,.08) 100%);}
+#routeSelectorHead{padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,rgba(14,165,233,.08) 0%,rgba(59,130,246,.08) 100%);cursor:move;user-select:none}
 #routeSelectorTitle{font-size:14px;font-weight:800;background:linear-gradient(135deg,#0ea5e9 0%,#3b82f6 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;flex:1;letter-spacing:.5px;}
 #routeSelectorClose{cursor:pointer;color:#64748b;font-size:18px;padding:3px 8px;border-radius:6px;transition:.15s;font-weight:700;}
 #routeSelectorClose:hover{color:#1e293b;background:rgba(0,0,0,.06);}
@@ -481,7 +481,7 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
 .zi-btn{background:#f1f5f9;border:1px solid #e2e8f0;color:#334155;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer}
 .zi-btn:hover{background:#e2e8f0}
 #zoneEditPanel{position:fixed;right:14px;top:64px;width:340px;max-height:78vh;display:none;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 28px rgba(15,23,42,.16);z-index:1200;font-family:system-ui,sans-serif;overflow:hidden}
-#zoneEditPanel .ze-head{padding:8px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:13px;display:flex;justify-content:space-between;align-items:center;color:#0f172a}
+#zoneEditPanel .ze-head{padding:8px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:13px;display:flex;justify-content:space-between;align-items:center;color:#0f172a;cursor:move;user-select:none}
 #zoneEditPanel .ze-cols{display:flex;height:calc(78vh - 130px)}
 #zoneEditPanel .ze-col{flex:1;min-width:0;display:flex;flex-direction:column;border-right:1px solid #eef2f7}
 #zoneEditPanel .ze-col:last-child{border-right:none}
@@ -1323,6 +1323,11 @@ const tipDom = document.getElementById('tip');
 const panel = document.getElementById('panel');
 
 function bootApp() {
+  var rs=document.getElementById('routeSelectorModal');
+  if(rs) makeDraggable(rs, '#routeSelectorHead', '#routeSelectorClose');
+  var cm=document.getElementById('costModal');
+  if(cm) makeDraggable(cm, '.cost-head', '.cost-close');
+
   initMap();
   initFilters();
   updateModeIndicator();
@@ -1852,6 +1857,41 @@ function unfocusZone(){
 }
 // ---- 辖区编辑面板 ----
 let zePanel=null, zeName=null, zePending=null, zeCands=null;
+function makeDraggable(panelEl, handleSel, excludeSel){
+  var handle = panelEl.querySelector(handleSel);
+  if(!handle) return;
+  handle.style.cursor='move';
+  handle.style.userSelect='none';
+  function start(e){
+    var t=e.target;
+    if(excludeSel && t.closest && t.closest(excludeSel)) return;
+    if(t.closest && t.closest('input,select,textarea,button,a,label')) return;
+    if(panelEl.style.right){
+      var r=parseFloat(panelEl.style.right)||16;
+      panelEl.style.right='';
+      panelEl.style.left=Math.max(0, window.innerWidth-panelEl.offsetWidth-r)+'px';
+    }
+    var sx = e.touches? e.touches[0].clientX : e.clientX;
+    var sy = e.touches? e.touches[0].clientY : e.clientY;
+    var oleft = panelEl.offsetLeft, otop = panelEl.offsetTop;
+    function move(ev){
+      var x = ev.touches? ev.touches[0].clientX : ev.clientX;
+      var y = ev.touches? ev.touches[0].clientY : ev.clientY;
+      var nl = Math.min(Math.max(0, oleft+x-sx), window.innerWidth-panelEl.offsetWidth);
+      var nt = Math.min(Math.max(0, otop+y-sy), window.innerHeight-40);
+      panelEl.style.left = nl+'px';
+      panelEl.style.top = nt+'px';
+    }
+    function end(){ document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',end); document.removeEventListener('touchmove',move); document.removeEventListener('touchend',end); }
+    if(e.cancelable) e.preventDefault();
+    document.addEventListener('mousemove',move);
+    document.addEventListener('mouseup',end);
+    document.addEventListener('touchmove',move,{passive:false});
+    document.addEventListener('touchend',end);
+  }
+  handle.addEventListener('mousedown',start);
+  handle.addEventListener('touchstart',start,{passive:false});
+}
 function zeEnsurePanel(){
   if(zePanel) return;
   zePanel=document.createElement('div');
@@ -1869,6 +1909,7 @@ function zeEnsurePanel(){
       '<button class="ze-btn" onclick="closeZoneEditor()">关闭</button>'+
     '</div>';
   document.body.appendChild(zePanel);
+  makeDraggable(zePanel, '.ze-head', '[onclick]');
   var inp=zePanel.querySelector('#zeSearch');
   inp.addEventListener('input', function(){ zeFill(); });
   zePanel.querySelector('#zeCurList').addEventListener('change', function(e){
