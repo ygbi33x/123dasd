@@ -2072,6 +2072,7 @@ function clearZoneLayer(){
 }
 
 function showZoneInfo(name,z){
+  zoneInfoWindow = zoneInfoWindow || new AMap.InfoWindow({offset:new AMap.Pixel(0,-14),autoMove:true});
   var branches=z.branches||[];
   var lis=branches.slice(0,200).map(function(b){ return '<li>'+zoneEscapeHtml(b.n)+'</li>'; }).join('');
   var more=branches.length>200?'<li style="color:#94a3b8">…其余 '+(branches.length-200)+' 个略，可点地图蓝点查看</li>':'';
