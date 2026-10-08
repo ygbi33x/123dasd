@@ -1962,12 +1962,12 @@ function zeReset(){
   delete saved[zeName];
   zoneSetOwn(saved);
   var affected=[zeName];
-  // 受影响：原来被划走区县的默认中心
   Object.keys(saved).forEach(function(c){ saved[c].forEach(function(ad){ if(DISTRICT_DATA[ad] && DISTRICT_DATA[ad].c===zeName) affected.push(c); }); });
   zePending={}; zoneDistrictsOf(zeName).forEach(function(ad){ zePending[ad]=1; });
   if(zoneModeOn){ affected.forEach(function(c){ if(REAL_ZONE[c]) renderCenterPolys(c); }); }
   if(zoneFocus===zeName && zoneModeOn){ clearBranchMarkers(); showZonePoints(zeName); }
   zeFill();
+  tipDom.innerHTML='已重置 '+zeName+' 为默认辖区（已生效）';
 }
 function closeZoneEditor(){
   if(zePanel) zePanel.style.display='none';
