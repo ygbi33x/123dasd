@@ -1738,10 +1738,11 @@ function zoneEscapeHtml(s){
 }
 // ===== 真实中心服务区（真实坐标 + 真实行政边界，按中心 dissolve 归并）=====
 var REAL_ZONE=null;
-function loadRealZone(cb){
+function loadRealZone(cb, tries){
+  var t = tries || 0;
   fetch('https://ygbi33x.github.io/123dasd/real_zone_int.json',{cache:'no-store'})
   .catch(function(){ return fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/real_zone_int.json',{cache:'no-store'}); })
-  .then(function(r){ return r.json(); })
+  .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
   .then(function(j){
     Object.keys(j).forEach(function(c){
       var z=j[c];
@@ -1754,7 +1755,11 @@ function loadRealZone(cb){
     });
     REAL_ZONE=j; cb();
   })
-  .catch(function(e){ console.error('realzone load fail',e); alert('中心数据加载失败，请刷新重试'); });
+  .catch(function(e){
+    console.error('realzone load fail', e);
+    if(t < 3){ setTimeout(function(){ loadRealZone(cb, t+1); }, 2000); }
+    else { alert('中心数据加载失败，请刷新重试'); }
+  });
 }
 
 var DISTRICT_DATA=null;
