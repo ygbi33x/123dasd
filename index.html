@@ -1755,7 +1755,7 @@ function buildZoneLayer(){
     z.rings.forEach(function(ring){
       var poly=new AMap.Polygon({
         path:ring, fillColor:col, fillOpacity:z.sp?0.12:0.22,
-        strokeColor:'#ffffff', strokeWeight:z.sp?0.5:0.7, strokeOpacity:0.55,
+        strokeColor:'#94a3b8', strokeWeight:z.sp?0.3:0.4, strokeOpacity:0.3,
         cursor:'pointer', zIndex:40
       });
       poly.on('click', function(){ onSelectCenter(name); });
