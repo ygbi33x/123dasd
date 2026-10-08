@@ -1337,10 +1337,6 @@ function bootApp() {
     loadRouteFromLocal();
   }
   
-  window.onload = function(){
-    if(!window.AMap) { alert("高德地图加载失败，请检查网络"); return; }
-    loadRealZone(bootApp);
-  };
   // 点击外部关闭POI下拉
   document.addEventListener('click', function(e) {
     const searchBox = document.querySelector('.search-box');
@@ -1355,7 +1351,12 @@ function bootApp() {
       iabDd.style.display = 'none';
     }
   });
+}
+window.onload = function(){
+  if(!window.AMap) { alert("高德地图加载失败，请检查网络"); return; }
+  loadRealZone(bootApp);
 };
+;
 
 
 // 侧边栏收回/展开
