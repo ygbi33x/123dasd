@@ -1742,7 +1742,7 @@ function toggleSiteFilter(){
   btn.textContent = el.classList.contains('site-tabs-collapsed') ? '▶ 展开' : '▼ 收起';
 }
 function renderSiteList(){
-  var box=document.getElementById('siteList'); if(!box || !window.EXCHANGE_POINTS) return;
+  var box=document.getElementById('siteList'); if(!box || typeof EXCHANGE_POINTS==='undefined') return;
   var types=['交换站','接驳点'];
   var colors={'交换站':'#8b5cf6','接驳点':'#f59e0b'};
   box.innerHTML='';
