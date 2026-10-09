@@ -46,6 +46,11 @@ button{font-family:inherit;}
 .route-more-item{padding:8px 14px;font-size:11px;color:#334155;cursor:pointer;font-weight:600;white-space:nowrap;}
 .route-more-item:hover{background:rgba(59,130,246,.08);color:#2563eb;}
 .province-tabs-collapsed{max-height:48px;overflow:hidden;}
+.site-tabs-collapsed{max-height:0;overflow:hidden;}
+.site-list{max-height:230px;overflow-y:auto;font-size:11px;}
+.site-item{display:flex;align-items:center;gap:6px;padding:3px 4px;cursor:pointer;border-radius:4px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.site-item:hover{background:#eff6ff;}
+.site-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
 .route-optimize{font-size:10px;color:#3b82f6;cursor:pointer;font-weight:600;padding:3px 8px;border:1px solid rgba(59,130,246,.3);border-radius:6px;background:rgba(59,130,246,.05);transition:.15s;}
 .route-optimize:hover{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.5);}
 .route-points{display:flex;flex-wrap:wrap;gap:5px;align-items:center;}
@@ -625,6 +630,19 @@ body.landscape-fullscreen #distPanel{top:10px;right:10px;left:auto;max-height:75
           <span class="province-collapse-btn" id="provinceCollapseBtn" onclick="toggleProvinceFilter()" style="cursor:pointer;font-size:12px;color:#6b7280;">▶ 展开</span>
         </div>
         <div class="filter-tabs province-tabs-collapsed" id="provinceTabs"></div>
+      </div>
+      <div class="filter-section">
+        <div class="filter-label" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>站点</span>
+          <span class="site-collapse-btn" id="siteCollapseBtn" onclick="toggleSiteFilter()" style="cursor:pointer;font-size:12px;color:#6b7280;">▶ 展开</span>
+        </div>
+        <div class="site-tabs site-tabs-collapsed" id="siteTabs">
+          <div class="ds-toggles" style="margin:2px 0 6px 0;">
+            <label class="ds-toggle"><input type="checkbox" id="showExchangeMarkers" checked onchange="toggleExchangeVisibility()"><span>交换站(<span id="exCount">0</span>)</span></label>
+            <label class="ds-toggle"><input type="checkbox" id="showJieboMarkers" checked onchange="toggleExchangeVisibility()"><span>接驳点(<span id="jbCount">0</span>)</span></label>
+          </div>
+          <div id="siteList" class="site-list"></div>
+        </div>
       </div>
     </div>
     <div class="city-list" id="cityList"></div>
@@ -1717,6 +1735,52 @@ function renderExchangePoints(){
     exchangeMarkers.push(m);
   });
 }
+function toggleSiteFilter(){
+  var el=document.getElementById('siteTabs');
+  var btn=document.getElementById('siteCollapseBtn');
+  el.classList.toggle('site-tabs-collapsed');
+  btn.textContent = el.classList.contains('site-tabs-collapsed') ? '▶ 展开' : '▼ 收起';
+}
+function renderSiteList(){
+  var box=document.getElementById('siteList'); if(!box || !window.EXCHANGE_POINTS) return;
+  var types=['交换站','接驳点'];
+  var colors={'交换站':'#8b5cf6','接驳点':'#f59e0b'};
+  box.innerHTML='';
+  types.forEach(function(t){
+    var items=EXCHANGE_POINTS.filter(function(p){return p.type===t;});
+    var cnt=document.getElementById(t==='交换站'?'exCount':'jbCount');
+    if(cnt) cnt.textContent=items.length;
+    items.forEach(function(p){
+      var d=document.createElement('div');
+      d.className='site-item';
+      d.innerHTML='<span class="site-dot" style="background:'+colors[t]+'"></span><span style="overflow:hidden;text-overflow:ellipsis;">'+p.name+'</span>';
+      d.title=p.name+'（'+p.center+'·'+p.prov+'）';
+      d.onclick=function(){ siteClick(p); };
+      box.appendChild(d);
+    });
+  });
+}
+function siteClick(p){
+  if(!map) return;
+  map.setZoomAndCenter(11,[p.lng,p.lat]);
+  if(exchangeInfoWindow) exchangeInfoWindow.close();
+  exchangeInfoWindow=exchangeInfoWindow||new AMap.InfoWindow({offset:new AMap.Pixel(0,-10),autoMove:true});
+  exchangeInfoWindow.setContent('<div style="min-width:200px;font-size:12px;line-height:1.7">'
+    +'<div style="font-weight:700;font-size:13px;color:#1e293b">'+p.name+'</div>'
+    +'<div style="color:#64748b">类型：'+p.type+' · 所属中心：'+p.center+' · '+p.prov+'</div>'
+    +'<div style="color:#64748b">地址：'+p.addr+'</div></div>');
+  exchangeInfoWindow.open(map,[p.lng,p.lat]);
+}
+function toggleExchangeVisibility(){
+  if(!exchangeMarkers.length) return;
+  var ex=document.getElementById('showExchangeMarkers').checked;
+  var jb=document.getElementById('showJieboMarkers').checked;
+  exchangeMarkers.forEach(function(m){
+    var p=m.getExtData();
+    var vis=(p.type==='交换站')?ex:jb;
+    m.setMap(vis?map:null);
+  });
+}
 
 function initMap() {
   map = new AMap.Map("map", { zoom: 5, center: [104, 35], resizeEnable: true });
@@ -1748,6 +1812,7 @@ function initMap() {
     cityMarkers.push(marker);
   });
   renderExchangePoints();
+  renderSiteList();
 
   document.getElementById("clearRouteBtn").onclick = clearRoute;
   document.getElementById("optimizeBtn").onclick = optimizeRouteOrderBtn;
