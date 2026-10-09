@@ -2468,10 +2468,12 @@ function applyZoneFilterView(){
   if(pts.length){
     if(pts.length===1){ map.setZoomAndCenter(9, pts[0]); }
     else {
-      var b=new AMap.Bounds(pts[0], pts[0]);
-      pts.forEach(function(p){ b.extend(p); });
-      map.setBounds(b);
-      if(map.getZoom()>8) map.setZoom(8);
+      var minLng=1e9,minLat=1e9,maxLng=-1e9,maxLat=-1e9;
+      pts.forEach(function(p){ var l=p.getLng(), a=p.getLat(); if(l<minLng)minLng=l; if(a<minLat)minLat=a; if(l>maxLng)maxLng=l; if(a>maxLat)maxLat=a; });
+      map.setBounds(new AMap.Bounds(minLng, minLat, maxLng, maxLat));
+      var z=map.getZoom();
+      if(z>8) map.setZoom(8);
+      if(z<3) map.setZoom(3);
     }
   }
 }
