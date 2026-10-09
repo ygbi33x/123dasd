@@ -2438,9 +2438,42 @@ function renderRegionTabs() {
       currentProvince = "全部";
       renderProvinceTabs();
       renderCityList();
+      applyZoneFilterView();
     };
     regionContainer.appendChild(tab);
   });
+}
+
+var centerRegionMap=null, centerProvinceMap=null;
+function applyZoneFilterView(){
+  if(!map) return;
+  if(!centerRegionMap){
+    centerRegionMap={}; centerProvinceMap={};
+    CITIES.forEach(function(c){ if(c.isCenter){ var k=c.name.replace('市',''); centerRegionMap[k]=c.region; centerProvinceMap[k]=c.province; } });
+  }
+  var pts=[];
+  if(zoneCenterMarkers && Object.keys(zoneCenterMarkers).length){
+    Object.keys(zoneCenterMarkers).forEach(function(name){
+      var r=centerRegionMap[name], p=centerProvinceMap[name];
+      var show=(currentRegion==='全部'||r===currentRegion)&&(currentProvince==='全部'||p===currentProvince);
+      zoneCenterMarkers[name].setMap(show?map:null);
+      if(show) pts.push(zoneCenterMarkers[name].getCenter());
+    });
+  }
+  if(!pts.length){
+    CITIES.forEach(function(c){
+      if((currentRegion==='全部'||c.region===currentRegion)&&(currentProvince==='全部'||c.province===currentProvince)&&c.lng&&c.lat) pts.push([c.lng,c.lat]);
+    });
+  }
+  if(pts.length){
+    if(pts.length===1){ map.setZoomAndCenter(9, pts[0]); }
+    else {
+      var b=new AMap.Bounds(pts[0], pts[0]);
+      pts.forEach(function(p){ b.extend(p); });
+      map.setBounds(b);
+      if(map.getZoom()>8) map.setZoom(8);
+    }
+  }
 }
 function initFilters() {
   renderRegionTabs();
@@ -2472,6 +2505,7 @@ function renderProvinceTabs() {
       tab.classList.add('active');
       currentProvince = prov;
       renderCityList();
+      applyZoneFilterView();
     };
     container.appendChild(tab);
   });
