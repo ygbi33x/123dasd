@@ -1902,6 +1902,7 @@ let zoneCustomOwn=null, zoneFocus=null;
 try{ zoneCustomOwn=JSON.parse(localStorage.getItem('zoneCustomOwn')||'null'); }catch(e){ zoneCustomOwn=null; }
 function zoneSetOwn(v){ zoneCustomOwn=v; try{ localStorage.setItem('zoneCustomOwn', v?JSON.stringify(v):'null'); }catch(e){} }
 function districtOwner(ad){
+  if(!DISTRICT_DATA) return null;
   if(zoneCustomOwn){ for(var c in zoneCustomOwn){ if(zoneCustomOwn[c] && zoneCustomOwn[c].indexOf(ad)>=0) return c; } }
   var d=DISTRICT_DATA[ad]; return d?d.c:'';
 }
@@ -1973,7 +1974,8 @@ function showZonePoints(name){
   var out=[];
   Object.keys(REAL_ZONE).forEach(function(c){
     (REAL_ZONE[c].branches||[]).forEach(function(b){
-      var own = b.a?districtOwner(b.a):c;
+      var own = c;
+      if(b.a){ var o = districtOwner(b.a); if(o) own = o; }
       if(own===name) out.push({c:c,b:b});
     });
   });
