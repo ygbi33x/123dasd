@@ -1828,7 +1828,22 @@ function renderCenterPolys(name){
   var eds=zoneCustomOwn && zoneCustomOwn.hasOwnProperty(name);
   var addPoly=function(rs){
     var poly=new AMap.Polygon({ path:rs, fillColor:col, fillOpacity:0.22, strokeColor:'#94a3b8', strokeWeight:0.3, strokeOpacity:0.25, cursor:'pointer', zIndex:40 });
-    poly.on('click', function(){ onSelectCenter(name); });
+    poly.on('click', function(e){
+      // 多边形重叠时按几何判断选最近的中心，避免命中相邻区块
+      var pt = e.lnglat ? [e.lnglat.lng, e.lnglat.lat] : null;
+      var best = null, bestD = 1e18;
+      if(pt){
+        Object.keys(zonePolygons).forEach(function(k){
+          var inside = zonePolygons[k].some(function(p){ return AMap.GeometryUtil.isPointInRing(pt, p.getPath()); });
+          if(inside){
+            var z = REAL_ZONE[k];
+            var d = Math.pow(z.lng-pt[0],2)+Math.pow(z.lat-pt[1],2);
+            if(d<bestD){ bestD=d; best=k; }
+          }
+        });
+      }
+      onSelectCenter(best || name);
+    });
     poly.setMap(map); arr.push(poly);
   };
   if(eds){
