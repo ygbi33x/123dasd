@@ -1828,7 +1828,7 @@ function buildZoneLayer(){
   Object.keys(REAL_ZONE).forEach(function(name){
     var z=REAL_ZONE[name];
     if(zoneCenterMarkers[name]){ zoneCenterMarkers[name].setMap(null); delete zoneCenterMarkers[name]; }
-    var cm=new AMap.CircleMarker({ center:[z.lng,z.lat], radius:z.sp?2:3, fillColor:z.sp?'#94a3b8':'#1e3a8a', fillOpacity:0.95, strokeColor:'#ffffff', strokeWeight:z.sp?1:2, strokeOpacity:1, cursor:'pointer', zIndex:60 });
+    var cm=new AMap.CircleMarker({ center:[z.lng,z.lat], radius:z.sp?1.5:2, fillColor:z.sp?'#94a3b8':'#1e3a8a', fillOpacity:0.95, strokeColor:'#ffffff', strokeWeight:z.sp?1:2, strokeOpacity:1, cursor:'pointer', zIndex:60 });
     cm.on('click', function(){ onSelectCenter(name); });
     cm.setMap(map); zoneCenterMarkers[name]=cm;
   });
@@ -2362,6 +2362,8 @@ function setCityTypeFilter(type) {
     t.classList.toggle('active', t.dataset.type === type);
   });
   renderCityList();
+  renderRegionTabs();
+  renderProvinceTabs();
 }
 
 // 显示设置面板展开/收起
@@ -2395,14 +2397,34 @@ function toggleMarkerVisibility() {
     if(!visible) marker.hide();
   });
   
-  // 同步更新左侧城市列表
+  // 同步更新左侧城市列表与筛选计数
   renderCityList();
+  renderRegionTabs();
+  renderProvinceTabs();
 }
 
-function initFilters() {
+function markerFilteredCount(region, province) {
+  var showCenter = document.getElementById('showCenterMarkers') ? document.getElementById('showCenterMarkers').checked : true;
+  var showCapital = document.getElementById('showCapitalMarkers') ? document.getElementById('showCapitalMarkers').checked : true;
+  var showNormal = document.getElementById('showNormalMarkers') ? document.getElementById('showNormalMarkers').checked : true;
+  var n = 0;
+  CITIES.forEach(function(c) {
+    if(region !== '全部' && c.region !== region) return;
+    if(province !== '全部' && c.province !== province) return;
+    var isCapital = CAPITAL_NAMES.indexOf(c.name) >= 0;
+    if(cityTypeFilter === 'center') { if(c.isCenter) n++; return; }
+    if(cityTypeFilter === 'capital') { if(isCapital) n++; return; }
+    if(c.isCenter) { if(showCenter) n++; }
+    else if(isCapital) { if(showCapital) n++; }
+    else if(showNormal) n++;
+  });
+  return n;
+}
+function renderRegionTabs() {
   const regionContainer = document.getElementById('regionTabs');
+  regionContainer.innerHTML = '';
   ALL_REGIONS.forEach(function(region) {
-    const count = region === "全部" ? CITIES.length : CITIES.filter(c => c.region === region).length;
+    const count = markerFilteredCount(region, '全部');
     const tab = document.createElement('span');
     tab.className = 'filter-tab' + (region === "全部" ? ' active' : '');
     tab.textContent = region + '(' + count + ')';
@@ -2416,6 +2438,9 @@ function initFilters() {
     };
     regionContainer.appendChild(tab);
   });
+}
+function initFilters() {
+  renderRegionTabs();
   renderProvinceTabs();
   document.getElementById('searchInput').addEventListener('input', function(e) {
     searchKeyword = e.target.value.trim();
@@ -2434,8 +2459,8 @@ function renderProvinceTabs() {
   }
   provinces.forEach(function(prov) {
     const count = prov === "全部" ?
-      (currentRegion === "全部" ? CITIES.length : CITIES.filter(c => c.region === currentRegion).length) :
-      CITIES.filter(c => c.province === prov).length;
+      markerFilteredCount(currentRegion, "全部") :
+      markerFilteredCount(currentRegion, prov);
     const tab = document.createElement('span');
     tab.className = 'filter-tab' + (prov === "全部" ? ' active' : '');
     tab.textContent = prov + '(' + count + ')';
