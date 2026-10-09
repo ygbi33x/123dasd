@@ -1830,6 +1830,7 @@ function buildZoneLayer(){
     cm.setMap(map); zoneCenterMarkers[name]=cm; n++;
   });
   tipDom.innerHTML='已按 '+n+' 个中心划分（真实行政边界），点击中心区块查看其分公司';
+  applyZoneFilterView();
   if(zoneFocus) applyZoneFocus();
 }
 function showZonePoints(name){
@@ -2441,6 +2442,8 @@ function renderRegionTabs() {
 var centerRegionMap=null, centerProvinceMap=null;
 function applyZoneFilterView(){
   if(!map) return;
+  if(!REAL_ZONE || !Object.keys(REAL_ZONE).length) return;
+  if(!zoneModeOn){ toggleZoneMode(); return; }
   if(!centerRegionMap){
     centerRegionMap={}; centerProvinceMap={};
     CITIES.forEach(function(c){ if(c.isCenter){ var k=c.name.replace('市',''); centerRegionMap[k]=c.region; centerProvinceMap[k]=c.province; } });
