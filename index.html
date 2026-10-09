@@ -1820,19 +1820,22 @@ function renderCenterPolys(name){
   }
   zonePolygons[name]=arr;
 }
+var ZONE_EXTRA=['华北','台湾','宝山','广州天河中转站','拉萨','江门','泰州','滇西','澳门','石桥','邢邯','青岛','香港'];
 function buildZoneLayer(){
   if(!map){ tipDom.innerHTML='地图尚未加载完成'; return; }
   cityMarkers.forEach(function(m){ m.hide(); });
   zoneInfoWindow = zoneInfoWindow || new AMap.InfoWindow({offset:new AMap.Pixel(0,-14),autoMove:true});
   Object.keys(REAL_ZONE).forEach(function(name){ renderCenterPolys(name); });
+  var n=0;
   Object.keys(REAL_ZONE).forEach(function(name){
+    if(ZONE_EXTRA.indexOf(name)>=0) return;
     var z=REAL_ZONE[name];
     if(zoneCenterMarkers[name]){ zoneCenterMarkers[name].setMap(null); delete zoneCenterMarkers[name]; }
     var cm=new AMap.CircleMarker({ center:[z.lng,z.lat], radius:z.sp?1:1.5, fillColor:z.sp?'#94a3b8':'#1e3a8a', fillOpacity:0.95, strokeColor:'#ffffff', strokeWeight:z.sp?1:2, strokeOpacity:1, cursor:'pointer', zIndex:60 });
     cm.on('click', function(){ onSelectCenter(name); });
-    cm.setMap(map); zoneCenterMarkers[name]=cm;
+    cm.setMap(map); zoneCenterMarkers[name]=cm; n++;
   });
-  tipDom.innerHTML='已按 '+Object.keys(REAL_ZONE).length+' 个中心划分（真实行政边界），点击中心区块查看其分公司';
+  tipDom.innerHTML='已按 '+n+' 个中心划分（真实行政边界），点击中心区块查看其分公司';
   if(zoneFocus) applyZoneFocus();
 }
 function showZonePoints(name){
