@@ -1827,6 +1827,46 @@ function loadRealZone(cb, tries){
       (z.branches||[]).forEach(function(b){ b.lng/=1000; b.lat/=1000; });
     });
     REAL_ZONE=j;
+    // ===== 性能优化：抽稀多边形顶点（保留边界形状，减少渲染计算量，108万→~23万）=====
+    (function(){
+      function _ptSegDist(p,a,b){
+        var dx=b[0]-a[0],dy=b[1]-a[1],l2=dx*dx+dy*dy;
+        if(l2<1e-12) return Math.sqrt((p[0]-a[0])*(p[0]-a[0])+(p[1]-a[1])*(p[1]-a[1]));
+        var t=((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l2; t=Math.max(0,Math.min(1,t));
+        return Math.sqrt((p[0]-a[0]-t*dx)*(p[0]-a[0]-t*dx)+(p[1]-a[1]-t*dy)*(p[1]-a[1]-t*dy));
+      }
+      function _rdp(pts,eps){
+        if(pts.length<4) return pts;
+        var dmax=0,idx=0,p0=pts[0],p1=pts[pts.length-1];
+        for(var i=1;i<pts.length-1;i++){
+          var d=_ptSegDist(pts[i],p0,p1);
+          if(d>dmax){ dmax=d; idx=i; }
+        }
+        if(dmax>eps){
+          var l=_rdp(pts.slice(0,idx+1),eps), r=_rdp(pts.slice(idx),eps);
+          return l.slice(0,-1).concat(r);
+        }
+        return [p0,p1];
+      }
+      try{
+        var _vn=0;
+        Object.keys(j).forEach(function(c){
+          var zz=j[c];
+          (zz.rings||[]).forEach(function(rs,i){
+            var nested = rs && Array.isArray(rs[0]) && rs[0] && Array.isArray(rs[0][0]);
+            var ring = nested ? rs[0] : rs;
+            if(!ring || ring.length<6) return;
+            var closed = Math.abs(ring[0][0]-ring[ring.length-1][0])<1e-9 && Math.abs(ring[0][1]-ring[ring.length-1][1])<1e-9;
+            var core = closed ? ring.slice(0,-1) : ring.slice();
+            var simp = _rdp(core, 0.009);
+            if(closed) simp.push([simp[0][0],simp[0][1]]);
+            if(nested) zz.rings[i]=[simp]; else zz.rings[i]=simp;
+            _vn+=simp.length;
+          });
+        });
+        console.log('[zone] simplified vertices:', _vn);
+      }catch(e){ console.error('[zone] simplify fail', e); }
+    })();
     // 用高德核实过的中心坐标覆盖服务区中心标记点（服务区多边形边界不受影响）
     try{
       CITIES.forEach(function(c){
