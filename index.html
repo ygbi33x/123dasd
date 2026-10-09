@@ -1741,23 +1741,32 @@ function zoneEscapeHtml(s){
 }
 // ===== 真实中心服务区（真实坐标 + 真实行政边界，按中心 dissolve 归并）=====
 var REAL_ZONE=null;
-function loadRealZone(cb, tries){
-  var t = tries || 0;
-  // 依次尝试两个源：先试 Pages 主源，若响应不完整/解析失败，自动切换备用源（raw）
-  function trySource(p){
+// 双源并行取数：谁先解析成功用谁（raw 速度快优先，Pages 兜底）
+function fetchJSONBest(pA, pB){
+  function tryOne(p){
     return p.then(function(r){
       if(!r || !r.ok) return null;
       return r.json().catch(function(){ return null; });
-    }).catch(function(){ return null; });
+    }).catch(function(){ return null; }).then(function(j){
+      if(j) return j; throw new Error('fail');
+    });
   }
-  var pA=fetch('https://ygbi33x.github.io/123dasd/real_zone_v2.json',{cache:'no-store'}).catch(function(){ return null; });
-  var pB=fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/real_zone_int.json',{cache:'no-store'}).catch(function(){ return null; });
-  trySource(pA).then(function(j1){
-    if(j1) return j1;
-    return trySource(pB);
-  })
+  return new Promise(function(res, rej){
+    var done=false, fails=0, ps=[tryOne(pA), tryOne(pB)];
+    ps.forEach(function(p){
+      p.then(function(j){ if(!done){ done=true; res(j); } }, function(){
+        fails++; if(fails===ps.length && !done){ done=true; rej(new Error('all fail')); }
+      });
+    });
+  });
+}
+function loadRealZone(cb, tries){
+  var t = tries || 0;
+  fetchJSONBest(
+    fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/real_zone_v2.json').catch(function(){ return null; }),
+    fetch('https://ygbi33x.github.io/123dasd/real_zone_v2.json').catch(function(){ return null; })
+  )
   .then(function(j){
-    if(!j) throw new Error('both fail');
     Object.keys(j).forEach(function(c){
       var z=j[c];
       z.lng/=1000; z.lat/=1000;
@@ -1780,9 +1789,10 @@ function loadRealZone(cb, tries){
 
 var DISTRICT_DATA=null;
 function loadDistrictData(){
-  fetch('https://ygbi33x.github.io/123dasd/districts_int.json')
-  .catch(function(){ return fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/districts_int.json'); })
-  .then(function(r){ return r.json(); })
+  fetchJSONBest(
+    fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/districts_int.json').catch(function(){ return null; }),
+    fetch('https://ygbi33x.github.io/123dasd/districts_int.json').catch(function(){ return null; })
+  )
   .then(function(j){ DISTRICT_DATA=j; if(window.zeName){ zeFill(); } if(window.zePanel && zePanel.style.display!=='none') zeFill(); })
   .catch(function(e){ DISTRICT_DATA=null; console.error('districts load fail', e); });
 }
