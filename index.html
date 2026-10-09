@@ -2064,6 +2064,7 @@ function toggleZoneMode(){
   if(zoneModeOn){
     item.innerHTML='🏛️ 中心服务区划分：开';
     item.style.background='rgba(34,197,94,.12)'; item.style.color='#16a34a';
+    clearCenterMarkersOnly();
     buildZoneLayer();
   }else{
     item.innerHTML='🏛️ 中心服务区划分：关';
@@ -2459,21 +2460,64 @@ function renderRegionTabs() {
 
 var centerRegionMap=null, centerProvinceMap=null;
 var pendingZoneFilter=false;
+var centerMarkersOnly=[]; // 独立中心标记层（不开启服务区划分）
+function clearCenterMarkersOnly(){
+  centerMarkersOnly.forEach(function(m){ m.setMap(null); });
+  centerMarkersOnly=[];
+}
+function buildCenterMarkersOnly(){
+  if(!REAL_ZONE || !map) return;
+  clearCenterMarkersOnly();
+  Object.keys(REAL_ZONE).forEach(function(name){
+    if(ZONE_EXTRA.indexOf(name)>=0) return;
+    var z=REAL_ZONE[name];
+    var cm=new AMap.CircleMarker({ center:[z.lng,z.lat], radius:z.sp?1:1.5, fillColor:z.sp?'#94a3b8':'#1e3a8a', fillOpacity:0.95, strokeColor:'#ffffff', strokeWeight:z.sp?1:2, strokeOpacity:1, cursor:'pointer', zIndex:60 });
+    cm.setExtData({name:name});
+    cm.on('click', function(){
+      if(zoneInfoWindow) zoneInfoWindow.close();
+      zoneInfoWindow = zoneInfoWindow || new AMap.InfoWindow({offset:new AMap.Pixel(0,-14),autoMove:true});
+      var r=centerRegionMap[name], p=centerProvinceMap[name];
+      zoneInfoWindow.setContent('<div class="zone-info" style="min-width:140px"><div class="zi-head">'+name+'</div><div class="zi-stats" style="font-size:11px">'+(r||'')+' · '+(p||'')+'</div></div>');
+      zoneInfoWindow.open(map,[z.lng,z.lat]);
+    });
+    cm.setMap(map); centerMarkersOnly.push(cm);
+  });
+}
+function zoomToPoints(pts){
+  if(!pts || !pts.length) return;
+  if(pts.length===1){ map.setZoomAndCenter(9, pts[0]); return; }
+  var minLng=1e9,minLat=1e9,maxLng=-1e9,maxLat=-1e9;
+  pts.forEach(function(p){ var l=p.getLng(), a=p.getLat(); if(l<minLng)minLng=l; if(a<minLat)minLat=a; if(l>maxLng)maxLng=l; if(a>maxLat)maxLat=a; });
+  map.setBounds(new AMap.Bounds(minLng, minLat, maxLng, maxLat));
+  var z=map.getZoom();
+  if(z>8) map.setZoom(8);
+  if(z<3) map.setZoom(3);
+}
 function applyZoneFilterView(){
   if(!map || !window.AMap){ pendingZoneFilter=true; return; }
   if(!REAL_ZONE || !Object.keys(REAL_ZONE).length){ pendingZoneFilter=true; return; }
-  if(!zoneModeOn){ toggleZoneMode(); return; }
   if(!centerRegionMap){
     centerRegionMap={}; centerProvinceMap={};
     CITIES.forEach(function(c){ if(c.isCenter){ var k=c.name.replace('市',''); centerRegionMap[k]=c.region; centerProvinceMap[k]=c.province; } });
   }
   var pts=[];
-  if(zoneCenterMarkers && Object.keys(zoneCenterMarkers).length){
-    Object.keys(zoneCenterMarkers).forEach(function(name){
-      var r=centerRegionMap[name], p=centerProvinceMap[name];
+  if(zoneModeOn){
+    if(zoneCenterMarkers && Object.keys(zoneCenterMarkers).length){
+      Object.keys(zoneCenterMarkers).forEach(function(name){
+        var r=centerRegionMap[name], p=centerProvinceMap[name];
+        var show=(currentRegion==='全部'||r===currentRegion)&&(currentProvince==='全部'||p===currentProvince);
+        zoneCenterMarkers[name].setMap(show?map:null);
+        if(show) pts.push(zoneCenterMarkers[name].getCenter());
+      });
+    }
+  } else {
+    if(!centerMarkersOnly.length) buildCenterMarkersOnly();
+    centerMarkersOnly.forEach(function(m){
+      var nm=m.getExtData().name;
+      var r=centerRegionMap[nm], p=centerProvinceMap[nm];
       var show=(currentRegion==='全部'||r===currentRegion)&&(currentProvince==='全部'||p===currentProvince);
-      zoneCenterMarkers[name].setMap(show?map:null);
-      if(show) pts.push(zoneCenterMarkers[name].getCenter());
+      m.setMap(show?map:null);
+      if(show) pts.push(m.getCenter());
     });
   }
   if(!pts.length){
@@ -2481,17 +2525,7 @@ function applyZoneFilterView(){
       if((currentRegion==='全部'||c.region===currentRegion)&&(currentProvince==='全部'||c.province===currentProvince)&&c.lng&&c.lat) pts.push([c.lng,c.lat]);
     });
   }
-  if(pts.length){
-    if(pts.length===1){ map.setZoomAndCenter(9, pts[0]); }
-    else {
-      var minLng=1e9,minLat=1e9,maxLng=-1e9,maxLat=-1e9;
-      pts.forEach(function(p){ var l=p.getLng(), a=p.getLat(); if(l<minLng)minLng=l; if(a<minLat)minLat=a; if(l>maxLng)maxLng=l; if(a>maxLat)maxLat=a; });
-      map.setBounds(new AMap.Bounds(minLng, minLat, maxLng, maxLat));
-      var z=map.getZoom();
-      if(z>8) map.setZoom(8);
-      if(z<3) map.setZoom(3);
-    }
-  }
+  zoomToPoints(pts);
 }
 function initFilters() {
   renderRegionTabs();
