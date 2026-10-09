@@ -1828,7 +1828,7 @@ function buildZoneLayer(){
   Object.keys(REAL_ZONE).forEach(function(name){
     var z=REAL_ZONE[name];
     if(zoneCenterMarkers[name]){ zoneCenterMarkers[name].setMap(null); delete zoneCenterMarkers[name]; }
-    var cm=new AMap.CircleMarker({ center:[z.lng,z.lat], radius:z.sp?1.5:2, fillColor:z.sp?'#94a3b8':'#1e3a8a', fillOpacity:0.95, strokeColor:'#ffffff', strokeWeight:z.sp?1:2, strokeOpacity:1, cursor:'pointer', zIndex:60 });
+    var cm=new AMap.CircleMarker({ center:[z.lng,z.lat], radius:z.sp?1:1.5, fillColor:z.sp?'#94a3b8':'#1e3a8a', fillOpacity:0.95, strokeColor:'#ffffff', strokeWeight:z.sp?1:2, strokeOpacity:1, cursor:'pointer', zIndex:60 });
     cm.on('click', function(){ onSelectCenter(name); });
     cm.setMap(map); zoneCenterMarkers[name]=cm;
   });
