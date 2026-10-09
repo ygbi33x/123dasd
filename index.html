@@ -1683,6 +1683,7 @@ document.addEventListener('fullscreenchange', function() {
 });
 function initMap() {
   map = new AMap.Map("map", { zoom: 5, center: [104, 35], resizeEnable: true });
+  if(pendingZoneFilter && typeof applyZoneFilterView==='function'){ pendingZoneFilter=false; applyZoneFilterView(); }
   map.addControl(new AMap.Scale());
   // 缩放控件放在右下角
   map.addControl(new AMap.ToolBar({position: "RB", offset: new AMap.Pixel(20, 20)}));
@@ -2444,7 +2445,7 @@ function renderRegionTabs() {
 var centerRegionMap=null, centerProvinceMap=null;
 var pendingZoneFilter=false;
 function applyZoneFilterView(){
-  if(!map) return;
+  if(!map || !window.AMap){ pendingZoneFilter=true; return; }
   if(!REAL_ZONE || !Object.keys(REAL_ZONE).length){ pendingZoneFilter=true; return; }
   if(!zoneModeOn){ toggleZoneMode(); return; }
   if(!centerRegionMap){
