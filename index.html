@@ -1360,7 +1360,11 @@ function bootApp() {
 }
 window.onload = function(){
   if(!window.AMap) { alert("高德地图加载失败，请检查网络"); return; }
-  loadRealZone(bootApp);
+  loadRealZone(function(){
+    if(pendingZoneFilter){ pendingZoneFilter=false; applyZoneFilterView(); }
+    else if(zoneModeOn && typeof buildZoneLayer==='function') buildZoneLayer();
+  });
+  bootApp();
 };
 ;
 
@@ -1747,9 +1751,19 @@ function zoneEscapeHtml(s){
 var REAL_ZONE=null;
 function loadRealZone(cb, tries){
   var t = tries || 0;
-  fetch('https://ygbi33x.github.io/123dasd/real_zone_int.json',{cache:'no-store'})
-  .catch(function(){ return fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/real_zone_int.json',{cache:'no-store'}); })
-  .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  var firstOk=function(p1,p2){
+    return new Promise(function(res){
+      var done=false, out=null;
+      function chk(r){ if(!done){ if(r && r.ok){ done=true; res(r); } else if(r) out=r; } }
+      p1.then(chk); p2.then(chk);
+      setTimeout(function(){ if(!done) res(out||null); }, 20000);
+    });
+  };
+  firstOk(
+    fetch('https://ygbi33x.github.io/123dasd/real_zone_int.json',{cache:'no-store'}).catch(function(){ return null; }),
+    fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/real_zone_int.json',{cache:'no-store'}).catch(function(){ return null; })
+  )
+  .then(function(r){ if(!r || !r.ok) throw new Error('HTTP'); return r.json(); })
   .then(function(j){
     Object.keys(j).forEach(function(c){
       var z=j[c];
@@ -1779,7 +1793,7 @@ function loadDistrictData(){
   .then(function(j){ DISTRICT_DATA=j; if(window.zeName){ zeFill(); } if(window.zePanel && zePanel.style.display!=='none') zeFill(); })
   .catch(function(e){ DISTRICT_DATA=null; console.error('districts load fail', e); });
 }
-loadDistrictData();
+// 区县数据按需加载（打开分区/编辑辖区时触发）
 // ===== 只看区域 + 辖区编辑 =====
 let zoneCustomOwn=null, zoneFocus=null;
 try{ zoneCustomOwn=JSON.parse(localStorage.getItem('zoneCustomOwn')||'null'); }catch(e){ zoneCustomOwn=null; }
@@ -1820,6 +1834,7 @@ function renderCenterPolys(name){
 var ZONE_EXTRA=['华北','台湾','宝山','广州天河中转站','拉萨','江门','泰州','滇西','澳门','石桥','邢邯','青岛','香港'];
 function buildZoneLayer(){
   if(!map){ tipDom.innerHTML='地图尚未加载完成'; return; }
+  if(!DISTRICT_DATA) loadDistrictData();
   cityMarkers.forEach(function(m){ m.hide(); });
   zoneInfoWindow = zoneInfoWindow || new AMap.InfoWindow({offset:new AMap.Pixel(0,-14),autoMove:true});
   Object.keys(REAL_ZONE).forEach(function(name){ renderCenterPolys(name); });
