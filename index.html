@@ -1693,31 +1693,23 @@ function initMap() {
   map.addControl(new AMap.ToolBar({position: "RB", offset: new AMap.Pixel(20, 20)}));
 
   CITIES.forEach(function(city) {
+    // 去掉普通地级市标记：仅保留中心（isCenter）与省会（CAPITAL_NAMES）
+    const isCapMark = CAPITAL_NAMES.indexOf(city.name) >= 0;
+    if(!city.isCenter && !isCapMark) return;
     const marker = new AMap.CircleMarker({
       center: [city.lng, city.lat],
-      radius: city.isCenter ? 7 : 4,
+      radius: city.isCenter ? 4 : 3,
       fillColor: city.isCenter ? "#2563eb" : "#60a5fa",
       fillOpacity: city.isCenter ? 0.7 : 0.5,
       strokeColor: city.isCenter ? "#1d4ed8" : "#3b82f6",
       strokeOpacity: city.isCenter ? 0.9 : 0.6,
-      strokeWeight: city.isCenter ? 2 : 1.5,
+      strokeWeight: city.isCenter ? 1.5 : 1,
       cursor: "pointer",
       extData: city,
       zIndex: city.isCenter ? 120 : 80
     });
     marker.on("click", function(e) {
       handleCityClick(e.target.getExtData());
-    });
-    // hover时普通城市变明显
-    marker.on("mouseover", function(e) {
-      if(!city.isCenter) {
-        marker.setOptions({radius: 6, fillOpacity: 0.8, strokeOpacity: 0.9});
-      }
-    });
-    marker.on("mouseout", function(e) {
-      if(!city.isCenter) {
-        marker.setOptions({radius: 4, fillOpacity: 0.5, strokeOpacity: 0.6});
-      }
     });
     marker.setMap(map);
     cityMarkers.push(marker);
@@ -1843,7 +1835,7 @@ function buildZoneLayer(){
     if(ZONE_EXTRA.indexOf(name)>=0) return;
     var z=REAL_ZONE[name];
     if(zoneCenterMarkers[name]){ zoneCenterMarkers[name].setMap(null); delete zoneCenterMarkers[name]; }
-    var cm=new AMap.CircleMarker({ center:[z.lng,z.lat], radius:z.sp?1:1.5, fillColor:z.sp?'#94a3b8':'#1e3a8a', fillOpacity:0.95, strokeColor:'#ffffff', strokeWeight:z.sp?1:2, strokeOpacity:1, cursor:'pointer', zIndex:60 });
+    var cm=new AMap.CircleMarker({ center:[z.lng,z.lat], radius:z.sp?0.8:1.2, fillColor:z.sp?'#94a3b8':'#1e3a8a', fillOpacity:0.95, strokeColor:'#ffffff', strokeWeight:z.sp?0.8:1.5, strokeOpacity:1, cursor:'pointer', zIndex:60 });
     cm.on('click', function(){ onSelectCenter(name); });
     cm.setMap(map); zoneCenterMarkers[name]=cm; n++;
   });
@@ -2471,7 +2463,7 @@ function buildCenterMarkersOnly(){
   Object.keys(REAL_ZONE).forEach(function(name){
     if(ZONE_EXTRA.indexOf(name)>=0) return;
     var z=REAL_ZONE[name];
-    var cm=new AMap.CircleMarker({ center:[z.lng,z.lat], radius:z.sp?1:1.5, fillColor:z.sp?'#94a3b8':'#1e3a8a', fillOpacity:0.95, strokeColor:'#ffffff', strokeWeight:z.sp?1:2, strokeOpacity:1, cursor:'pointer', zIndex:60 });
+    var cm=new AMap.CircleMarker({ center:[z.lng,z.lat], radius:z.sp?0.8:1.2, fillColor:z.sp?'#94a3b8':'#1e3a8a', fillOpacity:0.95, strokeColor:'#ffffff', strokeWeight:z.sp?0.8:1.5, strokeOpacity:1, cursor:'pointer', zIndex:60 });
     cm.setExtData({name:name});
     cm.on('click', function(){
       if(zoneInfoWindow) zoneInfoWindow.close();
