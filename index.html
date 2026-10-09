@@ -1750,7 +1750,7 @@ function loadRealZone(cb, tries){
       return r.json().catch(function(){ return null; });
     }).catch(function(){ return null; });
   }
-  var pA=fetch('https://ygbi33x.github.io/123dasd/real_zone_int.json',{cache:'no-store'}).catch(function(){ return null; });
+  var pA=fetch('https://ygbi33x.github.io/123dasd/real_zone_v2.json',{cache:'no-store'}).catch(function(){ return null; });
   var pB=fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/real_zone_int.json',{cache:'no-store'}).catch(function(){ return null; });
   trySource(pA).then(function(j1){
     if(j1) return j1;
