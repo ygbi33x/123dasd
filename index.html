@@ -1691,7 +1691,7 @@ document.addEventListener('fullscreenchange', function() {
 var exchangeMarkers=[];
 var exchangeInfoWindow=null;
 function renderExchangePoints(){
-  if(!map || typeof AMap==='undefined' || !window.EXCHANGE_POINTS) return;
+  if(!map || typeof AMap==='undefined' || !EXCHANGE_POINTS) return;
   exchangeMarkers.forEach(function(m){ if(m.setMap) m.setMap(null); });
   exchangeMarkers=[];
   EXCHANGE_POINTS.forEach(function(p){
