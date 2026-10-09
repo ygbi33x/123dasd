@@ -1742,7 +1742,7 @@ function zoneEscapeHtml(s){
 // ===== 真实中心服务区（真实坐标 + 真实行政边界，按中心 dissolve 归并）=====
 var REAL_ZONE=null;
 // 双源并行取数：谁先解析成功用谁（raw 速度快优先，Pages 兜底）
-function fetchJSONBest(pA, pB){
+function fetchJSONBest(pA, pB, pC){
   function tryOne(p){
     return p.then(function(r){
       if(!r || !r.ok) return null;
@@ -1752,7 +1752,8 @@ function fetchJSONBest(pA, pB){
     });
   }
   return new Promise(function(res, rej){
-    var done=false, fails=0, ps=[tryOne(pA), tryOne(pB)];
+    var done=false, fails=0, ps=[];
+    [pA, pB, pC].forEach(function(p){ if(p) ps.push(tryOne(p)); });
     ps.forEach(function(p){
       p.then(function(j){ if(!done){ done=true; res(j); } }, function(){
         fails++; if(fails===ps.length && !done){ done=true; rej(new Error('all fail')); }
@@ -1762,10 +1763,25 @@ function fetchJSONBest(pA, pB){
 }
 function loadRealZone(cb, tries){
   var t = tries || 0;
-  fetchJSONBest(
-    fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/real_zone_v2.json').catch(function(){ return null; }),
-    fetch('https://ygbi33x.github.io/123dasd/real_zone_v2.json').catch(function(){ return null; })
-  )
+  // 分片并行加载（jsDelivr 国内 CDN），全部失败时回退整文件多源
+  var PARTS=['p1','p2','p3','p4'];
+  var partPs = PARTS.map(function(p){
+    return fetch('https://cdn.jsdelivr.net/gh/ygbi33x/123dasd@main/real_zone_'+p+'.json')
+      .then(function(r){ if(!r || !r.ok) throw new Error('bad'); return r.json(); })
+      .catch(function(){ return null; });
+  });
+  Promise.all(partPs).then(function(arrs){
+    var merged={};
+    arrs.forEach(function(a){ if(a && typeof a==='object') Object.assign(merged, a); });
+    if(Object.keys(merged).length < 80) throw new Error('parts incomplete');
+    return merged;
+  }).catch(function(){
+    return fetchJSONBest(
+      fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/real_zone_v2.json').catch(function(){ return null; }),
+      fetch('https://ygbi33x.github.io/123dasd/real_zone_v2.json').catch(function(){ return null; }),
+      fetch('https://cdn.jsdelivr.net/gh/ygbi33x/123dasd@main/real_zone_v2.json').catch(function(){ return null; })
+    );
+  })
   .then(function(j){
     Object.keys(j).forEach(function(c){
       var z=j[c];
@@ -1799,6 +1815,7 @@ function loadRealZone(cb, tries){
 var DISTRICT_DATA=null;
 function loadDistrictData(){
   fetchJSONBest(
+    fetch('https://cdn.jsdelivr.net/gh/ygbi33x/123dasd@main/districts_int.json').catch(function(){ return null; }),
     fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/districts_int.json').catch(function(){ return null; }),
     fetch('https://ygbi33x.github.io/123dasd/districts_int.json').catch(function(){ return null; })
   )
