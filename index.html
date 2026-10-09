@@ -154,7 +154,8 @@ button{font-family:inherit;}
 .route-num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#fff;font-size:10px;font-weight:700;margin-right:7px;flex-shrink:0;box-shadow:0 2px 6px rgba(16,185,129,.35);}
 .city-province{font-size:9px;color:#94a3b8;margin-right:5px;font-weight:600;}
 .city-count{padding:8px 14px;font-size:10px;color:#64748b;border-top:1px solid rgba(0,0,0,.06);background:linear-gradient(135deg,rgba(59,130,246,.05) 0%,rgba(99,102,241,.05) 100%);font-weight:700;letter-spacing:.3px;}
-.empty-tip{padding:20px 14px;text-align:center;color:#94a3b8;font-size:11px;font-weight:500;}
+.province-group-title{padding:4px 12px 2px;font-size:11px;font-weight:700;color:#2563eb;background:rgba(37,99,235,.04);margin-top:4px;border-left:2px solid #2563eb;}
+  .empty-tip{padding:20px 14px;text-align:center;color:#94a3b8;font-size:11px;font-weight:500;}
 .main{flex:1;display:flex;flex-direction:column;min-width:0;background:#f0f4f8;}
 .header{background:rgba(255,255,255,.7);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border-bottom:1px solid rgba(0,0,0,.06);padding:10px 20px;box-shadow:0 4px 24px rgba(0,0,0,.06);z-index:50;flex-shrink:0;position:relative;}
 .header-collapse-btn{cursor:pointer;font-size:14px;color:#64748b;padding:6px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.08);background:rgba(255,255,255,.7);backdrop-filter:blur(10px);white-space:nowrap;flex-shrink:0;transition:.25s;font-weight:700;display:flex;align-items:center;justify-content:center;width:32px;height:32px;}
@@ -1827,7 +1828,7 @@ function buildZoneLayer(){
   Object.keys(REAL_ZONE).forEach(function(name){
     var z=REAL_ZONE[name];
     if(zoneCenterMarkers[name]){ zoneCenterMarkers[name].setMap(null); delete zoneCenterMarkers[name]; }
-    var cm=new AMap.CircleMarker({ center:[z.lng,z.lat], radius:z.sp?3:5, fillColor:z.sp?'#94a3b8':'#1e3a8a', fillOpacity:0.95, strokeColor:'#ffffff', strokeWeight:z.sp?1:2, strokeOpacity:1, cursor:'pointer', zIndex:60 });
+    var cm=new AMap.CircleMarker({ center:[z.lng,z.lat], radius:z.sp?2:3, fillColor:z.sp?'#94a3b8':'#1e3a8a', fillOpacity:0.95, strokeColor:'#ffffff', strokeWeight:z.sp?1:2, strokeOpacity:1, cursor:'pointer', zIndex:60 });
     cm.on('click', function(){ onSelectCenter(name); });
     cm.setMap(map); zoneCenterMarkers[name]=cm;
   });
@@ -2486,7 +2487,16 @@ function renderCityList(scrollToCity) {
     list.innerHTML = '<div class="empty-tip">未找到匹配的城市</div>';
   } else {
     const fragment = document.createDocumentFragment();
+    let lastProvince = null;
+    const groupByProvince = cityTypeFilter === 'center' && !currentProvince;
     filtered.forEach(function(city) {
+      if(groupByProvince && city.province !== lastProvince) {
+        lastProvince = city.province;
+        const ph = document.createElement('div');
+        ph.className = 'province-group-title';
+        ph.textContent = city.province;
+        fragment.appendChild(ph);
+      }
       const routeIdx = routePoints.findIndex(function(p) { return p.city.name === city.name; });
       const isRadialOrigin = currentMode === 'radial' && radialOrigin && radialOrigin.city.name === city.name;
       const radialDestIdx = currentMode === 'radial' ? radialDestinations.findIndex(function(d) { return d.city.name === city.name; }) : -1;
