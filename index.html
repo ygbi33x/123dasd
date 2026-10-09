@@ -1743,20 +1743,21 @@ function zoneEscapeHtml(s){
 var REAL_ZONE=null;
 function loadRealZone(cb, tries){
   var t = tries || 0;
-  var firstOk=function(p1,p2){
-    return new Promise(function(res){
-      var done=false, out=null;
-      function chk(r){ if(!done){ if(r && r.ok){ done=true; res(r); } else if(r) out=r; } }
-      p1.then(chk); p2.then(chk);
-      setTimeout(function(){ if(!done) res(out||null); }, 20000);
-    });
-  };
-  firstOk(
-    fetch('https://ygbi33x.github.io/123dasd/real_zone_int.json',{cache:'no-store'}).catch(function(){ return null; }),
-    fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/real_zone_int.json',{cache:'no-store'}).catch(function(){ return null; })
-  )
-  .then(function(r){ if(!r || !r.ok) throw new Error('HTTP'); return r.json(); })
+  // 依次尝试两个源：先试 Pages 主源，若响应不完整/解析失败，自动切换备用源（raw）
+  function trySource(p){
+    return p.then(function(r){
+      if(!r || !r.ok) return null;
+      return r.json().catch(function(){ return null; });
+    }).catch(function(){ return null; });
+  }
+  var pA=fetch('https://ygbi33x.github.io/123dasd/real_zone_int.json',{cache:'no-store'}).catch(function(){ return null; });
+  var pB=fetch('https://raw.githubusercontent.com/ygbi33x/123dasd/main/real_zone_int.json',{cache:'no-store'}).catch(function(){ return null; });
+  trySource(pA).then(function(j1){
+    if(j1) return j1;
+    return trySource(pB);
+  })
   .then(function(j){
+    if(!j) throw new Error('both fail');
     Object.keys(j).forEach(function(c){
       var z=j[c];
       z.lng/=1000; z.lat/=1000;
