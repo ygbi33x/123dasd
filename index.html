@@ -1359,6 +1359,7 @@ function bootApp() {
   buildIabDaySelect();
   initCostModal();
   loadRouteFromURL();
+  loadRouteFromQuery();
   // 无分享链接时，从本地存储恢复上次未完成的路线
   if(!window.location.hash || window.location.hash.indexOf('#route=') < 0) {
     loadRouteFromLocal();
@@ -6795,6 +6796,32 @@ function loadRouteFromURL() {
   } catch(e) {
     console.error('加载分享路线失败:', e);
   }
+}
+
+// 支持简单 ?route=城市1,城市2,城市3 格式（从线路优化分析系统跳转）
+function loadRouteFromQuery() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const route = params.get('route');
+    if(!route) return;
+    const cities = route.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+    if(cities.length < 2) return;
+    setTimeout(function() {
+      if(currentMode !== 'multi') toggleMode();
+      let idx = 0;
+      function addNext() {
+        if(idx >= cities.length) {
+          tipDom.innerHTML = '📥 已加载优化建议路线：' + cities.join(' → ');
+          return;
+        }
+        const city = CITIES.find(function(c){ return c.name === cities[idx] || c.name.indexOf(cities[idx]) >= 0 || cities[idx].indexOf(c.name) >= 0; });
+        if(city) addPoint(city);
+        idx++;
+        setTimeout(addNext, 400);
+      }
+      addNext();
+    }, 1500);
+  } catch(e) { console.error('query route error', e); }
 }
 
 // ===== 到各省会距离 =====
